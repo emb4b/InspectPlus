@@ -1,4 +1,6 @@
 {
-  "name": "InspectPlus",
-  "displayName": "InspectPlus"
+  "expo": {
+    "name": "InspectPlus",
+    "slug": "inspectplus"
+  }
 }

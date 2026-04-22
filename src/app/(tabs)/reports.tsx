@@ -1,9 +1,9 @@
 import { View, Text } from 'react-native';
 
-export default function App() {
+export default function ReportsScreen() {
   return (
     <View>
-      <Text>InspectPlus</Text>
+      <Text>Reports</Text>
     </View>
   );
 }
