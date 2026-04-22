@@ -6,7 +6,7 @@
     "android": "react-native run-android",
     "ios": "react-native run-ios",
     "start": "react-native start",
-    "lint": "eslint app src --ext .ts,.tsx --max-warnings 0",
+    "lint": "eslint src --ext .ts,.tsx --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
