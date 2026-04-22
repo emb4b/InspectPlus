@@ -1,4 +1,7 @@
 {
   "name": "InspectPlus",
-  "displayName": "InspectPlus"
+  "displayName": "InspectPlus",
+  "plugins": [
+    "expo-router"
+  ]
 }
