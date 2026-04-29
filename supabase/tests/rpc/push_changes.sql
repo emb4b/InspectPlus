@@ -1,5 +1,5 @@
 begin;
-select plan(18);
+select plan(24);
 
 insert into public.user_accounts (
   uid,
@@ -431,6 +431,151 @@ select is(
   ),
   0,
   'push_changes deletes an existing inspection report row'
+);
+
+select is(
+  public.push_changes(
+    '{
+      "establishments": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "inspection_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "purpose_of_inspection": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "survey_reports": {
+        "created": [
+          {
+            "survey_id": "survey-push-001",
+            "estab_id": "est-report-001",
+            "inspector_uid": "11111111-1111-1111-1111-111111111111",
+            "report_control_number": "SURV-001",
+            "inspection_date": "2026-04-29",
+            "project_name": "Survey Project",
+            "proponent_name": "Survey Proponent",
+            "project_location": "Survey Location",
+            "purpose": "ECC Application",
+            "sync_status": "pending",
+            "device_id": "device-a"
+          }
+        ],
+        "updated": [],
+        "deleted": []
+      }
+    }'::jsonb
+  )->>'status',
+  'ok',
+  'push_changes returns ok status for created survey_reports'
+);
+
+select is(
+  (
+    select count(*)::int
+    from public.survey_reports
+    where survey_id = 'survey-push-001'
+  ),
+  1,
+  'push_changes inserts one survey_report row'
+);
+
+select is(
+  public.push_changes(
+    '{
+      "establishments": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "inspection_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "purpose_of_inspection": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "survey_reports": {
+        "created": [],
+        "updated": [
+          {
+            "survey_id": "survey-push-001",
+            "estab_id": "est-report-001",
+            "inspector_uid": "11111111-1111-1111-1111-111111111111",
+            "report_control_number": "SURV-002",
+            "inspection_date": "2026-04-29",
+            "project_name": "Updated Survey Project",
+            "proponent_name": "Survey Proponent",
+            "project_location": "Survey Location",
+            "purpose": "ECC Amendment",
+            "sync_status": "pending",
+            "device_id": "device-a"
+          }
+        ],
+        "deleted": []
+      }
+    }'::jsonb
+  )->>'status',
+  'ok',
+  'push_changes returns ok status for updated survey_reports'
+);
+
+select is(
+  (
+    select report_control_number
+    from public.survey_reports
+    where survey_id = 'survey-push-001'
+  ),
+  'SURV-002',
+  'push_changes updates an existing survey_report row'
+);
+
+select is(
+  public.push_changes(
+    '{
+      "establishments": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "inspection_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "purpose_of_inspection": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "survey_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": ["survey-push-001"]
+      }
+    }'::jsonb
+  )->>'status',
+  'ok',
+  'push_changes returns ok status for deleted survey_reports'
+);
+
+select is(
+  (
+    select count(*)::int
+    from public.survey_reports
+    where survey_id = 'survey-push-001'
+  ),
+  0,
+  'push_changes deletes an existing survey_report row'
 );
 
 select * from finish();

@@ -1,5 +1,5 @@
 begin;
-select plan(7);
+select plan(9);
 
 insert into public.user_accounts (
   uid, full_name, username, password_hash, role, region, area_of_assignment, is_active, sync_status, device_id
@@ -72,6 +72,38 @@ insert into public.purpose_of_inspection (
   true
 );
 
+insert into public.survey_reports (
+  survey_id,
+  estab_id,
+  inspector_uid,
+  report_control_number,
+  inspection_date,
+  project_name,
+  proponent_name,
+  project_location,
+  purpose,
+  created_at,
+  updated_at,
+  is_archived,
+  sync_status,
+  device_id
+) values (
+  'survey-a',
+  'est-a',
+  '11111111-1111-1111-1111-111111111111',
+  'SURV-001',
+  current_date,
+  'Test Survey Project',
+  'Test Proponent',
+  'Test Location',
+  'ECC Application',
+  now() - interval '1 minute',
+  now() - interval '1 minute',
+  false,
+  'pending',
+  'device-a'
+);
+
 select ok(
   (public.pull_changes(0) ? 'changes'),
   'pull_changes returns changes key'
@@ -123,6 +155,22 @@ select is(
   ),
   0,
   'pull_changes returns no purpose_of_inspection rows for current timestamp'
+);
+
+select is(
+  jsonb_array_length(public.pull_changes(0)->'changes'->'survey_reports'->'created'),
+  1,
+  'pull_changes returns one survey_report row for initial sync'
+);
+
+select is(
+  jsonb_array_length(
+    public.pull_changes(
+      floor(extract(epoch from now()) * 1000)::bigint
+    )->'changes'->'survey_reports'->'created'
+  ),
+  0,
+  'pull_changes returns no survey_report rows for current timestamp'
 );
 
 select * from finish();
