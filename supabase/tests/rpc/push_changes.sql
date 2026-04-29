@@ -1,8 +1,17 @@
 begin;
-select plan(10);
+select plan(12);
 
 insert into public.user_accounts (
-  uid, full_name, username, password_hash, role, region, area_of_assignment, is_active, sync_status, device_id
+  uid,
+  full_name,
+  username,
+  password_hash,
+  role,
+  region,
+  area_of_assignment,
+  is_active,
+  sync_status,
+  device_id
 ) values (
   '11111111-1111-1111-1111-111111111111',
   'Inspector A',
@@ -16,6 +25,7 @@ insert into public.user_accounts (
   'device-a'
 );
 
+-- Establishments: create
 select is(
   public.push_changes(
     '{
@@ -37,7 +47,9 @@ select is(
         "deleted": []
       },
       "inspection_reports": {
-        "created": []
+        "created": [],
+        "updated": [],
+        "deleted": []
       }
     }'::jsonb
   )->>'status',
@@ -55,6 +67,7 @@ select is(
   'push_changes inserts one establishment row'
 );
 
+-- Establishments: update
 select is(
   public.push_changes(
     '{
@@ -76,7 +89,9 @@ select is(
         "deleted": []
       },
       "inspection_reports": {
-        "created": []
+        "created": [],
+        "updated": [],
+        "deleted": []
       }
     }'::jsonb
   )->>'status',
@@ -94,6 +109,7 @@ select is(
   'push_changes updates an existing establishment row'
 );
 
+-- Establishments: delete
 select is(
   public.push_changes(
     '{
@@ -103,7 +119,9 @@ select is(
         "deleted": ["est-push-001"]
       },
       "inspection_reports": {
-        "created": []
+        "created": [],
+        "updated": [],
+        "deleted": []
       }
     }'::jsonb
   )->>'status',
@@ -121,8 +139,19 @@ select is(
   'push_changes deletes an existing establishment row'
 );
 
+-- Shared parent establishment for inspection_reports tests
 insert into public.establishments (
-  estab_id, inspector_uid, name, address, province, nature_of_business, status, created_at, updated_at, sync_status, device_id
+  estab_id,
+  inspector_uid,
+  name,
+  address,
+  province,
+  nature_of_business,
+  status,
+  created_at,
+  updated_at,
+  sync_status,
+  device_id
 ) values (
   'est-report-001',
   '11111111-1111-1111-1111-111111111111',
@@ -137,6 +166,7 @@ insert into public.establishments (
   'device-a'
 );
 
+-- Inspection reports: create
 select is(
   public.push_changes(
     '{
@@ -160,7 +190,9 @@ select is(
             "sync_status": "pending",
             "device_id": "device-a"
           }
-        ]
+        ],
+        "updated": [],
+        "deleted": []
       }
     }'::jsonb
   )->>'status',
@@ -178,6 +210,7 @@ select is(
   'push_changes inserts one inspection report row'
 );
 
+-- Inspection reports: update
 select is(
   public.push_changes(
     '{
@@ -202,7 +235,8 @@ select is(
             "sync_status": "pending",
             "device_id": "device-a"
           }
-        ]
+        ],
+        "deleted": []
       }
     }'::jsonb
   )->>'status',
@@ -218,6 +252,36 @@ select is(
   ),
   'CTRL-002',
   'push_changes updates an existing inspection report row'
+);
+
+-- Inspection reports: delete
+select is(
+  public.push_changes(
+    '{
+      "establishments": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "inspection_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": ["rep-push-001"]
+      }
+    }'::jsonb
+  )->>'status',
+  'ok',
+  'push_changes returns ok status for deleted inspection reports'
+);
+
+select is(
+  (
+    select count(*)::int
+    from public.inspection_reports
+    where report_id = 'rep-push-001'
+  ),
+  0,
+  'push_changes deletes an existing inspection report row'
 );
 
 select * from finish();
