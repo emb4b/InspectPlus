@@ -1,5 +1,5 @@
 begin;
-select plan(4);
+select plan(6);
 
 insert into public.user_accounts (
   uid, full_name, username, password_hash, role, region, area_of_assignment, is_active, sync_status, device_id
@@ -84,6 +84,30 @@ select is(
   ),
   'Updated Plant',
   'push_changes updates an existing establishment row'
+);
+
+select is(
+  public.push_changes(
+    '{
+      "establishments": {
+        "created": [],
+        "updated": [],
+        "deleted": ["est-push-001"]
+      }
+    }'::jsonb
+  )->>'status',
+  'ok',
+  'push_changes returns ok status for deleted rows'
+);
+
+select is(
+  (
+    select count(*)::int
+    from public.establishments
+    where estab_id = 'est-push-001'
+  ),
+  0,
+  'push_changes deletes an existing establishment row'
 );
 
 select * from finish();
