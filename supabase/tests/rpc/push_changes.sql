@@ -1,5 +1,5 @@
 begin;
-select plan(24);
+select plan(30);
 
 insert into public.user_accounts (
   uid,
@@ -55,6 +55,16 @@ select is(
         "created": [],
         "updated": [],
         "deleted": []
+      },
+      "survey_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "compliance_air": {
+        "created": [],
+        "updated": [],
+        "deleted": []
       }
     }'::jsonb
   )->>'status',
@@ -102,6 +112,16 @@ select is(
         "created": [],
         "updated": [],
         "deleted": []
+      },
+      "survey_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "compliance_air": {
+        "created": [],
+        "updated": [],
+        "deleted": []
       }
     }'::jsonb
   )->>'status',
@@ -134,6 +154,16 @@ select is(
         "deleted": []
       },
       "purpose_of_inspection": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "survey_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "compliance_air": {
         "created": [],
         "updated": [],
         "deleted": []
@@ -213,6 +243,16 @@ select is(
         "created": [],
         "updated": [],
         "deleted": []
+      },
+      "survey_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "compliance_air": {
+        "created": [],
+        "updated": [],
+        "deleted": []
       }
     }'::jsonb
   )->>'status',
@@ -262,6 +302,16 @@ select is(
         "created": [],
         "updated": [],
         "deleted": []
+      },
+      "survey_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "compliance_air": {
+        "created": [],
+        "updated": [],
+        "deleted": []
       }
     }'::jsonb
   )->>'status',
@@ -302,6 +352,16 @@ select is(
             "application_type": "PTO Air"
           }
         ],
+        "updated": [],
+        "deleted": []
+      },
+      "survey_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "compliance_air": {
+        "created": [],
         "updated": [],
         "deleted": []
       }
@@ -346,6 +406,16 @@ select is(
           }
         ],
         "deleted": []
+      },
+      "survey_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "compliance_air": {
+        "created": [],
+        "updated": [],
+        "deleted": []
       }
     }'::jsonb
   )->>'status',
@@ -381,6 +451,16 @@ select is(
         "created": [],
         "updated": [],
         "deleted": ["purpose-push-001"]
+      },
+      "survey_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "compliance_air": {
+        "created": [],
+        "updated": [],
+        "deleted": []
       }
     }'::jsonb
   )->>'status',
@@ -398,41 +478,7 @@ select is(
   'push_changes deletes an existing purpose_of_inspection row'
 );
 
--- Inspection reports: delete
-select is(
-  public.push_changes(
-    '{
-      "establishments": {
-        "created": [],
-        "updated": [],
-        "deleted": []
-      },
-      "inspection_reports": {
-        "created": [],
-        "updated": [],
-        "deleted": ["rep-push-001"]
-      },
-      "purpose_of_inspection": {
-        "created": [],
-        "updated": [],
-        "deleted": []
-      }
-    }'::jsonb
-  )->>'status',
-  'ok',
-  'push_changes returns ok status for deleted inspection reports'
-);
-
-select is(
-  (
-    select count(*)::int
-    from public.inspection_reports
-    where report_id = 'rep-push-001'
-  ),
-  0,
-  'push_changes deletes an existing inspection report row'
-);
-
+-- Survey reports: create
 select is(
   public.push_changes(
     '{
@@ -469,6 +515,11 @@ select is(
         ],
         "updated": [],
         "deleted": []
+      },
+      "compliance_air": {
+        "created": [],
+        "updated": [],
+        "deleted": []
       }
     }'::jsonb
   )->>'status',
@@ -486,6 +537,7 @@ select is(
   'push_changes inserts one survey_report row'
 );
 
+-- Survey reports: update
 select is(
   public.push_changes(
     '{
@@ -522,6 +574,11 @@ select is(
           }
         ],
         "deleted": []
+      },
+      "compliance_air": {
+        "created": [],
+        "updated": [],
+        "deleted": []
       }
     }'::jsonb
   )->>'status',
@@ -539,6 +596,7 @@ select is(
   'push_changes updates an existing survey_report row'
 );
 
+-- Survey reports: delete
 select is(
   public.push_changes(
     '{
@@ -561,6 +619,11 @@ select is(
         "created": [],
         "updated": [],
         "deleted": ["survey-push-001"]
+      },
+      "compliance_air": {
+        "created": [],
+        "updated": [],
+        "deleted": []
       }
     }'::jsonb
   )->>'status',
@@ -576,6 +639,200 @@ select is(
   ),
   0,
   'push_changes deletes an existing survey_report row'
+);
+
+-- Compliance air: create
+select is(
+  public.push_changes(
+    '{
+      "establishments": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "inspection_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "purpose_of_inspection": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "survey_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "compliance_air": {
+        "created": [
+          {
+            "compliance_id": "air-push-001",
+            "report_id": "rep-push-001",
+            "other_observations": "Air observation",
+            "remarks_recommendations": "Air recommendation"
+          }
+        ],
+        "updated": [],
+        "deleted": []
+      }
+    }'::jsonb
+  )->>'status',
+  'ok',
+  'push_changes returns ok status for created compliance_air rows'
+);
+
+select is(
+  (
+    select count(*)::int
+    from public.compliance_air
+    where compliance_id = 'air-push-001'
+  ),
+  1,
+  'push_changes inserts one compliance_air row'
+);
+
+-- Compliance air: update
+select is(
+  public.push_changes(
+    '{
+      "establishments": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "inspection_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "purpose_of_inspection": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "survey_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "compliance_air": {
+        "created": [],
+        "updated": [
+          {
+            "compliance_id": "air-push-001",
+            "report_id": "rep-push-001",
+            "other_observations": "Updated air observation",
+            "remarks_recommendations": "Updated air recommendation"
+          }
+        ],
+        "deleted": []
+      }
+    }'::jsonb
+  )->>'status',
+  'ok',
+  'push_changes returns ok status for updated compliance_air rows'
+);
+
+select is(
+  (
+    select remarks_recommendations
+    from public.compliance_air
+    where compliance_id = 'air-push-001'
+  ),
+  'Updated air recommendation',
+  'push_changes updates an existing compliance_air row'
+);
+
+-- Compliance air: delete
+select is(
+  public.push_changes(
+    '{
+      "establishments": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "inspection_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "purpose_of_inspection": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "survey_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "compliance_air": {
+        "created": [],
+        "updated": [],
+        "deleted": ["air-push-001"]
+      }
+    }'::jsonb
+  )->>'status',
+  'ok',
+  'push_changes returns ok status for deleted compliance_air rows'
+);
+
+select is(
+  (
+    select count(*)::int
+    from public.compliance_air
+    where compliance_id = 'air-push-001'
+  ),
+  0,
+  'push_changes deletes an existing compliance_air row'
+);
+
+-- Inspection reports: delete (must come after child rows are gone)
+select is(
+  public.push_changes(
+    '{
+      "establishments": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "inspection_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": ["rep-push-001"]
+      },
+      "purpose_of_inspection": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "survey_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "compliance_air": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      }
+    }'::jsonb
+  )->>'status',
+  'ok',
+  'push_changes returns ok status for deleted inspection reports'
+);
+
+select is(
+  (
+    select count(*)::int
+    from public.inspection_reports
+    where report_id = 'rep-push-001'
+  ),
+  0,
+  'push_changes deletes an existing inspection report row'
 );
 
 select * from finish();

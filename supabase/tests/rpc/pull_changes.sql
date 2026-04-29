@@ -1,8 +1,17 @@
 begin;
-select plan(9);
+select plan(11);
 
 insert into public.user_accounts (
-  uid, full_name, username, password_hash, role, region, area_of_assignment, is_active, sync_status, device_id
+  uid,
+  full_name,
+  username,
+  password_hash,
+  role,
+  region,
+  area_of_assignment,
+  is_active,
+  sync_status,
+  device_id
 ) values (
   '11111111-1111-1111-1111-111111111111',
   'Inspector A',
@@ -17,7 +26,17 @@ insert into public.user_accounts (
 );
 
 insert into public.establishments (
-  estab_id, inspector_uid, name, address, province, nature_of_business, status, created_at, updated_at, sync_status, device_id
+  estab_id,
+  inspector_uid,
+  name,
+  address,
+  province,
+  nature_of_business,
+  status,
+  created_at,
+  updated_at,
+  sync_status,
+  device_id
 ) values (
   'est-a',
   '11111111-1111-1111-1111-111111111111',
@@ -104,6 +123,18 @@ insert into public.survey_reports (
   'device-a'
 );
 
+insert into public.compliance_air (
+  compliance_id,
+  report_id,
+  other_observations,
+  remarks_recommendations
+) values (
+  'air-a',
+  'rep-a',
+  'Initial observation',
+  'Initial recommendation'
+);
+
 select ok(
   (public.pull_changes(0) ? 'changes'),
   'pull_changes returns changes key'
@@ -119,6 +150,24 @@ select is(
   jsonb_array_length(public.pull_changes(0)->'changes'->'inspection_reports'->'created'),
   1,
   'pull_changes returns one inspection report row for initial sync'
+);
+
+select is(
+  jsonb_array_length(public.pull_changes(0)->'changes'->'purpose_of_inspection'->'created'),
+  1,
+  'pull_changes returns one purpose_of_inspection row for initial sync'
+);
+
+select is(
+  jsonb_array_length(public.pull_changes(0)->'changes'->'survey_reports'->'created'),
+  1,
+  'pull_changes returns one survey_report row for initial sync'
+);
+
+select is(
+  jsonb_array_length(public.pull_changes(0)->'changes'->'compliance_air'->'created'),
+  1,
+  'pull_changes returns one compliance_air row for initial sync'
 );
 
 select is(
@@ -142,12 +191,6 @@ select is(
 );
 
 select is(
-  jsonb_array_length(public.pull_changes(0)->'changes'->'purpose_of_inspection'->'created'),
-  1,
-  'pull_changes returns one purpose_of_inspection row for initial sync'
-);
-
-select is(
   jsonb_array_length(
     public.pull_changes(
       floor(extract(epoch from now()) * 1000)::bigint
@@ -158,12 +201,6 @@ select is(
 );
 
 select is(
-  jsonb_array_length(public.pull_changes(0)->'changes'->'survey_reports'->'created'),
-  1,
-  'pull_changes returns one survey_report row for initial sync'
-);
-
-select is(
   jsonb_array_length(
     public.pull_changes(
       floor(extract(epoch from now()) * 1000)::bigint
@@ -171,6 +208,16 @@ select is(
   ),
   0,
   'pull_changes returns no survey_report rows for current timestamp'
+);
+
+select is(
+  jsonb_array_length(
+    public.pull_changes(
+      floor(extract(epoch from now()) * 1000)::bigint
+    )->'changes'->'compliance_air'->'created'
+  ),
+  0,
+  'pull_changes returns no compliance_air rows for current timestamp'
 );
 
 select * from finish();
