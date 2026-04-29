@@ -1,5 +1,5 @@
 begin;
-select plan(5);
+select plan(7);
 
 insert into public.user_accounts (
   uid, full_name, username, password_hash, role, region, area_of_assignment, is_active, sync_status, device_id
@@ -62,6 +62,16 @@ insert into public.inspection_reports (
   'device-a'
 );
 
+insert into public.purpose_of_inspection (
+  purpose_id,
+  report_id,
+  determine_compliance
+) values (
+  'purpose-a',
+  'rep-a',
+  true
+);
+
 select ok(
   (public.pull_changes(0) ? 'changes'),
   'pull_changes returns changes key'
@@ -97,6 +107,22 @@ select is(
   ),
   0,
   'pull_changes returns no inspection report rows for current timestamp'
+);
+
+select is(
+  jsonb_array_length(public.pull_changes(0)->'changes'->'purpose_of_inspection'->'created'),
+  1,
+  'pull_changes returns one purpose_of_inspection row for initial sync'
+);
+
+select is(
+  jsonb_array_length(
+    public.pull_changes(
+      floor(extract(epoch from now()) * 1000)::bigint
+    )->'changes'->'purpose_of_inspection'->'created'
+  ),
+  0,
+  'pull_changes returns no purpose_of_inspection rows for current timestamp'
 );
 
 select * from finish();

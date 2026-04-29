@@ -1,5 +1,5 @@
 begin;
-select plan(12);
+select plan(18);
 
 insert into public.user_accounts (
   uid,
@@ -50,6 +50,11 @@ select is(
         "created": [],
         "updated": [],
         "deleted": []
+      },
+      "purpose_of_inspection": {
+        "created": [],
+        "updated": [],
+        "deleted": []
       }
     }'::jsonb
   )->>'status',
@@ -92,6 +97,11 @@ select is(
         "created": [],
         "updated": [],
         "deleted": []
+      },
+      "purpose_of_inspection": {
+        "created": [],
+        "updated": [],
+        "deleted": []
       }
     }'::jsonb
   )->>'status',
@@ -122,6 +132,11 @@ select is(
         "created": [],
         "updated": [],
         "deleted": []
+      },
+      "purpose_of_inspection": {
+        "created": [],
+        "updated": [],
+        "deleted": []
       }
     }'::jsonb
   )->>'status',
@@ -139,7 +154,7 @@ select is(
   'push_changes deletes an existing establishment row'
 );
 
--- Shared parent establishment for inspection_reports tests
+-- Shared parent establishment for report tests
 insert into public.establishments (
   estab_id,
   inspector_uid,
@@ -193,6 +208,11 @@ select is(
         ],
         "updated": [],
         "deleted": []
+      },
+      "purpose_of_inspection": {
+        "created": [],
+        "updated": [],
+        "deleted": []
       }
     }'::jsonb
   )->>'status',
@@ -237,6 +257,11 @@ select is(
           }
         ],
         "deleted": []
+      },
+      "purpose_of_inspection": {
+        "created": [],
+        "updated": [],
+        "deleted": []
       }
     }'::jsonb
   )->>'status',
@@ -254,6 +279,125 @@ select is(
   'push_changes updates an existing inspection report row'
 );
 
+-- Purpose of inspection: create
+select is(
+  public.push_changes(
+    '{
+      "establishments": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "inspection_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "purpose_of_inspection": {
+        "created": [
+          {
+            "purpose_id": "purpose-push-001",
+            "report_id": "rep-push-001",
+            "determine_compliance": true,
+            "application_type": "PTO Air"
+          }
+        ],
+        "updated": [],
+        "deleted": []
+      }
+    }'::jsonb
+  )->>'status',
+  'ok',
+  'push_changes returns ok status for created purpose_of_inspection rows'
+);
+
+select is(
+  (
+    select count(*)::int
+    from public.purpose_of_inspection
+    where purpose_id = 'purpose-push-001'
+  ),
+  1,
+  'push_changes inserts one purpose_of_inspection row'
+);
+
+-- Purpose of inspection: update
+select is(
+  public.push_changes(
+    '{
+      "establishments": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "inspection_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "purpose_of_inspection": {
+        "created": [],
+        "updated": [
+          {
+            "purpose_id": "purpose-push-001",
+            "report_id": "rep-push-001",
+            "determine_compliance": false,
+            "application_type": "HazWaste ID"
+          }
+        ],
+        "deleted": []
+      }
+    }'::jsonb
+  )->>'status',
+  'ok',
+  'push_changes returns ok status for updated purpose_of_inspection rows'
+);
+
+select is(
+  (
+    select application_type
+    from public.purpose_of_inspection
+    where purpose_id = 'purpose-push-001'
+  ),
+  'HazWaste ID',
+  'push_changes updates an existing purpose_of_inspection row'
+);
+
+-- Purpose of inspection: delete
+select is(
+  public.push_changes(
+    '{
+      "establishments": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "inspection_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
+      },
+      "purpose_of_inspection": {
+        "created": [],
+        "updated": [],
+        "deleted": ["purpose-push-001"]
+      }
+    }'::jsonb
+  )->>'status',
+  'ok',
+  'push_changes returns ok status for deleted purpose_of_inspection rows'
+);
+
+select is(
+  (
+    select count(*)::int
+    from public.purpose_of_inspection
+    where purpose_id = 'purpose-push-001'
+  ),
+  0,
+  'push_changes deletes an existing purpose_of_inspection row'
+);
+
 -- Inspection reports: delete
 select is(
   public.push_changes(
@@ -267,6 +411,11 @@ select is(
         "created": [],
         "updated": [],
         "deleted": ["rep-push-001"]
+      },
+      "purpose_of_inspection": {
+        "created": [],
+        "updated": [],
+        "deleted": []
       }
     }'::jsonb
   )->>'status',
