@@ -58,8 +58,8 @@ select is(
   'anon cannot SELECT compliance_eia'
 );
 
--- authenticated should not directly SELECT sensitive tables.
--- Access should go through RPCs / safe views instead.
+-- authenticated access policy:
+-- some tables are intentionally readable via direct SELECT with RLS enforced
 
 select is(
   has_table_privilege('authenticated', 'public.user_accounts', 'SELECT'),
@@ -75,20 +75,20 @@ select is(
 
 select is(
   has_table_privilege('authenticated', 'public.inspection_reports', 'SELECT'),
-  false,
-  'authenticated cannot directly SELECT inspection_reports'
+  true,
+  'authenticated can directly SELECT inspection_reports subject to RLS'
 );
 
 select is(
   has_table_privilege('authenticated', 'public.purpose_of_inspection', 'SELECT'),
-  false,
-  'authenticated cannot directly SELECT purpose_of_inspection'
+  true,
+  'authenticated can directly SELECT purpose_of_inspection subject to RLS'
 );
 
 select is(
   has_table_privilege('authenticated', 'public.survey_reports', 'SELECT'),
-  false,
-  'authenticated cannot directly SELECT survey_reports'
+  true,
+  'authenticated can directly SELECT survey_reports subject to RLS'
 );
 
 select is(
