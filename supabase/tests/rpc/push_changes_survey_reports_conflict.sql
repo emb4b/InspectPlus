@@ -1,0 +1,94 @@
+begin;
+select plan(1);
+
+insert into public.user_accounts (
+  uid, full_name, username, password_hash, role, region, area_of_assignment, is_active, sync_status, device_id
+) values (
+  '11111111-1111-1111-1111-111111111111',
+  'Inspector A',
+  'inspector_a',
+  'hashed',
+  'Inspector',
+  'Region 4-B',
+  'Occidental Mindoro',
+  true,
+  'pending',
+  'device-a'
+);
+
+insert into public.establishments (
+  estab_id, inspector_uid, name, address, province, nature_of_business, status,
+  created_at, updated_at, sync_status, device_id
+) values (
+  'est-conflict-surv-001',
+  '11111111-1111-1111-1111-111111111111',
+  'Survey Conflict Plant',
+  'Address',
+  'Occidental Mindoro',
+  'Manufacturing',
+  'Active',
+  now(),
+  now(),
+  'pending',
+  'device-a'
+);
+
+insert into public.survey_reports (
+  survey_id, estab_id, inspector_uid, report_control_number, inspection_date,
+  project_name, proponent_name, project_location, purpose,
+  created_at, updated_at, is_archived, sync_status, device_id
+) values (
+  'survey-conflict-001',
+  'est-conflict-surv-001',
+  '11111111-1111-1111-1111-111111111111',
+  'SURV-NEW',
+  current_date,
+  'Newest Project Name',
+  'Proponent',
+  'Location',
+  'ECC Application',
+  now(),
+  '2026-05-01T12:00:00Z'::timestamptz,
+  false,
+  'pending',
+  'device-a'
+);
+
+select public.push_changes(
+  '{
+    "survey_reports": {
+      "created": [],
+      "updated": [
+        {
+          "survey_id": "survey-conflict-001",
+          "estab_id": "est-conflict-surv-001",
+          "inspector_uid": "11111111-1111-1111-1111-111111111111",
+          "report_control_number": "SURV-OLD",
+          "inspection_date": "2026-04-29",
+          "project_name": "Old Project Name",
+          "proponent_name": "Proponent",
+          "project_location": "Location",
+          "purpose": "ECC Amendment",
+          "updated_at": "2026-04-01T12:00:00Z",
+          "is_archived": false,
+          "sync_status": "pending",
+          "device_id": "device-a"
+        }
+      ],
+      "deleted": []
+    }
+  }'::jsonb
+);
+
+select is(
+  (
+    select report_control_number
+    from public.survey_reports
+    where survey_id = 'survey-conflict-001'
+  ),
+  'SURV-NEW',
+  'stale survey_report update is ignored'
+);
+
+select * from finish();
+rollback;

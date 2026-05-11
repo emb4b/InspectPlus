@@ -205,14 +205,13 @@ select is(
   'push_changes returns ok status for deleted survey_reports'
 );
 
-select is(
+select ok(
   (
-    select count(*)::int
+    select deleted_at is not null
     from public.survey_reports
     where survey_id = 'survey-push-001'
   ),
-  0,
-  'push_changes deletes an existing survey_report row'
+  'push_changes soft deletes an existing survey_report row'
 );
 
 select * from finish();

@@ -205,14 +205,13 @@ select is(
   'push_changes returns ok status for deleted inspection reports'
 );
 
-select is(
+select ok(
   (
-    select count(*)::int
+    select deleted_at is not null
     from public.inspection_reports
     where report_id = 'rep-push-001'
   ),
-  0,
-  'push_changes deletes an existing inspection report row'
+  'push_changes soft deletes an existing inspection report row'
 );
 
 select * from finish();
