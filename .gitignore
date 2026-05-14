@@ -98,3 +98,4 @@ ios/Pods/
 coverage/
 dist/
 build/
+.expo/
