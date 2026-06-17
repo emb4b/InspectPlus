@@ -1,0 +1,1 @@
+GRANT SELECT, UPDATE ON public.user_accounts TO authenticated;

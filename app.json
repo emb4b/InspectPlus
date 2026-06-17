@@ -1,6 +1,15 @@
 {
   "expo": {
     "name": "InspectPlus",
-    "slug": "inspectplus"
+    "slug": "inspectplus",
+    "scheme": "inspectplus",
+    "version": "1.0.0",
+    "router": {
+      "root": "src/app"
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-font"
+    ]
   }
 }
