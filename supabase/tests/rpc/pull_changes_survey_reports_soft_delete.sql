@@ -2,35 +2,26 @@ begin;
 select plan(1);
 
 insert into public.user_accounts (
-  uid, full_name, username, password_hash, role, region, area_of_assignment, is_active, sync_status, device_id
+  uid, first_name, last_name, username, password_hash, role, region, area_of_assignment,
+  email, is_active, sync_status, device_id
 ) values (
   '11111111-1111-1111-1111-111111111111',
-  'Inspector A',
-  'inspector_a',
-  'hashed',
-  'Inspector',
-  'Region 4-B',
-  'Occidental Mindoro',
-  true,
-  'pending',
-  'device-a'
+  'Inspector', 'A', 'inspector_a', 'hashed', 'Inspector',
+  'Region 4-B', 'Occidental Mindoro', 'inspector_a_surv_soft@test.local',
+  true, 'pending', 'device-a'
 );
 
 insert into public.establishments (
-  estab_id, inspector_uid, name, address, province, nature_of_business, status,
+  estab_id, inspector_uid, name, address_line, barangay, city, province,
+  nature_of_business, operating_status, owner_name, managing_head_name,
+  phone_fax, email, contact_person_name, contact_person_position,
   created_at, updated_at, sync_status, device_id
 ) values (
-  'est-soft-surv-002',
-  '11111111-1111-1111-1111-111111111111',
-  'Survey Plant 2',
-  'Address',
-  'Occidental Mindoro',
-  'Manufacturing',
-  'Active',
-  now() - interval '1 minute',
-  now() - interval '1 minute',
-  'pending',
-  'device-a'
+  'est-soft-surv-002', '11111111-1111-1111-1111-111111111111', 'Survey Plant 2',
+  'Address', 'Barangay A', 'City A', 'Occidental Mindoro',
+  'Manufacturing', 'Operational', 'Owner A', 'Head A',
+  '09170000022', 'survey-plant-2@test.local', 'Contact A', 'Manager',
+  now() - interval '1 minute', now() - interval '1 minute', 'pending', 'device-a'
 );
 
 insert into public.survey_reports (

@@ -51,13 +51,19 @@ The backend receives:
 The current synced entities are:
 
 - `establishments`
-- `inspection_reports`
 - `purpose_of_inspection`
+- `inspection_reports`
 - `survey_reports`
 - `compliance_air`
 - `compliance_water`
 - `compliance_hazwaste`
 - `compliance_eia`
+
+### Directly-accessed entities
+
+- `user_accounts`
+
+`user_accounts` is **not** part of the `pull_changes` / `push_changes` RPC loop. It is read and updated directly via PostgREST (`supabase.from('user_accounts')`), gated by row-level security rather than by the generic sync contract. See [Entity Payload Notes → `user_accounts`](#0-user_accounts) for its access rules.
 
 ---
 
@@ -201,70 +207,180 @@ Example:
 
 ## Entity Payload Notes
 
+## 0. `user_accounts`
+
+### Access model
+Unlike the other entities in this document, `user_accounts` is **not** synced through `pull_changes` / `push_changes`. The mobile app reads and updates it directly via PostgREST:
+
+```ts
+supabase.from('user_accounts').select(...).eq('uid', uid)
+supabase.from('user_accounts').update({...}).eq('uid', uid)
+```
+
+- `SELECT` and `UPDATE` are granted to `authenticated`
+- no `DELETE` is granted — rows cannot be removed from the client
+- RLS restricts both `SELECT` and `UPDATE` to `uid = auth.uid()`; a client can only see and modify its own account row
+- an additional `SECURITY DEFINER` RPC, `get_email_by_username(p_username text)`, is callable by `anon` to resolve a username to its login email before authentication
+
+### Primary key
+- `uid` (matches the Supabase Auth user id)
+
+### Important fields
+- `first_name`, `middle_name`, `last_name`
+- `username`
+- `email`
+- `role` (`Inspector` or `Administrator`)
+- `region`
+- `area_of_assignment`
+- `phone_number`
+- `created_at`
+- `last_login`
+- `is_active`
+- `sync_status`
+- `device_id`
+
+`password_hash` still exists on the table but is unused — password auth is
+handled entirely by Supabase Auth (`auth.users`), not by this column.
+
+### Deletion behavior
+- not deletable through the client; `establishments.inspector_uid` and other FKs reference `user_accounts(uid)` with `on delete restrict`
+
+---
+
 ## 1. `establishments`
 
 ### Primary key
 - `estab_id`
 
+### Foreign key
+- `inspector_uid` → `user_accounts.uid`
+
 ### Important fields
-- `inspector_uid`
-- `name`
-- `address`
-- `province`
-- `nature_of_business`
-- `status`
+- `name`, `former_name`
+- `address_line`, `barangay`, `city`, `province`
+- `geo_lat`, `geo_lng`
+- `nature_of_business`, `psic_code`, `product`, `year_established`
+- `operating_status` (`Operational` | `Temporarily Close` | `Non-Operational`)
+- `operating_hours_day`, `operating_days_week`, `operating_days_year`
+- `product_lines` (jsonb array — see below)
+- `owner_name`, `managing_head_name`
+- `pco_name`, `pco_accreditation_no`, `pco_effectivity`
+- `phone_fax`, `email`, `contact_person_name`, `contact_person_position`
+- `denr_permits` (jsonb array — see below)
+- `created_at`
+- `updated_at`
+- `sync_status`
+- `device_id`
+- `is_archived`
+
+### JSONB shapes
+
+`product_lines` — array of:
+```json
+{ "product_line": "string", "ecc_production_rate": "string", "actual_production_rate": "string" }
+```
+
+`denr_permits` — array of the same shape as `inspection_reports.permits_snapshot` (see below):
+```json
+{ "envi_law": "string", "permit_type": "string", "permit_serial": "string", "issued_date": "date", "expiry_date": "date" }
+```
+
+---
+
+## 2. `purpose_of_inspection`
+
+Independent per-visit entity — created once per site visit, before any
+`inspection_reports` row exists. A single purpose row can be shared by
+several `inspection_reports` rows generated from that same visit (one per
+`report_type`). This is a **many-to-one** relationship
+(`inspection_reports.purpose_id` → `purpose_of_inspection.purpose_id`), the
+inverse of the old `purpose_of_inspection.report_id` design.
+
+### Primary key
+- `purpose_id`
+
+### Foreign keys
+- `estab_id` → `establishments.estab_id`
+- `inspector_uid` → `user_accounts.uid`
+
+### Important fields
+- `inspection_date`
+- `verify_info` (bool) + `verify_info_list` (jsonb array — see below)
+- `determine_compliance` (bool)
+- `investigate_complaints` (bool)
+- `check_commitments` (bool) + `check_commitments_list` (jsonb array — see below)
+- `others`
 - `created_at`
 - `updated_at`
 - `sync_status`
 - `device_id`
 
+### JSONB shapes
+
+`verify_info_list` — array of:
+```json
+{ "item_key": "pmpin | hazwaste_id | hazwaste_transporter | hazwaste_tsd | pto_air | discharge_permit | others", "status": "new | renewal | null", "remarks": "string" }
+```
+
+`check_commitments_list` — array of:
+```json
+{ "item_key": "industrial_ecowatch | pepp | pab | others", "remarks": "string" }
+```
+
+### Deletion behavior
+- hard delete
+
 ---
 
-## 2. `inspection_reports`
+## 3. `inspection_reports`
 
 ### Primary key
 - `report_id`
 
 ### Foreign keys
-- `estab_id`
-- `inspector_uid`
+- `estab_id` → `establishments.estab_id` (plain, non-unique — one establishment can have many reports)
+- `inspector_uid` → `user_accounts.uid`
+- `purpose_id` → `purpose_of_inspection.purpose_id` (non-unique — many reports from the same visit can share one purpose)
 
 ### Important fields
 - `report_type`
-- `report_control_number`
+- `report_control_no`
 - `inspection_date`
-- `snapshot`
-- `permits_snapshot`
+- `establishment_snapshot` (jsonb object, not an array — see below)
+- `permits_snapshot` (jsonb array — see below)
 - `created_at`
 - `updated_at`
 - `deleted_at`
 - `is_archived`
 - `sync_status`
 - `device_id`
+- `report_status` (`draft` | `submitted`)
+
+### JSONB shapes
+
+`establishment_snapshot` — a single object frozen from `establishments` at
+report-creation time. Deliberately excludes `product`, `year_established`,
+`pco_accreditation_no`, `pco_effectivity`, `contact_person_position`,
+`product_lines` and `denr_permits`:
+```json
+{
+  "estab_id": "string", "name": "string", "former_name": "string",
+  "address_line": "string", "barangay": "string", "city": "string", "province": "string",
+  "geo_lat": 0, "geo_lng": 0,
+  "nature_of_business": "string", "psic_code": "string",
+  "operating_status": "string", "operating_hours_day": 0, "operating_days_week": 0, "operating_days_year": 0,
+  "owner_name": "string", "managing_head_name": "string", "pco_name": "string",
+  "phone_fax": "string", "email": "string", "contact_person_name": "string"
+}
+```
+
+`permits_snapshot` — array, same shape as `establishments.denr_permits`:
+```json
+{ "envi_law": "string", "permit_type": "string", "permit_serial": "string", "issued_date": "date", "expiry_date": "date" }
+```
 
 ### Deletion behavior
 - soft delete
-
----
-
-## 3. `purpose_of_inspection`
-
-### Primary key
-- `purpose_id`
-
-### Foreign key
-- `report_id`
-
-### Important fields
-- `verify_new_application`
-- `verify_renewal`
-- `verify_modification`
-- `application_type`
-- `determine_compliance`
-- `investigate_complaint`
-- `check_voluntary_commitment`
-- `voluntary_commitment_type`
-- `others_specify`
 
 ---
 
@@ -444,6 +560,9 @@ Currently used for:
 - `compliance_eia`
 - `establishments` (current behavior unless changed later)
 
+## Not deletable
+`user_accounts` has no delete path exposed to the client (no `DELETE` grant, and it is outside the `pull_changes` / `push_changes` loop entirely). Referencing FKs use `on delete restrict`.
+
 ---
 
 ## Client Responsibilities
@@ -462,6 +581,7 @@ pull_changes(0)
 
 ### 3. Preserve backend IDs
 The client must preserve:
+- `uid`
 - `estab_id`
 - `report_id`
 - `survey_id`
@@ -481,7 +601,8 @@ If an entity appears in `deleted`, the client must mark/remove it from the local
 Child entities must not be pushed unless their parent row exists locally and remotely.
 
 Examples:
-- `purpose_of_inspection.report_id` must reference an existing `inspection_reports.report_id`
+- `purpose_of_inspection.estab_id` must reference an existing `establishments.estab_id`
+- `inspection_reports.purpose_id` must reference an existing `purpose_of_inspection.purpose_id`
 - all `compliance_*` tables must reference an existing `inspection_reports.report_id`
 
 ---
@@ -491,11 +612,11 @@ Examples:
 Implement sync in this order:
 
 1. `establishments`
-2. `inspection_reports`
-3. `survey_reports`
+2. `purpose_of_inspection`
+3. `inspection_reports`
+4. `survey_reports`
 
 Then add:
-4. `purpose_of_inspection`
 5. `compliance_air`
 6. `compliance_water`
 7. `compliance_hazwaste`

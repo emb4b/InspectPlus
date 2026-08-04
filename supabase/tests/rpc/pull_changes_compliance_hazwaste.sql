@@ -2,83 +2,44 @@ begin;
 select plan(2);
 
 insert into public.user_accounts (
-  uid,
-  full_name,
-  username,
-  password_hash,
-  role,
-  region,
-  area_of_assignment,
-  is_active,
-  sync_status,
-  device_id
+  uid, first_name, last_name, username, password_hash, role, region, area_of_assignment,
+  email, is_active, sync_status, device_id
 ) values (
   '11111111-1111-1111-1111-111111111111',
-  'Inspector A',
-  'inspector_a',
-  'hashed',
-  'Inspector',
-  'Region 4-B',
-  'Occidental Mindoro',
-  true,
-  'pending',
-  'device-a'
+  'Inspector', 'A', 'inspector_a', 'hashed', 'Inspector',
+  'Region 4-B', 'Occidental Mindoro', 'inspector_a_hw@test.local',
+  true, 'pending', 'device-a'
 );
 
 insert into public.establishments (
-  estab_id,
-  inspector_uid,
-  name,
-  address,
-  province,
-  nature_of_business,
-  status,
-  created_at,
-  updated_at,
-  sync_status,
-  device_id
+  estab_id, inspector_uid, name, address_line, barangay, city, province,
+  nature_of_business, operating_status, owner_name, managing_head_name,
+  phone_fax, email, contact_person_name, contact_person_position,
+  created_at, updated_at, sync_status, device_id
 ) values (
-  'est-hw-a',
-  '11111111-1111-1111-1111-111111111111',
-  'HazWaste Plant A',
-  'HazWaste Address A',
-  'Occidental Mindoro',
-  'Manufacturing',
-  'Active',
-  now() - interval '1 minute',
-  now() - interval '1 minute',
-  'pending',
-  'device-a'
+  'est-hw-a', '11111111-1111-1111-1111-111111111111', 'HazWaste Plant A',
+  'HazWaste Address A', 'Barangay A', 'City A', 'Occidental Mindoro',
+  'Manufacturing', 'Operational', 'Owner A', 'Head A',
+  '09170000014', 'hazwaste-plant-a@test.local', 'Contact A', 'Manager',
+  now() - interval '1 minute', now() - interval '1 minute', 'pending', 'device-a'
+);
+
+insert into public.purpose_of_inspection (
+  purpose_id, estab_id, inspector_uid, inspection_date, device_id
+) values (
+  'purpose-hw-a', 'est-hw-a', '11111111-1111-1111-1111-111111111111',
+  current_date, 'device-a'
 );
 
 insert into public.inspection_reports (
-  report_id,
-  estab_id,
-  inspector_uid,
-  report_type,
-  report_control_number,
-  inspection_date,
-  snapshot,
-  permits_snapshot,
-  created_at,
-  updated_at,
-  is_archived,
-  sync_status,
-  device_id
+  report_id, estab_id, inspector_uid, purpose_id, report_type, report_control_no,
+  inspection_date, establishment_snapshot, permits_snapshot,
+  created_at, updated_at, is_archived, sync_status, device_id
 ) values (
-  'rep-hw-a',
-  'est-hw-a',
-  '11111111-1111-1111-1111-111111111111',
-  'hazardous_waste',
-  'CTRL-HW-001',
-  current_date,
-  '{"name":"HazWaste Plant A"}'::jsonb,
-  '{"hwid_no":"HWID-001"}'::jsonb,
-  now() - interval '1 minute',
-  now() - interval '1 minute',
-  false,
-  'pending',
-  'device-a'
+  'rep-hw-a', 'est-hw-a', '11111111-1111-1111-1111-111111111111', 'purpose-hw-a',
+  'hazardous_waste', 'CTRL-HW-001', current_date,
+  '{"name":"HazWaste Plant A"}'::jsonb, '[]'::jsonb,
+  now() - interval '1 minute', now() - interval '1 minute', false, 'pending', 'device-a'
 );
 
 insert into public.compliance_hazwaste (

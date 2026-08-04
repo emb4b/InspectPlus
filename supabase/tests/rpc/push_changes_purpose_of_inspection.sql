@@ -3,86 +3,30 @@ begin;
 select plan(6);
 
 insert into public.user_accounts (
-  uid,
-  full_name,
-  username,
-  password_hash,
-  role,
-  region,
-  area_of_assignment,
-  is_active,
-  sync_status,
-  device_id
+  uid, first_name, last_name, username, password_hash, role, region, area_of_assignment,
+  email, is_active, sync_status, device_id
 ) values (
   '33333333-3333-3333-3333-333333333333',
-  'Inspector C',
-  'inspector_c_purpose_push',
-  'hashed',
-  'Inspector',
-  'Region 4-B',
-  'Occidental Mindoro',
-  true,
-  'pending',
-  'device-c'
+  'Inspector', 'C', 'inspector_c_purpose_push', 'hashed', 'Inspector',
+  'Region 4-B', 'Occidental Mindoro', 'inspector_c_purpose_push@test.local',
+  true, 'pending', 'device-c'
 );
 
 insert into public.establishments (
-  estab_id,
-  inspector_uid,
-  name,
-  address,
-  province,
-  nature_of_business,
-  status,
-  created_at,
-  updated_at,
-  sync_status,
-  device_id
+  estab_id, inspector_uid, name, address_line, barangay, city, province,
+  nature_of_business, operating_status, owner_name, managing_head_name,
+  phone_fax, email, contact_person_name, contact_person_position,
+  created_at, updated_at, sync_status, device_id
 ) values (
-  'est-purpose-001',
-  '33333333-3333-3333-3333-333333333333',
-  'Purpose Plant',
-  'Purpose Address',
-  'Occidental Mindoro',
-  'Manufacturing',
-  'Active',
-  now(),
-  now(),
-  'pending',
-  'device-c'
+  'est-purpose-001', '33333333-3333-3333-3333-333333333333', 'Purpose Plant',
+  'Purpose Address', 'Barangay A', 'City A', 'Occidental Mindoro',
+  'Manufacturing', 'Operational', 'Owner A', 'Head A',
+  '09170000004', 'purpose-plant@test.local', 'Contact A', 'Manager',
+  now(), now(), 'pending', 'device-c'
 );
 
-insert into public.inspection_reports (
-  report_id,
-  estab_id,
-  inspector_uid,
-  report_type,
-  report_control_number,
-  inspection_date,
-  snapshot,
-  permits_snapshot,
-  created_at,
-  updated_at,
-  is_archived,
-  sync_status,
-  device_id
-) values (
-  'rep-purpose-001',
-  'est-purpose-001',
-  '33333333-3333-3333-3333-333333333333',
-  'air_monitoring',
-  'CTRL-PURPOSE-001',
-  current_date,
-  '{"name":"Purpose Plant"}'::jsonb,
-  '{"ecc_no":"ECC-001"}'::jsonb,
-  now(),
-  now(),
-  false,
-  'pending',
-  'device-c'
-);
-
--- Purpose of inspection: create
+-- Purpose of inspection: create (no report needed — purpose_of_inspection no
+-- longer depends on inspection_reports; it's the other way around now)
 select is(
   public.push_changes(
     '{
@@ -91,20 +35,23 @@ select is(
         "updated": [],
         "deleted": []
       },
-      "inspection_reports": {
-        "created": [],
-        "updated": [],
-        "deleted": []
-      },
       "purpose_of_inspection": {
         "created": [
           {
             "purpose_id": "purpose-push-001",
-            "report_id": "rep-purpose-001",
+            "estab_id": "est-purpose-001",
+            "inspector_uid": "33333333-3333-3333-3333-333333333333",
+            "inspection_date": "2026-04-29",
             "determine_compliance": true,
-            "application_type": "PTO Air"
+            "sync_status": "pending",
+            "device_id": "device-c"
           }
         ],
+        "updated": [],
+        "deleted": []
+      },
+      "inspection_reports": {
+        "created": [],
         "updated": [],
         "deleted": []
       },
@@ -143,21 +90,25 @@ select is(
         "updated": [],
         "deleted": []
       },
-      "inspection_reports": {
-        "created": [],
-        "updated": [],
-        "deleted": []
-      },
       "purpose_of_inspection": {
         "created": [],
         "updated": [
           {
             "purpose_id": "purpose-push-001",
-            "report_id": "rep-purpose-001",
+            "estab_id": "est-purpose-001",
+            "inspector_uid": "33333333-3333-3333-3333-333333333333",
+            "inspection_date": "2026-04-29",
             "determine_compliance": false,
-            "application_type": "HazWaste ID"
+            "investigate_complaints": true,
+            "sync_status": "pending",
+            "device_id": "device-c"
           }
         ],
+        "deleted": []
+      },
+      "inspection_reports": {
+        "created": [],
+        "updated": [],
         "deleted": []
       },
       "survey_reports": {
@@ -178,15 +129,15 @@ select is(
 
 select is(
   (
-    select application_type
+    select investigate_complaints
     from public.purpose_of_inspection
     where purpose_id = 'purpose-push-001'
   ),
-  'HazWaste ID',
+  true,
   'push_changes updates an existing purpose_of_inspection row'
 );
 
--- Purpose of inspection: delete
+-- Purpose of inspection: delete (hard delete)
 select is(
   public.push_changes(
     '{
@@ -195,15 +146,15 @@ select is(
         "updated": [],
         "deleted": []
       },
-      "inspection_reports": {
-        "created": [],
-        "updated": [],
-        "deleted": []
-      },
       "purpose_of_inspection": {
         "created": [],
         "updated": [],
         "deleted": ["purpose-push-001"]
+      },
+      "inspection_reports": {
+        "created": [],
+        "updated": [],
+        "deleted": []
       },
       "survey_reports": {
         "created": [],

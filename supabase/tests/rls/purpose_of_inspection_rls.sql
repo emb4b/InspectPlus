@@ -2,146 +2,50 @@ begin;
 select plan(2);
 
 insert into public.user_accounts (
-  uid,
-  full_name,
-  username,
-  password_hash,
-  role,
-  region,
-  area_of_assignment,
-  is_active,
-  sync_status,
-  device_id
+  uid, first_name, last_name, username, password_hash, role, region, area_of_assignment,
+  email, is_active, sync_status, device_id
 ) values
   (
     '11111111-1111-1111-1111-111111111111',
-    'Inspector A',
-    'inspector_a',
-    'hashed',
-    'Inspector',
-    'Region 4-B',
-    'Occidental Mindoro',
-    true,
-    'pending',
-    'device-a'
+    'Inspector', 'A', 'inspector_a_poi_rls', 'hashed', 'Inspector',
+    'Region 4-B', 'Occidental Mindoro', 'inspector_a_poi_rls@test.local',
+    true, 'pending', 'device-a'
   ),
   (
     '22222222-2222-2222-2222-222222222222',
-    'Inspector B',
-    'inspector_b',
-    'hashed',
-    'Inspector',
-    'Region 4-B',
-    'Oriental Mindoro',
-    true,
-    'pending',
-    'device-b'
+    'Inspector', 'B', 'inspector_b_poi_rls', 'hashed', 'Inspector',
+    'Region 4-B', 'Oriental Mindoro', 'inspector_b_poi_rls@test.local',
+    true, 'pending', 'device-b'
   );
 
 insert into public.establishments (
-  estab_id,
-  inspector_uid,
-  name,
-  address,
-  province,
-  nature_of_business,
-  status,
-  created_at,
-  updated_at,
-  sync_status,
-  device_id
+  estab_id, inspector_uid, name, address_line, barangay, city, province,
+  nature_of_business, operating_status, owner_name, managing_head_name,
+  phone_fax, email, contact_person_name, contact_person_position,
+  created_at, updated_at, sync_status, device_id
 ) values
   (
-    'est-poi-a',
-    '11111111-1111-1111-1111-111111111111',
-    'Plant A',
-    'Address A',
-    'Occidental Mindoro',
-    'Manufacturing',
-    'Active',
-    now(),
-    now(),
-    'pending',
-    'device-a'
+    'est-poi-a', '11111111-1111-1111-1111-111111111111', 'Plant A',
+    'Address A', 'Barangay A', 'City A', 'Occidental Mindoro',
+    'Manufacturing', 'Operational', 'Owner A', 'Head A',
+    '09170000001', 'plant-poi-a@test.local', 'Contact A', 'Manager',
+    now(), now(), 'pending', 'device-a'
   ),
   (
-    'est-poi-b',
-    '22222222-2222-2222-2222-222222222222',
-    'Plant B',
-    'Address B',
-    'Oriental Mindoro',
-    'Processing',
-    'Active',
-    now(),
-    now(),
-    'pending',
-    'device-b'
+    'est-poi-b', '22222222-2222-2222-2222-222222222222', 'Plant B',
+    'Address B', 'Barangay B', 'City B', 'Oriental Mindoro',
+    'Processing', 'Operational', 'Owner B', 'Head B',
+    '09170000002', 'plant-poi-b@test.local', 'Contact B', 'Manager',
+    now(), now(), 'pending', 'device-b'
   );
 
-insert into public.inspection_reports (
-  report_id,
-  estab_id,
-  inspector_uid,
-  report_type,
-  report_control_number,
-  inspection_date,
-  snapshot,
-  permits_snapshot,
-  created_at,
-  updated_at,
-  is_archived,
-  sync_status,
-  device_id
-) values
-  (
-    'rep-poi-a',
-    'est-poi-a',
-    '11111111-1111-1111-1111-111111111111',
-    'air_monitoring',
-    'CTRL-POI-A',
-    current_date,
-    '{"name":"Plant A"}'::jsonb,
-    '{"ecc_no":"ECC-A"}'::jsonb,
-    now(),
-    now(),
-    false,
-    'pending',
-    'device-a'
-  ),
-  (
-    'rep-poi-b',
-    'est-poi-b',
-    '22222222-2222-2222-2222-222222222222',
-    'water_monitoring',
-    'CTRL-POI-B',
-    current_date,
-    '{"name":"Plant B"}'::jsonb,
-    '{"dp_no":"DP-B"}'::jsonb,
-    now(),
-    now(),
-    false,
-    'pending',
-    'device-b'
-  );
-
+-- purpose_of_inspection now carries its own inspector_uid directly, so
+-- ownership no longer needs to be derived through a join to a report.
 insert into public.purpose_of_inspection (
-  purpose_id,
-  report_id,
-  determine_compliance,
-  application_type
+  purpose_id, estab_id, inspector_uid, inspection_date, determine_compliance, device_id
 ) values
-  (
-    'purpose-rls-a',
-    'rep-poi-a',
-    true,
-    'PTO Air'
-  ),
-  (
-    'purpose-rls-b',
-    'rep-poi-b',
-    true,
-    'DP'
-  );
+  ('purpose-rls-a', 'est-poi-a', '11111111-1111-1111-1111-111111111111', current_date, true, 'device-a'),
+  ('purpose-rls-b', 'est-poi-b', '22222222-2222-2222-2222-222222222222', current_date, true, 'device-b');
 
 select set_config('role', 'authenticated', true);
 select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
@@ -153,7 +57,7 @@ select is(
     where purpose_id = 'purpose-rls-a'
   ),
   1,
-  'user A can read own purpose_of_inspection row through parent report ownership'
+  'user A can read their own purpose_of_inspection row'
 );
 
 select is(
