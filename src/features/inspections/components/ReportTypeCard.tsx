@@ -16,7 +16,7 @@ interface ReportTypeCardProps {
 // Every thumbnail — SVG illustration or icon-font fallback — renders at this
 // exact box so the grid reads as uniform regardless of each source's own
 // aspect ratio or viewBox.
-const ICON_SIZE = 44;
+const ICON_SIZE = 40;
 
 export const ReportTypeCard: React.FC<ReportTypeCardProps> = ({ item }) => {
   const IconComponent = item.iconLibrary === 'MaterialCommunityIcons' ? MaterialCommunityIcons : Ionicons;
@@ -40,30 +40,34 @@ export const ReportTypeCard: React.FC<ReportTypeCardProps> = ({ item }) => {
           <IconComponent name={item.iconName as any} size={ICON_SIZE} color={item.textColor} />
         )}
       </View>
-      <Text style={[styles.law, { color: item.textColor }]}>{item.law}</Text>
-      <Text style={styles.title}>{item.title}</Text>
+      <Text style={[styles.law, { color: item.textColor }]} numberOfLines={1}>
+        {item.law}
+      </Text>
+      <Text style={styles.title} numberOfLines={4} ellipsizeMode="tail">
+        {item.title}
+      </Text>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
+    flex: 1,
     borderWidth: 1.5,
     borderRadius: 12,
-    padding: 18,
+    padding: 14,
     alignItems: 'center',
-    minHeight: 150,
     justifyContent: 'center',
   },
   iconWrap: {
-    marginBottom: 12,
+    marginBottom: 10,
     height: ICON_SIZE,
     width: ICON_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
   },
   law: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
     marginBottom: 4,
     textAlign: 'center',

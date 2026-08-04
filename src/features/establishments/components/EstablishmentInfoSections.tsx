@@ -48,10 +48,12 @@ export const EstablishmentInfoSections: React.FC<EstablishmentInfoSectionsProps>
         <View style={styles.row}>
           <TextField label="Managing Head" value={establishment.managingHeadName || '—'} readOnly />
           <TextField label="PCO Name" value={establishment.pcoName || '—'} readOnly />
-          <TextField label="PCO Accreditation No." value={establishment.pcoAccreditationNo || '—'} readOnly />
         </View>
         <View style={styles.row}>
+          <TextField label="PCO Accreditation No." value={establishment.pcoAccreditationNo || '—'} readOnly />
           <TextField label="PCO Accreditation Effectivity" value={establishment.pcoEffectivity || '—'} readOnly />
+        </View>
+        <View style={styles.row}>
           <TextField label="Contact Person" value={establishment.contactPersonName || '—'} readOnly />
           <TextField label="Contact Position" value={establishment.contactPersonPosition || '—'} readOnly />
         </View>

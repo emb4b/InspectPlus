@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { router } from 'expo-router';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 
 interface LoginCredentials {
@@ -46,9 +45,11 @@ export const useAuth = (): UseAuthReturn => {
       // after signIn() resolves — e.g. read the signed-in user's role
       // and, if asAdmin is true but role !== 'administrator', call
       // signOut() and throw an error instead of proceeding.
+      // Navigation to /home happens reactively in RootNavigator once
+      // AuthProvider's `session` updates — no explicit redirect here.
+      // Calling router.replace('/home') on top of that produced a visible
+      // double slide-in on login (RootNavigator firing first, then this).
       await signIn(username, password);
-
-      router.replace('/home');
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : 'Login failed. Please try again.';

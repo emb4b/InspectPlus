@@ -48,8 +48,9 @@ export const EstablishmentHeaderCard: React.FC<EstablishmentHeaderCardProps> = (
           <Ionicons name="add" size={14} color={Colors.textWhite} />
           <Text style={styles.btnAddReportText}>Add Report</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.btnEdit} onPress={onEdit} activeOpacity={0.8}>
-          <Ionicons name="pencil" size={13} color={Colors.textWhite} />
+        <TouchableOpacity style={styles.btnEdit} onPress={onEdit} activeOpacity={0.75}>
+          <Ionicons name="pencil" size={11} color={Colors.textSecondary} />
+          <Text style={styles.btnEditText}>Edit</Text>
         </TouchableOpacity>
       </View>
 
@@ -160,11 +161,19 @@ const styles = StyleSheet.create({
     color: Colors.textWhite,
   },
   btnEdit: {
-    width: 34,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: Colors.navy,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  btnEditText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: Colors.textSecondary,
   },
   divider: {
     height: 1,
@@ -176,16 +185,16 @@ const styles = StyleSheet.create({
   },
   statRow: {
     flexDirection: 'row',
-    justifyContent: 'space-evenly',
+    gap: 6,
   },
   statChip: {
+    flex: 1,
     backgroundColor: Colors.bgMuted,
     borderWidth: 1,
     borderColor: Colors.borderLight,
     borderRadius: 8,
     paddingHorizontal: 9,
     paddingVertical: 5,
-    minWidth: 64,
   },
   statLabel: {
     fontSize: 7.5,
