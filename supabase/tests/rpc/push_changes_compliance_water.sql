@@ -2,83 +2,44 @@ begin;
 select plan(6);
 
 insert into public.user_accounts (
-  uid,
-  full_name,
-  username,
-  password_hash,
-  role,
-  region,
-  area_of_assignment,
-  is_active,
-  sync_status,
-  device_id
+  uid, first_name, last_name, username, password_hash, role, region, area_of_assignment,
+  email, is_active, sync_status, device_id
 ) values (
   '11111111-1111-1111-1111-111111111111',
-  'Inspector A',
-  'inspector_a',
-  'hashed',
-  'Inspector',
-  'Region 4-B',
-  'Occidental Mindoro',
-  true,
-  'pending',
-  'device-a'
+  'Inspector', 'A', 'inspector_a', 'hashed', 'Inspector',
+  'Region 4-B', 'Occidental Mindoro', 'inspector_a_water_push@test.local',
+  true, 'pending', 'device-a'
 );
 
 insert into public.establishments (
-  estab_id,
-  inspector_uid,
-  name,
-  address,
-  province,
-  nature_of_business,
-  status,
-  created_at,
-  updated_at,
-  sync_status,
-  device_id
+  estab_id, inspector_uid, name, address_line, barangay, city, province,
+  nature_of_business, operating_status, owner_name, managing_head_name,
+  phone_fax, email, contact_person_name, contact_person_position,
+  created_at, updated_at, sync_status, device_id
 ) values (
-  'est-water-push-001',
-  '11111111-1111-1111-1111-111111111111',
-  'Water Push Plant',
-  'Water Push Address',
-  'Occidental Mindoro',
-  'Manufacturing',
-  'Active',
-  now(),
-  now(),
-  'pending',
-  'device-a'
+  'est-water-push-001', '11111111-1111-1111-1111-111111111111', 'Water Push Plant',
+  'Water Push Address', 'Barangay A', 'City A', 'Occidental Mindoro',
+  'Manufacturing', 'Operational', 'Owner A', 'Head A',
+  '09170000013', 'water-push-plant@test.local', 'Contact A', 'Manager',
+  now(), now(), 'pending', 'device-a'
+);
+
+insert into public.purpose_of_inspection (
+  purpose_id, estab_id, inspector_uid, inspection_date, device_id
+) values (
+  'purpose-water-push-001', 'est-water-push-001', '11111111-1111-1111-1111-111111111111',
+  current_date, 'device-a'
 );
 
 insert into public.inspection_reports (
-  report_id,
-  estab_id,
-  inspector_uid,
-  report_type,
-  report_control_number,
-  inspection_date,
-  snapshot,
-  permits_snapshot,
-  created_at,
-  updated_at,
-  is_archived,
-  sync_status,
-  device_id
+  report_id, estab_id, inspector_uid, purpose_id, report_type, report_control_no,
+  inspection_date, establishment_snapshot, permits_snapshot,
+  created_at, updated_at, is_archived, sync_status, device_id
 ) values (
-  'rep-water-push-001',
-  'est-water-push-001',
-  '11111111-1111-1111-1111-111111111111',
-  'water_monitoring',
-  'CTRL-WATER-PUSH-001',
-  current_date,
-  '{"name":"Water Push Plant"}'::jsonb,
-  '{"dp_no":"DP-PUSH-001"}'::jsonb,
-  now(),
-  now(),
-  false,
-  'pending',
-  'device-a'
+  'rep-water-push-001', 'est-water-push-001', '11111111-1111-1111-1111-111111111111', 'purpose-water-push-001',
+  'water_monitoring', 'CTRL-WATER-PUSH-001', current_date,
+  '{"name":"Water Push Plant"}'::jsonb, '[]'::jsonb,
+  now(), now(), false, 'pending', 'device-a'
 );
 
 select is(

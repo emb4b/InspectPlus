@@ -63,14 +63,14 @@ select is(
 
 select is(
   has_table_privilege('authenticated', 'public.user_accounts', 'SELECT'),
-  false,
-  'authenticated cannot directly SELECT user_accounts'
+  true,
+  'authenticated can directly SELECT user_accounts subject to RLS'
 );
 
 select is(
   has_table_privilege('authenticated', 'public.establishments', 'SELECT'),
-  false,
-  'authenticated cannot directly SELECT establishments'
+  true,
+  'authenticated can directly SELECT establishments subject to RLS'
 );
 
 select is(

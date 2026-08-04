@@ -3,27 +3,13 @@ begin;
 select plan(6);
 
 insert into public.user_accounts (
-  uid,
-  full_name,
-  username,
-  password_hash,
-  role,
-  region,
-  area_of_assignment,
-  is_active,
-  sync_status,
-  device_id
+  uid, first_name, last_name, username, password_hash, role, region, area_of_assignment,
+  email, is_active, sync_status, device_id
 ) values (
   '11111111-1111-1111-1111-111111111111',
-  'Inspector A',
-  'inspector_a_est_push',
-  'hashed',
-  'Inspector',
-  'Region 4-B',
-  'Occidental Mindoro',
-  true,
-  'pending',
-  'device-a'
+  'Inspector', 'A', 'inspector_a_est_push', 'hashed', 'Inspector',
+  'Region 4-B', 'Occidental Mindoro', 'inspector_a_est_push@test.local',
+  true, 'pending', 'device-a'
 );
 
 -- Establishments: create
@@ -36,10 +22,18 @@ select is(
             "estab_id": "est-push-001",
             "inspector_uid": "11111111-1111-1111-1111-111111111111",
             "name": "Pushed Plant",
-            "address": "Push Address",
+            "address_line": "Push Address",
+            "barangay": "Push Barangay",
+            "city": "Push City",
             "province": "Occidental Mindoro",
             "nature_of_business": "Manufacturing",
-            "status": "Active",
+            "operating_status": "Operational",
+            "owner_name": "Push Owner",
+            "managing_head_name": "Push Head",
+            "phone_fax": "09170000099",
+            "email": "push-plant@test.local",
+            "contact_person_name": "Push Contact",
+            "contact_person_position": "Manager",
             "sync_status": "pending",
             "device_id": "device-a"
           }
@@ -47,12 +41,12 @@ select is(
         "updated": [],
         "deleted": []
       },
-      "inspection_reports": {
+      "purpose_of_inspection": {
         "created": [],
         "updated": [],
         "deleted": []
       },
-      "purpose_of_inspection": {
+      "inspection_reports": {
         "created": [],
         "updated": [],
         "deleted": []
@@ -94,22 +88,30 @@ select is(
             "estab_id": "est-push-001",
             "inspector_uid": "11111111-1111-1111-1111-111111111111",
             "name": "Updated Plant",
-            "address": "Updated Address",
+            "address_line": "Updated Address",
+            "barangay": "Push Barangay",
+            "city": "Push City",
             "province": "Occidental Mindoro",
             "nature_of_business": "Manufacturing",
-            "status": "Inactive",
+            "operating_status": "Non-Operational",
+            "owner_name": "Push Owner",
+            "managing_head_name": "Push Head",
+            "phone_fax": "09170000099",
+            "email": "push-plant@test.local",
+            "contact_person_name": "Push Contact",
+            "contact_person_position": "Manager",
             "sync_status": "pending",
             "device_id": "device-a"
           }
         ],
         "deleted": []
       },
-      "inspection_reports": {
+      "purpose_of_inspection": {
         "created": [],
         "updated": [],
         "deleted": []
       },
-      "purpose_of_inspection": {
+      "inspection_reports": {
         "created": [],
         "updated": [],
         "deleted": []
@@ -149,12 +151,12 @@ select is(
         "updated": [],
         "deleted": ["est-push-001"]
       },
-      "inspection_reports": {
+      "purpose_of_inspection": {
         "created": [],
         "updated": [],
         "deleted": []
       },
-      "purpose_of_inspection": {
+      "inspection_reports": {
         "created": [],
         "updated": [],
         "deleted": []
