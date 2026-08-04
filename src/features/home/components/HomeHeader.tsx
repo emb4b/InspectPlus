@@ -53,22 +53,26 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
     return disableCollapse || !collapsed ? 0 : collapsed.value;
   }, [disableCollapse, collapsed]);
 
-  const rowStyle = useAnimatedStyle(() => ({
-    paddingTop: interpolate(progress.value, [0, 1], [10, 6]),
-    paddingBottom: interpolate(progress.value, [0, 1], [12, 6]),
-  }));
+  // paddingTop/paddingBottom on `row` used to animate too, but that's a
+  // second Yoga-affecting node recomputing on every scroll frame right next
+  // to the two below — folded into a static value so only the height
+  // animations (which actually need to reclaim layout space) pay that cost.
+  // logosStyle/subtitleStyle still animate `height` (not transform) because
+  // they need to genuinely reclaim layout space as the header collapses —
+  // but avatarStyle has no such requirement, so it's transform/opacity only
+  // (compositor-only, zero Yoga relayout) to keep at least one of these off
+  // the layout thread entirely.
   const logosStyle = useAnimatedStyle(() => ({
-    height: interpolate(progress.value, [0, 1], [30, 0]),
+    height: interpolate(progress.value, [0, 1], [30, 0], Extrapolation.CLAMP),
     opacity: interpolate(progress.value, [0, 0.6, 1], [1, 0, 0], Extrapolation.CLAMP),
   }));
   const subtitleStyle = useAnimatedStyle(() => ({
-    height: interpolate(progress.value, [0, 1], [16, 0]),
+    height: interpolate(progress.value, [0, 1], [16, 0], Extrapolation.CLAMP),
     opacity: interpolate(progress.value, [0, 0.6, 1], [1, 0, 0], Extrapolation.CLAMP),
   }));
-  const avatarStyle = useAnimatedStyle(() => {
-    const size = interpolate(progress.value, [0, 1], [38, 30]);
-    return { width: size, height: size };
-  });
+  const avatarStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(progress.value, [0, 1], [1, 30 / 38], Extrapolation.CLAMP) }],
+  }));
 
   return (
     <LinearGradient
@@ -77,7 +81,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
       end={{ x: 1, y: 0 }}
       style={styles.header}>
 
-      <Reanimated.View style={[styles.row, rowStyle]}>
+      <View style={styles.row}>
         {/* Left: wordmark + small agency logos + subtitle */}
         <View style={styles.left}>
           <View style={styles.logoRow}>
@@ -110,7 +114,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
             </Reanimated.View>
           </TouchableOpacity>
         )}
-      </Reanimated.View>
+      </View>
     </LinearGradient>
   );
 };
@@ -123,6 +127,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   left: {
     flex: 1,
@@ -157,6 +163,9 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
+    // Fixed size — avatarStyle scales this down visually via transform
+    // rather than animating width/height, so it never triggers a layout
+    // relayout while the header collapse animation is running.
     borderWidth: 1.5,
     borderColor: Colors.green,
     alignItems: 'center',

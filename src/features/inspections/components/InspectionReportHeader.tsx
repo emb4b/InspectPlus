@@ -72,17 +72,17 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
       <View style={styles.card}>
         <View style={styles.topRow}>
           <View style={styles.iconWrap}>
-            <Ionicons name="business" size={16} color={Colors.green} />
+            <Ionicons name="business" size={22} color={Colors.green} />
           </View>
           <View style={styles.titleInfo}>
-            <View style={styles.nameRow}>
-              <Text style={styles.name} numberOfLines={1}>{establishmentName}</Text>
+            <Text style={styles.name}>{establishmentName}</Text>
+            <View style={styles.pillRow}>
               <View style={[styles.pill, { backgroundColor: typeMeta.bgColor }]}>
                 {IconAsset && <IconAsset width={11} height={11} />}
                 <Text style={[styles.pillText, { color: typeMeta.textColor }]}>{typeMeta.label}</Text>
               </View>
             </View>
-            <Text style={styles.location} numberOfLines={1}>{establishmentLocation}</Text>
+            <Text style={styles.location}>{establishmentLocation}</Text>
           </View>
           <View
             style={[
@@ -104,17 +104,17 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
         <View style={styles.metaRow}>
           <View style={styles.metaChip}>
             <Ionicons name="calendar-outline" size={11} color={Colors.textLight} />
-            <Text style={styles.metaText} numberOfLines={1}>{formatDate(inspectionDate)}</Text>
+            <Text style={styles.metaText}>{formatDate(inspectionDate)}</Text>
           </View>
           <View style={styles.metaChip}>
             <Ionicons name="pricetag-outline" size={11} color={Colors.textLight} />
-            <Text style={styles.metaText} numberOfLines={1}>
+            <Text style={styles.metaText}>
               {reportControlNo ? `Control No. ${reportControlNo}` : 'No control number yet'}
             </Text>
           </View>
           <View style={styles.metaChip}>
             <Ionicons name="person-circle-outline" size={12} color={Colors.textLight} />
-            <Text style={styles.metaText} numberOfLines={1}>{inspectorLabel}</Text>
+            <Text style={styles.metaText}>{inspectorLabel}</Text>
           </View>
         </View>
       </View>
@@ -173,13 +173,15 @@ const styles = StyleSheet.create({
   },
   topRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     gap: 10,
   },
   iconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 9,
+    // No fixed size — stretches to the title block's height (topRow's
+    // tallest child) and aspectRatio keeps it square, so it scales up
+    // with the block instead of looking small next to a 3-line title.
+    aspectRatio: 1,
+    borderRadius: 12,
     backgroundColor: Colors.greenMuted,
     alignItems: 'center',
     justifyContent: 'center',
@@ -189,16 +191,14 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
   name: {
     fontSize: 17,
     fontWeight: '800',
     color: Colors.navy,
-    flexShrink: 1,
+  },
+  pillRow: {
+    flexDirection: 'row',
+    marginTop: 4,
   },
   pill: {
     flexDirection: 'row',
@@ -215,9 +215,10 @@ const styles = StyleSheet.create({
   location: {
     fontSize: 11.5,
     color: Colors.textMuted,
-    marginTop: 2,
+    marginTop: 4,
   },
   statusBadge: {
+    alignSelf: 'center',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 20,
@@ -234,16 +235,14 @@ const styles = StyleSheet.create({
   },
   metaRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    alignItems: 'stretch',
     gap: 6,
   },
   metaChip: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    flexShrink: 1,
-    minWidth: 0,
     backgroundColor: Colors.bgMuted,
     borderWidth: 1,
     borderColor: Colors.borderLight,
@@ -252,6 +251,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   metaText: {
+    flex: 1,
     flexShrink: 1,
     fontSize: 10.5,
     fontWeight: '600',
