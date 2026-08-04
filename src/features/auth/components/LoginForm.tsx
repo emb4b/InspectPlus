@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
 import { Colors } from '../../../constants/colors';
 import { useAuth } from '../hooks/useAuth';
 import { Ionicons } from '@expo/vector-icons';
+import { focusInput } from '../../../components/form';
 
 export const LoginForm: React.FC = () => {
   const [username, setUsername] = useState('');
@@ -17,6 +18,7 @@ export const LoginForm: React.FC = () => {
   const [usernameFocused, setUsernameFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const passwordRef = useRef<TextInput>(null);
 
   const { login, isLoading, error, clearError } = useAuth();
 
@@ -41,6 +43,8 @@ export const LoginForm: React.FC = () => {
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="next"
+          blurOnSubmit={false}
+          onSubmitEditing={() => focusInput(passwordRef.current)}
         />
       </View>
 
@@ -49,6 +53,7 @@ export const LoginForm: React.FC = () => {
         <Text style={styles.label}>Password</Text>
         <View style={styles.inputWrapper}>
           <TextInput
+            ref={passwordRef}
             style={[styles.input, styles.inputWithIcon,
               passwordFocused && styles.inputFocused]}
             placeholder="Enter password"

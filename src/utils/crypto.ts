@@ -6,3 +6,7 @@ export async function hashString(input: string): Promise<string> {
     input,
   );
 }
+
+export function generateId(): string {
+  return Crypto.randomUUID();
+}

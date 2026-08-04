@@ -9,6 +9,7 @@ const SESSION_TS_KEY    = 'inspectplus.session.ts';
 const CRED_HASH_KEY     = 'inspectplus.cred.hash';
 const CRED_EMAIL_KEY    = 'inspectplus.cred.email';
 const CRED_USERNAME_KEY = 'inspectplus.cred.username';
+const CRED_FULLNAME_KEY = 'inspectplus.cred.fullname';
 const CRED_TS_KEY       = 'inspectplus.cred.ts';
 
 // ── Timeouts ──────────────────────────────────────────────
@@ -53,19 +54,21 @@ async function signInOnline(
   });
   if (error) throw error;
 
-  // Always resolve the canonical username, regardless of which
-  // credential type was used to log in
   let resolvedUsername = '';
+  let resolvedFullName = '';
   if (data.user) {
     const { data: profile, error: profileError } = await supabase
       .from('user_accounts')
-      .select('username')
+      .select('username, first_name, middle_name, last_name')
       .eq('uid', data.user.id)
       .single();
     if (profileError) {
       console.log('[Auth] Could not resolve username for offline cache:', profileError.message);
     } else {
       resolvedUsername = profile?.username ?? '';
+      resolvedFullName = [profile?.first_name, profile?.middle_name, profile?.last_name]
+        .filter(Boolean)
+        .join(' ');
     }
   }
 
@@ -78,13 +81,14 @@ async function signInOnline(
     SecureStore.setItemAsync(CRED_HASH_KEY,     credHash),
     SecureStore.setItemAsync(CRED_EMAIL_KEY,    email),
     SecureStore.setItemAsync(CRED_USERNAME_KEY, resolvedUsername),
+    SecureStore.setItemAsync(CRED_FULLNAME_KEY, resolvedFullName),
     SecureStore.setItemAsync(CRED_TS_KEY,       now),
   ]);
 
   console.log('[Auth] Online sign-in success. Credentials cached at', now,
     '| email:', email, '| username:', resolvedUsername);
 
-  return data;
+  return { ...data, fullName: resolvedFullName };
 }
 
 async function signInOffline(
@@ -119,13 +123,13 @@ async function signInOffline(
     );
   }
 
-  // Refresh the short-cache timestamp. Without this, a successful manual
-  // offline re-entry would NOT grant a fresh 30-minute auto-login window —
-  // the user would be forced to retype their password every time they
-  // reopen the app offline, even minutes apart.
+  // Refresh the short-cache timestamp so a successful manual offline
+  // re-entry also grants a fresh 30-minute auto-login window.
   await SecureStore.setItemAsync(SESSION_TS_KEY, Date.now().toString());
 
-  return { session: JSON.parse(sessionRaw), user: null };
+  const fullName = (await SecureStore.getItemAsync(CRED_FULLNAME_KEY)) ?? '';
+
+  return { session: JSON.parse(sessionRaw), user: null, fullName };
 }
 
 // ── Public API ────────────────────────────────────────────
@@ -151,6 +155,26 @@ export const authService = {
     }
   },
 
+  async getCachedFullName(): Promise<string> {
+    try {
+      return (await SecureStore.getItemAsync(CRED_FULLNAME_KEY)) ?? '';
+    } catch {
+      return '';
+    }
+  },
+
+  // Backfills CRED_FULLNAME_KEY for a session that was restored without
+  // ever going through signInOnline (e.g. a short-cache auto-restore on a
+  // device whose credential cache predates this feature) — see
+  // AuthProvider's self-healing effect.
+  async cacheFullName(fullName: string): Promise<void> {
+    try {
+      await SecureStore.setItemAsync(CRED_FULLNAME_KEY, fullName);
+    } catch {
+      // Best effort — worst case it re-resolves next boot too.
+    }
+  },
+
   async hasActiveCredentialWindow(): Promise<boolean> {
     try {
       const ts = await SecureStore.getItemAsync(CRED_TS_KEY);
@@ -162,24 +186,26 @@ export const authService = {
   },
 
   async signOut() {
-    await Promise.all([
-      SecureStore.deleteItemAsync(SESSION_KEY),
-      SecureStore.deleteItemAsync(SESSION_TS_KEY),
-      SecureStore.deleteItemAsync(CRED_HASH_KEY),
-      SecureStore.deleteItemAsync(CRED_EMAIL_KEY),
-      SecureStore.deleteItemAsync(CRED_USERNAME_KEY),
-      SecureStore.deleteItemAsync(CRED_TS_KEY),
-    ]);
+    // IMPORTANT: we deliberately do NOT delete SESSION_KEY or any of the
+    // CRED_* keys here. Those are what allow an inspector to log back in
+    // OFFLINE for the rest of that 24-hour window after logging in online
+    // just once. Wiping them on every logout would defeat that entirely.
+    //
+    // We only delete SESSION_TS_KEY — this is the marker that lets the
+    // app silently auto-restore a session within 30 minutes with no
+    // password at all. Removing it means logout actually requires the
+    // password to be re-entered next time, even though that re-entry
+    // can still succeed fully offline via the preserved CRED_* keys.
+    await SecureStore.deleteItemAsync(SESSION_TS_KEY);
+
     try {
-      // 'local' scope clears the on-device session immediately without
-      // a network round-trip — this works correctly even while offline.
-      // Without this, an offline logout could leave a stale session
-      // sitting in Supabase's own AsyncStorage persistence, which could
-      // resurrect on the next app launch.
+      // 'local' scope clears Supabase's own persisted session without
+      // needing network, so the online auto-restore path doesn't
+      // silently bypass the login screen either.
       await supabase.auth.signOut({ scope: 'local' });
     } catch {
-      // Ignore — the SecureStore state above is what actually gates
-      // re-entry into the app, so this is a best-effort cleanup.
+      // Best effort — SESSION_TS_KEY above is what actually gates
+      // automatic re-entry.
     }
   },
 };

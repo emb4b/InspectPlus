@@ -1,41 +1,81 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import {
   View,
   Text,
   TextInput,
   TouchableOpacity,
+  ActivityIndicator,
+  Keyboard,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { Colors } from '../../../constants/colors';
-import { EstablishmentCard } from './EstablishmentCard';
-import {
-  MOCK_ESTABLISHMENTS,
-} from '../data/mockEstablishments';
+import { ReportListCard } from './ReportListCard';
+import { useAllReports, AllReportItem, ReportStatusFilter } from '../hooks/useEstablishment';
 
 const PAGE_SIZE = 5;
 
-export const ManageReportsTab: React.FC = () => {
+const STATUS_FILTERS: { key: ReportStatusFilter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'draft', label: 'Draft' },
+  { key: 'submitted', label: 'Submitted' },
+];
+
+export interface ManageReportsTabHandle {
+  refresh: () => Promise<void>;
+}
+
+export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref) => {
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<ReportStatusFilter>('all');
   const [page, setPage] = useState(1);
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    if (!q) return MOCK_ESTABLISHMENTS;
-    return MOCK_ESTABLISHMENTS.filter(
-      e =>
-        e.name.toLowerCase().includes(q) ||
-        e.location.toLowerCase().includes(q),
-    );
-  }, [search]);
+  const { reports, loading, error, refetch } = useAllReports(search, statusFilter);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  useImperativeHandle(ref, () => ({ refresh: refetch }), [refetch]);
 
-  const handleSearch = (text: string) => {
+  const totalPages = Math.max(1, Math.ceil(reports.length / PAGE_SIZE));
+  const paginated = reports.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const handleSearch = useCallback((text: string) => {
     setSearch(text);
     setPage(1);
-  };
+  }, []);
+
+  const handleFilterChange = useCallback((key: ReportStatusFilter) => {
+    setStatusFilter(key);
+    setPage(1);
+  }, []);
+
+  const handleOpen = useCallback((item: AllReportItem) => {
+    if (item.kind === 'inspection') {
+      router.push({ pathname: '/inspection/[id]', params: { id: item.reportId } });
+    } else {
+      router.push({ pathname: '/survey/[id]', params: { id: item.reportId } });
+    }
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.centeredState}>
+        <ActivityIndicator size="large" color={Colors.navy} />
+        <Text style={styles.stateText}>Loading reports...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.centeredState}>
+        <Ionicons name="alert-circle-outline" size={40} color={Colors.conflict} />
+        <Text style={styles.stateText}>{error}</Text>
+        <TouchableOpacity style={styles.retryBtn} onPress={refetch} activeOpacity={0.8}>
+          <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -44,13 +84,14 @@ export const ManageReportsTab: React.FC = () => {
         <Ionicons name="search-outline" size={14} color={Colors.textMuted} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by establishment name..."
+          placeholder="Search by establishment, report, or control no..."
           placeholderTextColor={Colors.textMuted}
           value={search}
           onChangeText={handleSearch}
           autoCorrect={false}
           autoCapitalize="none"
           returnKeyType="search"
+          onSubmitEditing={() => Keyboard.dismiss()}
         />
         {search.length > 0 && (
           <TouchableOpacity onPress={() => handleSearch('')} activeOpacity={0.7}>
@@ -59,24 +100,41 @@ export const ManageReportsTab: React.FC = () => {
         )}
       </View>
 
-      {/* Section label */}
-      <Text style={styles.sectionLabel}>EXISTING ESTABLISHMENTS</Text>
+      {/* Status filter chips */}
+      <View style={styles.filterRow}>
+        {STATUS_FILTERS.map(f => {
+          const isActive = statusFilter === f.key;
+          return (
+            <TouchableOpacity
+              key={f.key}
+              style={[styles.filterChip, isActive && styles.filterChipActive]}
+              onPress={() => handleFilterChange(f.key)}
+              activeOpacity={0.75}>
+              <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
+                {f.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
 
-      {/* Establishment list */}
+      {/* Section label + count */}
+      <View style={styles.sectionRow}>
+        <Text style={styles.sectionLabel}>REPORTS</Text>
+        <Text style={styles.sectionCount}>{reports.length} total</Text>
+      </View>
+
+      {/* List */}
       {paginated.length === 0 ? (
-        <View style={styles.emptyWrap}>
-          <Ionicons name="business-outline" size={40} color={Colors.border} />
-          <Text style={styles.emptyText}>No establishments found.</Text>
+        <View style={styles.centeredState}>
+          <Ionicons name="document-outline" size={40} color={Colors.border} />
+          <Text style={styles.stateText}>
+            {search || statusFilter !== 'all' ? 'No reports match your filters.' : 'No reports yet.'}
+          </Text>
         </View>
       ) : (
         paginated.map(item => (
-          <EstablishmentCard
-            key={item.id}
-            item={item}
-            onAdd={id => console.log('Add report for:', id)}
-            onEdit={id => console.log('Edit:', id)}
-            onDelete={id => console.log('Delete:', id)}
-          />
+          <ReportListCard key={item.key} item={item} onPress={handleOpen} />
         ))
       )}
 
@@ -141,12 +199,36 @@ export const ManageReportsTab: React.FC = () => {
       )}
     </View>
   );
-};
+});
+
+ManageReportsTab.displayName = 'ManageReportsTab';
 
 const styles = StyleSheet.create({
   container: {
     padding: 16,
     paddingBottom: 32,
+  },
+  centeredState: {
+    alignItems: 'center',
+    paddingTop: 48,
+    gap: 10,
+  },
+  stateText: {
+    fontSize: 13,
+    color: Colors.textMuted,
+    textAlign: 'center',
+  },
+  retryBtn: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    backgroundColor: Colors.navy,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  retryText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textWhite,
   },
   searchWrap: {
     flexDirection: 'row',
@@ -156,7 +238,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 8,
-    marginBottom: 14,
+    marginBottom: 12,
   },
   searchInput: {
     flex: 1,
@@ -164,22 +246,47 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     paddingVertical: 0,
   },
+  filterRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 14,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: Colors.bgLight,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  filterChipActive: {
+    backgroundColor: Colors.navy,
+    borderColor: Colors.navy,
+  },
+  filterChipText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: Colors.textMuted,
+  },
+  filterChipTextActive: {
+    color: Colors.textWhite,
+  },
+  sectionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
   sectionLabel: {
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1,
     color: Colors.textMuted,
-    marginBottom: 12,
     fontFamily: 'monospace',
   },
-  emptyWrap: {
-    alignItems: 'center',
-    paddingTop: 48,
-    gap: 10,
-  },
-  emptyText: {
-    fontSize: 13,
-    color: Colors.textMuted,
+  sectionCount: {
+    fontSize: 10,
+    color: Colors.textLight,
   },
   pager: {
     flexDirection: 'row',

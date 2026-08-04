@@ -1,30 +1,74 @@
 import React from 'react';
-import {
-  View,
-  Image,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
+import { View, Image, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import Reanimated, {
+  Extrapolation,
+  interpolate,
+  SharedValue,
+  useAnimatedStyle,
+  useDerivedValue,
+} from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
 import { Colors } from '../../../constants/colors';
+import { Logo } from '../../../components/Logo';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 
-export const HomeHeader: React.FC = () => {
+interface HomeHeaderProps {
+  // Hide the avatar/logout control on pages with no active session (e.g. login).
+  showAccountButton?: boolean;
+  // Scroll-driven collapse progress (0 = expanded, 1 = collapsed), shared
+  // with whatever screen is currently mounted below — see HeaderScrollContext.
+  // A shared value (not React state) so the animation runs entirely on the
+  // UI thread instead of racing the scroll handler for JS-thread time.
+  collapsed?: SharedValue<number>;
+  // Home always shows the full header regardless of scroll state.
+  disableCollapse?: boolean;
+}
+
+export const HomeHeader: React.FC<HomeHeaderProps> = ({
+  showAccountButton = true,
+  collapsed,
+  disableCollapse = false,
+}) => {
   const { signOut } = useAuthContext();
 
   const handleLogout = async () => {
     try {
+      // No manual navigation here — this component is rendered several
+      // navigator levels deep (root Stack → (app) group → its inner Stack),
+      // so an imperative root-level redirect from here can silently
+      // misfire. RootNavigator (the true root) reactively redirects to
+      // '/' as soon as signOut() clears the session below.
       await signOut();
     } catch (err) {
       console.warn('[HomeHeader] signOut encountered an error:', err);
-    } finally {
-      // Navigate regardless — local session state is cleared either way,
-      // so the user shouldn't get stuck on this screen.
-      router.replace('/');
+      Alert.alert('Sign out failed', 'Something went wrong while signing out. Please try again.');
     }
   };
+
+  // Single derived value so every interpolation below reacts to the same
+  // number — recomputed on the UI thread whenever `collapsed` changes, and
+  // pinned to 0 on screens (home) that opt out of collapsing altogether.
+  const progress = useDerivedValue(() => {
+    return disableCollapse || !collapsed ? 0 : collapsed.value;
+  }, [disableCollapse, collapsed]);
+
+  const rowStyle = useAnimatedStyle(() => ({
+    paddingTop: interpolate(progress.value, [0, 1], [10, 6]),
+    paddingBottom: interpolate(progress.value, [0, 1], [12, 6]),
+  }));
+  const logosStyle = useAnimatedStyle(() => ({
+    height: interpolate(progress.value, [0, 1], [30, 0]),
+    opacity: interpolate(progress.value, [0, 0.6, 1], [1, 0, 0], Extrapolation.CLAMP),
+  }));
+  const subtitleStyle = useAnimatedStyle(() => ({
+    height: interpolate(progress.value, [0, 1], [16, 0]),
+    opacity: interpolate(progress.value, [0, 0.6, 1], [1, 0, 0], Extrapolation.CLAMP),
+  }));
+  const avatarStyle = useAnimatedStyle(() => {
+    const size = interpolate(progress.value, [0, 1], [38, 30]);
+    return { width: size, height: size };
+  });
 
   return (
     <LinearGradient
@@ -33,42 +77,40 @@ export const HomeHeader: React.FC = () => {
       end={{ x: 1, y: 0 }}
       style={styles.header}>
 
-      <View style={styles.row}>
-        {/* Left: logo + small agency logos + subtitle */}
+      <Reanimated.View style={[styles.row, rowStyle]}>
+        {/* Left: wordmark + small agency logos + subtitle */}
         <View style={styles.left}>
           <View style={styles.logoRow}>
-            {/* iNSPECTPlus wordmark */}
-            <Image
-              source={require('../../../../assets/inspect_plus_logo.png')}
-              style={styles.wordmark}
-              resizeMode="contain"
-            />
-            {/* Small agency logos inline */}
-            <Image
-              source={require('../../../../assets/denr_logo.png')}
-              style={styles.agencyLogo}
-              resizeMode="contain"
-            />
-            <Image
-              source={require('../../../../assets/bagong_pilipinas_logo.png')}
-              style={styles.agencyLogo}
-              resizeMode="contain"
-            />
+            <Logo dark variant="plain" fontSize={19} />
+            <Reanimated.View style={[styles.logosRow, logosStyle]}>
+              <Image
+                source={require('../../../../assets/denr_logo.png')}
+                style={styles.agencyLogo}
+                resizeMode="contain"
+              />
+              <Image
+                source={require('../../../../assets/bagong_pilipinas_logo.png')}
+                style={styles.agencyLogo}
+                resizeMode="contain"
+              />
+            </Reanimated.View>
           </View>
+          <Reanimated.View style={[styles.subtitleWrap, subtitleStyle]}>
+            <Text style={styles.subtitle} numberOfLines={1}>
+              EMB4B INSPECTION & MONITORING SYSTEM
+            </Text>
+          </Reanimated.View>
         </View>
 
         {/* Right: avatar / logout button */}
-        <TouchableOpacity
-          style={styles.avatarBtn}
-          onPress={handleLogout}
-          activeOpacity={0.8}>
-          <Ionicons
-            name="person-circle-outline"
-            size={30}
-            color={Colors.textWhite}
-          />
-        </TouchableOpacity>
-      </View>
+        {showAccountButton && (
+          <TouchableOpacity onPress={handleLogout} activeOpacity={0.8}>
+            <Reanimated.View style={[styles.avatarBtn, avatarStyle]}>
+              <Ionicons name="person-circle-outline" size={26} color={Colors.textWhite} />
+            </Reanimated.View>
+          </TouchableOpacity>
+        )}
+      </Reanimated.View>
     </LinearGradient>
   );
 };
@@ -76,8 +118,6 @@ export const HomeHeader: React.FC = () => {
 const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 14,
-    paddingTop: 10,
-    paddingBottom: 12,
   },
   row: {
     flexDirection: 'row',
@@ -90,16 +130,28 @@ const styles = StyleSheet.create({
   logoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
   },
-  wordmark: {
-    width: 130,
-    height: 40,
+  logosRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    overflow: 'hidden',
   },
   agencyLogo: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+  },
+  subtitleWrap: {
+    overflow: 'hidden',
+  },
+  subtitle: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    letterSpacing: 0.4,
+    color: 'rgba(255,255,255,0.6)',
+    marginTop: 3,
   },
   avatarBtn: {
     width: 38,
