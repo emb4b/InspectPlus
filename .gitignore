@@ -81,6 +81,7 @@ yarn-error.log
 # supabase local runtime
 supabase/.temp/
 supabase/functions/.env
+supabase/snippets/
 
 # mobile build outputs
 android/app/build/
@@ -98,3 +99,4 @@ ios/Pods/
 coverage/
 dist/
 build/
+.expo/

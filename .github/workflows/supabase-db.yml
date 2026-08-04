@@ -1,0 +1,45 @@
+name: Supabase DB Tests
+
+on:
+  push:
+    branches:
+      - develop
+      - 'feature/**'
+      - 'hotfix/**'
+  pull_request:
+
+jobs:
+  supabase-db-tests:
+    name: ci/supabase-db-tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase local stack
+        run: npx supabase start
+
+      - name: Reset local database
+        run: npx supabase db reset
+
+      - name: Run database tests
+        run: npx supabase test db
+
+      - name: Stop Supabase local stack
+        if: always()
+        run: npx supabase stop
