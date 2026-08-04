@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+  <!-- DEV ONLY: allow cleartext HTTP for local Supabase testing.
+       Remove or restrict before any real deployment. -->
+  <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
