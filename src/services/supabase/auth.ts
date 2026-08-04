@@ -6,15 +6,30 @@ import { hashString } from '../../utils/crypto';
 // ── Storage keys ──────────────────────────────────────────
 const SESSION_KEY       = 'inspectplus.session';
 const SESSION_TS_KEY    = 'inspectplus.session.ts';
-const CRED_HASH_KEY     = 'inspectplus.cred.hash';
-const CRED_EMAIL_KEY    = 'inspectplus.cred.email';
-const CRED_USERNAME_KEY = 'inspectplus.cred.username';
 const CRED_FULLNAME_KEY = 'inspectplus.cred.fullname';
-const CRED_TS_KEY       = 'inspectplus.cred.ts';
+// Every inspector who has signed in online on this device, keyed by email,
+// each with their own password hash + session so any of them (not just
+// whoever logged in most recently) can sign back in offline. See
+// CachedCredential below.
+const CRED_USERS_KEY    = 'inspectplus.cred.users';
 
 // ── Timeouts ──────────────────────────────────────────────
 const SHORT_CACHE_MS    = 30 * 60 * 1000;
 const CREDENTIAL_WINDOW = 24 * 60 * 60 * 1000;
+
+// ── Types ───────────────────────────────────────────────────
+interface CachedCredential {
+  email: string;
+  username: string;
+  fullName: string;
+  credHash: string;
+  // This user's own Supabase session, so offline sign-in can restore the
+  // right one even when they're not the last person who used the device.
+  session: object;
+  // When this credential was last refreshed by a successful online
+  // sign-in — the 24h offline window is measured from here, per user.
+  ts: number;
+}
 
 // ── Auth-specific helpers (not reusable outside auth) ─────
 function buildCredentialHash(email: string, password: string) {
@@ -29,17 +44,43 @@ async function resolveEmail(emailOrUsername: string): Promise<string> {
   return data as string;
 }
 
-async function resolveEmailOffline(emailOrUsername: string): Promise<string> {
-  if (emailOrUsername.includes('@')) return emailOrUsername;
-  const storedUsername = await SecureStore.getItemAsync(CRED_USERNAME_KEY);
-  const storedEmail    = await SecureStore.getItemAsync(CRED_EMAIL_KEY);
-  if (storedUsername !== emailOrUsername || !storedEmail) {
-    throw new Error(
-      'Username not recognized for offline access. ' +
-      'Please connect to the internet to log in.',
-    );
+// ── Per-device, multi-user offline credential store ────────
+async function readCachedUsers(): Promise<CachedCredential[]> {
+  try {
+    const raw = await SecureStore.getItemAsync(CRED_USERS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
   }
-  return storedEmail;
+}
+
+async function writeCachedUsers(users: CachedCredential[]): Promise<void> {
+  await SecureStore.setItemAsync(CRED_USERS_KEY, JSON.stringify(users));
+}
+
+// Adds this inspector's credential to the device's offline store, or
+// refreshes it (new hash, session, and 24h window) if they were already
+// cached from a previous online sign-in — every other cached inspector on
+// this device keeps their own entry untouched.
+async function upsertCachedUser(entry: CachedCredential): Promise<void> {
+  const users = await readCachedUsers();
+  const next = users.filter(
+    u => u.email.toLowerCase() !== entry.email.toLowerCase(),
+  );
+  next.push(entry);
+  await writeCachedUsers(next);
+}
+
+function findCachedUser(
+  users: CachedCredential[],
+  emailOrUsername: string,
+): CachedCredential | undefined {
+  const needle = emailOrUsername.toLowerCase();
+  return emailOrUsername.includes('@')
+    ? users.find(u => u.email.toLowerCase() === needle)
+    : users.find(u => u.username.toLowerCase() === needle);
 }
 
 // ── Sign-in flows ─────────────────────────────────────────
@@ -72,17 +113,21 @@ async function signInOnline(
     }
   }
 
-  const now      = Date.now().toString();
+  const now      = Date.now();
   const credHash = await buildCredentialHash(email, password);
 
   await Promise.all([
     SecureStore.setItemAsync(SESSION_KEY,       JSON.stringify(data.session)),
-    SecureStore.setItemAsync(SESSION_TS_KEY,    now),
-    SecureStore.setItemAsync(CRED_HASH_KEY,     credHash),
-    SecureStore.setItemAsync(CRED_EMAIL_KEY,    email),
-    SecureStore.setItemAsync(CRED_USERNAME_KEY, resolvedUsername),
+    SecureStore.setItemAsync(SESSION_TS_KEY,    now.toString()),
     SecureStore.setItemAsync(CRED_FULLNAME_KEY, resolvedFullName),
-    SecureStore.setItemAsync(CRED_TS_KEY,       now),
+    upsertCachedUser({
+      email,
+      username: resolvedUsername,
+      fullName: resolvedFullName,
+      credHash,
+      session: data.session as object,
+      ts: now,
+    }),
   ]);
 
   console.log('[Auth] Online sign-in success. Credentials cached at', now,
@@ -95,41 +140,50 @@ async function signInOffline(
   emailOrUsername: string,
   password: string,
 ) {
-  const credTs = await SecureStore.getItemAsync(CRED_TS_KEY);
-  console.log('[Auth] Offline attempt — CRED_TS_KEY found:', credTs);
-  if (!credTs) {
+  const users = await readCachedUsers();
+  if (users.length === 0) {
     throw new Error(
       'No offline credentials stored. ' +
       'Please connect to the internet to log in.',
     );
   }
-  if (Date.now() - parseInt(credTs) >= CREDENTIAL_WINDOW) {
+
+  const match = findCachedUser(users, emailOrUsername);
+  if (!match) {
+    throw new Error(
+      'Username not recognized for offline access. ' +
+      'Please connect to the internet to log in.',
+    );
+  }
+
+  if (Date.now() - match.ts >= CREDENTIAL_WINDOW) {
     throw new Error(
       'Offline access has expired. ' +
       'Please connect to the internet to log in.',
     );
   }
 
-  const email      = await resolveEmailOffline(emailOrUsername);
-  const storedHash = await SecureStore.getItemAsync(CRED_HASH_KEY);
-  const inputHash  = await buildCredentialHash(email, password);
-  if (inputHash !== storedHash) throw new Error('Invalid credentials.');
+  const inputHash = await buildCredentialHash(match.email, password);
+  if (inputHash !== match.credHash) throw new Error('Invalid credentials.');
 
-  const sessionRaw = await SecureStore.getItemAsync(SESSION_KEY);
-  if (!sessionRaw) {
+  if (!match.session) {
     throw new Error(
       'Session not found. ' +
       'Please connect to the internet to log in.',
     );
   }
 
-  // Refresh the short-cache timestamp so a successful manual offline
-  // re-entry also grants a fresh 30-minute auto-login window.
-  await SecureStore.setItemAsync(SESSION_TS_KEY, Date.now().toString());
+  // This inspector becomes the device's active session — the short-cache
+  // auto-restore and the cached display name both follow whoever most
+  // recently signed in, online or off.
+  const now = Date.now().toString();
+  await Promise.all([
+    SecureStore.setItemAsync(SESSION_KEY,       JSON.stringify(match.session)),
+    SecureStore.setItemAsync(SESSION_TS_KEY,    now),
+    SecureStore.setItemAsync(CRED_FULLNAME_KEY, match.fullName),
+  ]);
 
-  const fullName = (await SecureStore.getItemAsync(CRED_FULLNAME_KEY)) ?? '';
-
-  return { session: JSON.parse(sessionRaw), user: null, fullName };
+  return { session: match.session, user: null, fullName: match.fullName };
 }
 
 // ── Public API ────────────────────────────────────────────
@@ -175,27 +229,30 @@ export const authService = {
     }
   },
 
+  // True if ANY inspector cached on this device still has an active 24h
+  // offline window — not tied to whoever is currently signed in.
   async hasActiveCredentialWindow(): Promise<boolean> {
     try {
-      const ts = await SecureStore.getItemAsync(CRED_TS_KEY);
-      if (!ts) return false;
-      return Date.now() - parseInt(ts) < CREDENTIAL_WINDOW;
+      const users = await readCachedUsers();
+      return users.some(u => Date.now() - u.ts < CREDENTIAL_WINDOW);
     } catch {
       return false;
     }
   },
 
   async signOut() {
-    // IMPORTANT: we deliberately do NOT delete SESSION_KEY or any of the
-    // CRED_* keys here. Those are what allow an inspector to log back in
-    // OFFLINE for the rest of that 24-hour window after logging in online
-    // just once. Wiping them on every logout would defeat that entirely.
+    // IMPORTANT: we deliberately do NOT delete CRED_USERS_KEY (or any one
+    // user's entry in it) here. Those are what let ANY inspector who has
+    // signed in online on this device log back in OFFLINE for the rest of
+    // their own 24-hour window — wiping them on every logout would defeat
+    // that entirely, for this user and every other cached inspector.
     //
     // We only delete SESSION_TS_KEY — this is the marker that lets the
     // app silently auto-restore a session within 30 minutes with no
     // password at all. Removing it means logout actually requires the
     // password to be re-entered next time, even though that re-entry
-    // can still succeed fully offline via the preserved CRED_* keys.
+    // can still succeed fully offline via the preserved CRED_USERS_KEY
+    // entry for whoever logs back in.
     await SecureStore.deleteItemAsync(SESSION_TS_KEY);
 
     try {
