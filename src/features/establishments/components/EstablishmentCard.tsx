@@ -3,18 +3,18 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Image,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
-import type { MockEstablishment, ComplianceTag } from '../data/mockEstablishments';
+import type { EstablishmentDTO, ComplianceTag } from '../types';
 
 interface EstablishmentCardProps {
-  item: MockEstablishment;
-  onAdd?: (id: string) => void;
-  onEdit?: (id: string) => void;
-  onDelete?: (id: string) => void;
+  item: EstablishmentDTO;
+  onPress?: (item: EstablishmentDTO) => void;
+  onAdd?: (item: EstablishmentDTO) => void;
+  onEdit?: (item: EstablishmentDTO) => void;
+  onDelete?: (item: EstablishmentDTO) => void;
 }
 
 const TAG_STYLES: Record<ComplianceTag, { bg: string; text: string; icon: string }> = {
@@ -29,21 +29,26 @@ const MAX_VISIBLE_TAGS = 3;
 
 export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
   item,
+  onPress,
   onAdd,
   onEdit,
   onDelete,
 }) => {
-  const visibleTags = item.tags.slice(0, MAX_VISIBLE_TAGS);
-  const overflowCount = item.tags.length - MAX_VISIBLE_TAGS;
+  const visibleTags = item.complianceTags.slice(0, MAX_VISIBLE_TAGS);
+  const overflowCount = item.complianceTags.length - MAX_VISIBLE_TAGS;
 
   return (
-    <View style={styles.card}>
-      {/* Left: establishment icon */}
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() => onPress?.(item)}
+      activeOpacity={onPress ? 0.75 : 1}
+      disabled={!onPress}>
+      {/* Icon */}
       <View style={styles.iconWrap}>
         <Ionicons name="business" size={22} color="#94a3b8" />
       </View>
 
-      {/* Center: content */}
+      {/* Content */}
       <View style={styles.content}>
         {/* Top row: name + action buttons */}
         <View style={styles.topRow}>
@@ -51,20 +56,20 @@ export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
           <View style={styles.actions}>
             <TouchableOpacity
               style={styles.btnAdd}
-              onPress={() => onAdd?.(item.id)}
+              onPress={() => onAdd?.(item)}
               activeOpacity={0.75}>
               <Text style={styles.btnAddText}>+ Add</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.btnEdit}
-              onPress={() => onEdit?.(item.id)}
+              onPress={() => onEdit?.(item)}
               activeOpacity={0.75}>
               <Ionicons name="pencil" size={10} color={Colors.textWhite} />
               <Text style={styles.btnEditText}>Edit</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.btnDelete}
-              onPress={() => onDelete?.(item.id)}
+              onPress={() => onDelete?.(item)}
               activeOpacity={0.75}>
               <Ionicons name="trash-outline" size={12} color={Colors.textWhite} />
             </TouchableOpacity>
@@ -74,10 +79,24 @@ export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
         {/* Location */}
         <View style={styles.locationRow}>
           <Ionicons name="location" size={10} color="#e74c3c" />
-          <Text style={styles.location}>{item.location}</Text>
+          <Text style={styles.location}>{item.addressLine}, {item.city}, {item.province}</Text>
         </View>
 
-        {/* Tags */}
+        {/* Sync status indicator */}
+        {item.syncStatus === 'pending' && (
+          <View style={styles.syncRow}>
+            <Ionicons name="cloud-upload-outline" size={10} color={Colors.pending} />
+            <Text style={styles.syncText}>Pending sync</Text>
+          </View>
+        )}
+        {item.syncStatus === 'conflict' && (
+          <View style={styles.syncRow}>
+            <Ionicons name="alert-circle-outline" size={10} color={Colors.conflict} />
+            <Text style={[styles.syncText, { color: Colors.conflict }]}>Sync conflict</Text>
+          </View>
+        )}
+
+        {/* Compliance tags */}
         <View style={styles.tagRow}>
           {visibleTags.map(tag => {
             const s = TAG_STYLES[tag];
@@ -93,9 +112,17 @@ export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
               <Text style={styles.tagOverflowText}>+{overflowCount} more</Text>
             </View>
           )}
+
+          {/* Empty state — no reports yet */}
+          {item.complianceTags.length === 0 && (
+            <Text style={styles.noTags}>No reports yet</Text>
+          )}
         </View>
       </View>
-    </View>
+
+      {/* Chevron */}
+      <Ionicons name="chevron-forward" size={14} color={Colors.textLight} />
+    </TouchableOpacity>
   );
 };
 
@@ -186,16 +213,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    marginBottom: 7,
+    marginBottom: 4,
   },
   location: {
     fontSize: 10,
     color: Colors.textMuted,
+    flex: 1,
+  },
+  syncRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginBottom: 4,
+  },
+  syncText: {
+    fontSize: 9,
+    color: Colors.pending,
+    fontWeight: '600',
   },
   tagRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 5,
+    marginTop: 2,
   },
   tag: {
     flexDirection: 'row',
@@ -219,5 +259,10 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '600',
     color: Colors.textMuted,
+  },
+  noTags: {
+    fontSize: 9,
+    color: Colors.textLight,
+    fontStyle: 'italic',
   },
 });

@@ -2,21 +2,29 @@ import React, { useEffect } from 'react';
 import { Stack, router } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { AuthProvider, useAuthContext } from '../core/providers/AuthProvider';
-import { Colors } from '../constants/colors';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { ActivityIndicator, View } from 'react-native';
+import { AuthProvider, useAuthContext } from '../core/providers/AuthProvider';
+import { DatabaseProvider } from '../core/providers/DatabaseProvider';
+import { Colors } from '../constants/colors';
 
+// ── Root navigator — drives routing based on live auth session ────────────────
 function RootNavigator() {
   const { session, loading } = useAuthContext();
+  // Supabase's onAuthStateChange fires a new `session` object on every
+  // silent token refresh, not just on real login/logout — deriving a
+  // stable boolean keeps the redirect effect from re-firing (and replaying
+  // its transition) whenever that happens without an actual status change.
+  const isAuthenticated = !!session;
 
   useEffect(() => {
     if (loading) return;
-    if (session) {
+    if (isAuthenticated) {
       router.replace('/home');
     } else {
       router.replace('/');
     }
-  }, [session, loading]);
+  }, [isAuthenticated, loading]);
 
   if (loading) {
     return (
@@ -29,41 +37,36 @@ function RootNavigator() {
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
-      <Stack.Screen name="home" options={{ animation: 'fade' }} />
-      <Stack.Screen
-        name="inspection/[id]"
-        options={{
-          headerShown: true,
-          headerTitle: 'Inspection Report',
-          headerStyle: { backgroundColor: Colors.navy },
-          headerTintColor: Colors.textWhite,
-          headerTitleStyle: { fontWeight: '700' },
-          animation: 'slide_from_right',
-        }}
-      />
-      <Stack.Screen
-        name="survey/[id]"
-        options={{
-          headerShown: true,
-          headerTitle: 'Survey Report',
-          headerStyle: { backgroundColor: Colors.navy },
-          headerTintColor: Colors.textWhite,
-          headerTitleStyle: { fontWeight: '700' },
-          animation: 'slide_from_right',
-        }}
-      />
+      {/* Shared header/footer chrome for every authenticated screen lives in
+          (app)/_layout.tsx — this group's inner Stack owns per-page animation. */}
+      <Stack.Screen name="(app)" options={{ animation: 'fade' }} />
     </Stack>
   );
 }
 
+// ── Root layout — provider hierarchy ─────────────────────────────────────────
+// Order matters:
+//   GestureHandlerRootView  — must be outermost for gesture support
+//   KeyboardProvider        — feeds keyboard-frame animations to every
+//                             KeyboardAwareScrollView in the tree
+//   SafeAreaProvider        — provides safe area insets app-wide
+//   AuthProvider            — manages session state
+//   DatabaseProvider        — mounts WatermelonDB (needs to be inside auth
+//                             so it can eventually be seeded per-user)
+//   RootNavigator           — consumes auth state to drive routing
+// ─────────────────────────────────────────────────────────────────────────────
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <AuthProvider>
-          <RootNavigator />
-        </AuthProvider>
-      </SafeAreaProvider>
+      <KeyboardProvider>
+        <SafeAreaProvider>
+          <AuthProvider>
+            <DatabaseProvider>
+              <RootNavigator />
+            </DatabaseProvider>
+          </AuthProvider>
+        </SafeAreaProvider>
+      </KeyboardProvider>
     </GestureHandlerRootView>
   );
 }

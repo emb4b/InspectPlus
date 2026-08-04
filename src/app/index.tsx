@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   View,
-  Text,
   ScrollView,
   StyleSheet,
   StatusBar,
@@ -9,9 +8,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../constants/colors';
-import { Logo } from '../components/Logo';
+import { BrandLockup } from '../components/BrandLockup';
 import { LoginForm } from '../features/auth/components/LoginForm';
 import { AgencyLogos } from '../features/auth/components/AgencyLogos';
+import { HomeFooter } from '../features/home/components/HomeFooter';
 
 export default function LoginScreen() {
   return (
@@ -35,10 +35,7 @@ export default function LoginScreen() {
 
         {/* Logo */}
         <View style={styles.logoWrap}>
-          <Logo width={260} height={80} />
-          <Text style={styles.subtitle}>
-            EMB4B Inspection and Monitoring System
-          </Text>
+          <BrandLockup />
         </View>
 
         {/* Login form */}
@@ -48,13 +45,8 @@ export default function LoginScreen() {
         <AgencyLogos />
       </ScrollView>
 
-      {/* Gradient footer */}
-      <LinearGradient
-        colors={[Colors.navy, '#0a7a3e']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.footerBar}
-      />
+      {/* Gradient footer with credits — non-authenticated pages only */}
+      <HomeFooter showCredits />
     </SafeAreaView>
   );
 }
@@ -66,9 +58,6 @@ const styles = StyleSheet.create({
   },
   headerBar: {
     height: 56,
-  },
-  footerBar: {
-    height: 20,
   },
   scroll: {
     flex: 1,
@@ -83,12 +72,5 @@ const styles = StyleSheet.create({
   logoWrap: {
     alignItems: 'center',
     marginBottom: 32,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: Colors.textMuted,
-    marginTop: 6,
-    letterSpacing: 0.2,
-    textAlign: 'center',
   },
 });

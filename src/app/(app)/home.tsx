@@ -1,18 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
   ScrollView,
+  RefreshControl,
   StyleSheet,
-  StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors } from '../constants/colors';
-import { HomeHeader } from '../features/home/components/HomeHeader';
-import { HomeTabs, HomeTab } from '../features/home/components/HomeTabs';
-import { HomeFooter } from '../features/home/components/HomeFooter';
-import { CreateNewReportTab } from '../features/inspections/components/CreateNewReportTab';
-import { ManageReportsTab } from '../features/establishments/components/ManageReportsTab';
+import { Colors } from '../../constants/colors';
+import { HomeTabs, HomeTab } from '../../features/home/components/HomeTabs';
+import { CreateNewReportTab } from '../../features/inspections/components/CreateNewReportTab';
+import {
+  ManageEstablishmentsTab,
+  ManageEstablishmentsTabHandle,
+} from '../../features/establishments/components/ManageEstablishmentsTab';
+import {
+  ManageReportsTab,
+  ManageReportsTabHandle,
+} from '../../features/establishments/components/ManageReportsTab';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -38,25 +42,40 @@ const ImportExportTab: React.FC = () => (
 
 export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState<HomeTab>('create');
+  const [refreshing, setRefreshing] = useState(false);
+  const manageEstablishmentsRef = useRef<ManageEstablishmentsTabHandle>(null);
+  const manageReportsRef = useRef<ManageReportsTabHandle>(null);
 
   const renderTab = () => {
     switch (activeTab) {
       case 'create':
         return <CreateNewReportTab />;
-      case 'manage':
-        return <ManageReportsTab />;
+      case 'manageEstablishments':
+        return <ManageEstablishmentsTab ref={manageEstablishmentsRef} />;
+      case 'manageReports':
+        return <ManageReportsTab ref={manageReportsRef} />;
       case 'export':
         return <ImportExportTab />;
     }
   };
 
+  // Pull-to-refresh reloads the active tab's data. The "create" and "export"
+  // tabs are static, so the gesture just settles back for those.
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      if (activeTab === 'manageEstablishments') {
+        await manageEstablishmentsRef.current?.refresh();
+      } else if (activeTab === 'manageReports') {
+        await manageReportsRef.current?.refresh();
+      }
+    } finally {
+      setRefreshing(false);
+    }
+  }, [activeTab]);
+
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <StatusBar barStyle="light-content" backgroundColor={Colors.navy} />
-
-      {/* Fixed gradient header */}
-      <HomeHeader />
-
+    <View style={styles.screen}>
       {/* Welcome section + sticky tab bar */}
       <View style={styles.welcomeWrap}>
         <Text style={styles.welcomeText}>Welcome back, Inspector!</Text>
@@ -73,20 +92,25 @@ export default function HomeScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={Colors.navy}
+            colors={[Colors.navy]}
+          />
+        }>
         {renderTab()}
       </ScrollView>
-
-      {/* Fixed gradient footer */}
-      <HomeFooter />
-    </SafeAreaView>
+    </View>
   );
 }
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  safeArea: {
+  screen: {
     flex: 1,
     backgroundColor: Colors.white,
   },
