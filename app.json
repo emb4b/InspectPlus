@@ -4,8 +4,16 @@
     "slug": "inspectplus",
     "scheme": "inspectplus",
     "version": "1.0.0",
+    "icon": "./assets/icons/app_icon_night_mode.png",
     "router": {
       "root": "src/app"
+    },
+    "android": {
+      "package": "com.inspectplus",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icons/app_icon_night_mode.png",
+        "backgroundColor": "#0d2137"
+      }
     },
     "plugins": [
       "expo-secure-store",
