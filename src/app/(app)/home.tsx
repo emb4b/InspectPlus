@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Colors } from '../../constants/colors';
+import { useAuthContext } from '../../core/providers/AuthProvider';
 import { HomeTabs, HomeTab } from '../../features/home/components/HomeTabs';
 import { CreateNewReportTab } from '../../features/inspections/components/CreateNewReportTab';
 import {
@@ -29,22 +30,41 @@ function getFormattedDate(): string {
   });
 }
 
-// ── Import/Export placeholder ─────────────────────────────────────────────────
+function getFormattedTime(): string {
+  return new Date().toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+}
 
-const ImportExportTab: React.FC = () => (
-  <View style={styles.placeholderWrap}>
-    <Text style={styles.placeholderTitle}>Import / Export Reports</Text>
-    <Text style={styles.placeholderSub}>This feature is coming soon.</Text>
-  </View>
-);
+// ── Import/Export placeholder ─────────────────────────────────────────────────
+// Disabled along with its menu entry in HomeTabs — feature isn't ready yet.
+//
+// const ImportExportTab: React.FC = () => (
+//   <View style={styles.placeholderWrap}>
+//     <Text style={styles.placeholderTitle}>Import / Export Reports</Text>
+//     <Text style={styles.placeholderSub}>This feature is coming soon.</Text>
+//   </View>
+// );
 
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
+  const { fullName } = useAuthContext();
   const [activeTab, setActiveTab] = useState<HomeTab>('create');
   const [refreshing, setRefreshing] = useState(false);
   const manageEstablishmentsRef = useRef<ManageEstablishmentsTabHandle>(null);
   const manageReportsRef = useRef<ManageReportsTabHandle>(null);
+  const firstName = fullName?.trim().split(/\s+/)[0] ?? 'Inspector';
+
+  // Ticks the header clock once a second — cheap enough given it's just one
+  // small Text re-render, and keeps the displayed time actually live.
+  const [currentTime, setCurrentTime] = useState(getFormattedTime());
+  useEffect(() => {
+    const id = setInterval(() => setCurrentTime(getFormattedTime()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const renderTab = () => {
     switch (activeTab) {
@@ -54,8 +74,8 @@ export default function HomeScreen() {
         return <ManageEstablishmentsTab ref={manageEstablishmentsRef} />;
       case 'manageReports':
         return <ManageReportsTab ref={manageReportsRef} />;
-      case 'export':
-        return <ImportExportTab />;
+      // case 'export':
+      //   return <ImportExportTab />;
     }
   };
 
@@ -78,9 +98,9 @@ export default function HomeScreen() {
     <View style={styles.screen}>
       {/* Welcome section + sticky tab bar */}
       <View style={styles.welcomeWrap}>
-        <Text style={styles.welcomeText}>Welcome back, Inspector!</Text>
+        <Text style={styles.welcomeText}>Welcome back, {firstName}!</Text>
         <Text style={styles.dateText}>
-          {getFormattedDate()} · EMB Region 4-B
+          {getFormattedDate()} · {currentTime} · EMB Region 4-B
         </Text>
       </View>
 

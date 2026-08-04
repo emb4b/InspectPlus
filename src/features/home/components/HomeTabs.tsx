@@ -18,7 +18,8 @@ const TABS: { key: HomeTab; label: string }[] = [
   { key: 'create', label: 'Create New Report' },
   { key: 'manageEstablishments', label: 'Manage\nEstablishments' },
   { key: 'manageReports', label: 'Manage Reports' },
-  { key: 'export', label: 'Import/Export\nReports' },
+  // Import/Export Reports — disabled until the feature is ready.
+  // { key: 'export', label: 'Import/Export\nReports' },
 ];
 
 export const HomeTabs: React.FC<HomeTabsProps> = ({ activeTab, onTabChange }) => {
