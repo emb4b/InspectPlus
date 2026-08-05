@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useCallback, useMemo, useImperativeHandle, forwardRef } from 'react';
 import {
   View,
   Text,
@@ -6,21 +6,51 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Keyboard,
+  Modal,
   StyleSheet,
 } from 'react-native';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
+import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Colors } from '../../../constants/colors';
+import { SelectField, DateField } from '../../../components/form';
 import { ReportListCard } from './ReportListCard';
-import { useAllReports, AllReportItem, ReportStatusFilter } from '../hooks/useEstablishment';
+import {
+  useAllReports,
+  useEstablishmentFilterOptions,
+  AllReportItem,
+  ReportStatusFilter,
+  ReportFilters,
+  ReportSortOrder,
+  INSPECTION_TYPE_LABELS,
+} from '../hooks/useEstablishment';
 
 const PAGE_SIZE = 5;
+const ALL_OPTION = 'All';
 
 const STATUS_FILTERS: { key: ReportStatusFilter; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'draft', label: 'Draft' },
   { key: 'submitted', label: 'Submitted' },
 ];
+
+const REPORT_TYPE_OPTIONS = Object.entries(INSPECTION_TYPE_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}));
+
+const SORT_OPTIONS: { key: ReportSortOrder; label: string }[] = [
+  { key: 'newest', label: 'Newest first' },
+  { key: 'oldest', label: 'Oldest first' },
+];
+
+// The date range fields below are plain TextInputs that can be typed into
+// directly (not just via the calendar picker), so the numeric keypad can pop
+// up while this sheet is open. RN's Modal doesn't resize for the keyboard on
+// its own — same issue NewEstablishmentModal solved — so the bottom-anchored
+// sheet needs to shift up manually or the keyboard covers the date row.
+const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 
 export interface ManageReportsTabHandle {
   refresh: () => Promise<void>;
@@ -30,8 +60,33 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<ReportStatusFilter>('all');
   const [page, setPage] = useState(1);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [province, setProvince] = useState('');
+  const [reportType, setReportType] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [sortOrder, setSortOrder] = useState<ReportSortOrder>('newest');
 
-  const { reports, loading, error, refetch } = useAllReports(search, statusFilter);
+  const { provinceOptions } = useEstablishmentFilterOptions();
+
+  const { height: keyboardHeight } = useReanimatedKeyboardAnimation();
+  const overlayAnimatedStyle = useAnimatedStyle(() => ({
+    // keyboardHeight.value is <= 0 (negative while shown), so negating it
+    // gives the padding needed to push the flex-end-anchored sheet up above
+    // the keyboard instead of letting the keyboard cover it.
+    paddingBottom: -keyboardHeight.value,
+  }));
+
+  // Stable reference so the filter object only changes when a filter value
+  // actually changes — a fresh object literal on every render would
+  // re-trigger the data-fetching effect in useAllReports on a loop.
+  const filters: ReportFilters = useMemo(
+    () => ({ province, reportType, dateFrom, dateTo, sortOrder }),
+    [province, reportType, dateFrom, dateTo, sortOrder],
+  );
+  const activeFilterCount = [province, reportType, dateFrom, dateTo].filter(Boolean).length;
+
+  const { reports, loading, error, refetch } = useAllReports(search, statusFilter, filters);
 
   useImperativeHandle(ref, () => ({ refresh: refetch }), [refetch]);
 
@@ -47,6 +102,19 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
     setStatusFilter(key);
     setPage(1);
   }, []);
+
+  const clearFilters = useCallback(() => {
+    setProvince('');
+    setReportType('');
+    setDateFrom('');
+    setDateTo('');
+    setSortOrder('newest');
+    setPage(1);
+  }, []);
+
+  const selectedReportTypeLabel =
+    REPORT_TYPE_OPTIONS.find(o => o.value === reportType)?.label ?? ALL_OPTION;
+  const selectedSortLabel = SORT_OPTIONS.find(o => o.key === sortOrder)?.label ?? SORT_OPTIONS[0].label;
 
   const handleOpen = useCallback((item: AllReportItem) => {
     if (item.kind === 'inspection') {
@@ -79,25 +147,42 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
 
   return (
     <View style={styles.container}>
-      {/* Search */}
-      <View style={styles.searchWrap}>
-        <Ionicons name="search-outline" size={14} color={Colors.textMuted} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search by establishment, report, or control no..."
-          placeholderTextColor={Colors.textMuted}
-          value={search}
-          onChangeText={handleSearch}
-          autoCorrect={false}
-          autoCapitalize="none"
-          returnKeyType="search"
-          onSubmitEditing={() => Keyboard.dismiss()}
-        />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => handleSearch('')} activeOpacity={0.7}>
-            <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
-          </TouchableOpacity>
-        )}
+      {/* Search + filter trigger */}
+      <View style={styles.searchRow}>
+        <View style={styles.searchWrap}>
+          <Ionicons name="search-outline" size={14} color={Colors.textMuted} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by establishment name..."
+            placeholderTextColor={Colors.textMuted}
+            value={search}
+            onChangeText={handleSearch}
+            autoCorrect={false}
+            autoCapitalize="none"
+            returnKeyType="search"
+            onSubmitEditing={() => Keyboard.dismiss()}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => handleSearch('')} activeOpacity={0.7}>
+              <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
+            </TouchableOpacity>
+          )}
+        </View>
+        <TouchableOpacity
+          style={[styles.filterBtn, activeFilterCount > 0 && styles.filterBtnActive]}
+          onPress={() => setFiltersOpen(true)}
+          activeOpacity={0.75}>
+          <Ionicons
+            name="options-outline"
+            size={18}
+            color={activeFilterCount > 0 ? Colors.textWhite : Colors.textMuted}
+          />
+          {activeFilterCount > 0 && (
+            <View style={styles.filterBadge}>
+              <Text style={styles.filterBadgeText}>{activeFilterCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
       {/* Status filter chips */}
@@ -129,7 +214,9 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
         <View style={styles.centeredState}>
           <Ionicons name="document-outline" size={40} color={Colors.border} />
           <Text style={styles.stateText}>
-            {search || statusFilter !== 'all' ? 'No reports match your filters.' : 'No reports yet.'}
+            {search || statusFilter !== 'all' || activeFilterCount > 0
+              ? 'No reports match your filters.'
+              : 'No reports yet.'}
           </Text>
         </View>
       ) : (
@@ -197,6 +284,79 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Filter sheet */}
+      <Modal
+        visible={filtersOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFiltersOpen(false)}>
+        <AnimatedTouchableOpacity
+          style={[styles.overlay, overlayAnimatedStyle]}
+          activeOpacity={1}
+          onPress={() => {
+            // With both the sheet and keyboard open, a tap outside the
+            // sheet should only dismiss the keyboard — closing the sheet
+            // too would be a second, unrequested action from one tap.
+            // Closing the sheet is reserved for when it's the only thing
+            // open.
+            if (Keyboard.isVisible()) {
+              Keyboard.dismiss();
+            } else {
+              setFiltersOpen(false);
+            }
+          }}>
+          <TouchableOpacity activeOpacity={1} style={styles.sheet} onPress={() => {}}>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Filter reports</Text>
+              <TouchableOpacity onPress={() => setFiltersOpen(false)}>
+                <Ionicons name="close" size={20} color={Colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <SelectField
+              label="Region"
+              value={province || ALL_OPTION}
+              options={[ALL_OPTION, ...provinceOptions]}
+              onSelect={v => {
+                setProvince(v === ALL_OPTION ? '' : v);
+                setPage(1);
+              }}
+              style={styles.filterField}
+            />
+
+            <SelectField
+              label="Inspection report type"
+              value={selectedReportTypeLabel}
+              options={[ALL_OPTION, ...REPORT_TYPE_OPTIONS.map(o => o.label)]}
+              onSelect={v => {
+                setReportType(v === ALL_OPTION ? '' : REPORT_TYPE_OPTIONS.find(o => o.label === v)?.value ?? '');
+                setPage(1);
+              }}
+              style={styles.filterField}
+            />
+
+            <View style={styles.dateRow}>
+              <DateField label="From" value={dateFrom} onChange={v => { setDateFrom(v); setPage(1); }} style={styles.dateField} />
+              <DateField label="To" value={dateTo} onChange={v => { setDateTo(v); setPage(1); }} style={styles.dateField} />
+            </View>
+
+            <SelectField
+              label="Sort by date"
+              value={selectedSortLabel}
+              options={SORT_OPTIONS.map(o => o.label)}
+              onSelect={v => {
+                setSortOrder(SORT_OPTIONS.find(o => o.label === v)?.key ?? 'newest');
+              }}
+              style={styles.filterField}
+            />
+
+            <TouchableOpacity style={styles.clearBtn} onPress={clearFilters} activeOpacity={0.75}>
+              <Text style={styles.clearBtnText}>Clear all filters</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </AnimatedTouchableOpacity>
+      </Modal>
     </View>
   );
 });
@@ -230,7 +390,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.textWhite,
   },
+  searchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
   searchWrap: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#f1f5f9',
@@ -238,13 +405,93 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     gap: 8,
-    marginBottom: 12,
   },
   searchInput: {
     flex: 1,
     fontSize: 13,
     color: Colors.textPrimary,
     paddingVertical: 0,
+  },
+  filterBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f1f5f9',
+  },
+  filterBtnActive: {
+    backgroundColor: Colors.navy,
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    backgroundColor: '#e74c3c',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: Colors.textWhite,
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: Colors.overlay,
+    justifyContent: 'flex-end',
+  },
+  sheet: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 16,
+    maxHeight: '80%',
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  sheetTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.navy,
+  },
+  // SelectField's own `group` style sets `flex: 1` for when it's used
+  // side-by-side in a form row — stacked standalone here, that flex-basis-0
+  // sizing collapses the field to near-zero height (its column parent, the
+  // filter sheet, only has a maxHeight cap, not a definite height, so there's
+  // no resolvable "extra space" for it to grow into). Clearing it back to
+  // Yoga's default (content-sized) fixes the squished/overlapping layout.
+  filterField: {
+    flex: undefined,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  // Unlike filterField above, these two ARE meant to keep flex: 1 — they
+  // share a row (a definite-width flex container), so it correctly splits
+  // width 50/50 instead of collapsing height.
+  dateField: {
+    flex: 1,
+  },
+  clearBtn: {
+    alignSelf: 'center',
+    marginTop: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  clearBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.conflict,
   },
   filterRow: {
     flexDirection: 'row',

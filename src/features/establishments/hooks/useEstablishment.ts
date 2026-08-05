@@ -3,6 +3,7 @@ import { database } from '../../../db/database';
 import { Establishment, InspectionReport, SurveyReport } from '../../../db/models';
 import { Q } from '@nozbe/watermelondb';
 import type { EstablishmentDTO, ComplianceTag } from '../types';
+import { resolveInspectorNames } from '../../../services/inspectorNames';
 
 // ── Report type → compliance tag mapping ──────────────────────────────────────
 // 'air_monitoring' | 'water_monitoring' | 'hazardous_waste' | 'eia'
@@ -82,17 +83,29 @@ interface UseEstablishmentsReturn {
   refetch: () => Promise<void>;
 }
 
+export interface EstablishmentFilters {
+  province?: string;
+  inspectorUid?: string;
+  complianceTag?: ComplianceTag | '';
+}
+
+const EMPTY_ESTABLISHMENT_FILTERS: EstablishmentFilters = {};
+
 // ── useEstablishments ─────────────────────────────────────────────────────────
 // Fetches all establishments from local WatermelonDB, ordered by name.
-// Accepts an optional search query that filters by name, address, or city.
-// Re-fetches when search changes or when refetch() is called — refetch()
-// returns a promise so callers (e.g. pull-to-refresh) can await completion.
+// Accepts an optional search query that filters by name, address, or city,
+// plus optional region/inspector/compliance-type filters. Re-fetches when
+// search or filters change or when refetch() is called — refetch() returns
+// a promise so callers (e.g. pull-to-refresh) can await completion.
 //
 // NOTE: When the sync layer is wired up, a successful pull will update
 // WatermelonDB directly — just call refetch() from the sync completion
 // callback to refresh this list without any other changes.
 // ─────────────────────────────────────────────────────────────────────────────
-export function useEstablishments(search = ''): UseEstablishmentsReturn {
+export function useEstablishments(
+  search = '',
+  filters: EstablishmentFilters = EMPTY_ESTABLISHMENT_FILTERS,
+): UseEstablishmentsReturn {
   const [establishments, setEstablishments] = useState<EstablishmentDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -101,10 +114,18 @@ export function useEstablishments(search = ''): UseEstablishmentsReturn {
   // refetch() overlaps with the search-driven effect (or a rapid double pull).
   const requestId = useRef(0);
 
-  const fetchEstablishments = useCallback(async (searchTerm: string) => {
+  // Only the very first fetch should show the full-screen spinner. Every
+  // later fetch (search-as-you-type, refetch()) sets `loading` back to
+  // true too if left ungated — which unmounts the search bar's TextInput
+  // via the tab component's `if (loading) return <spinner>` and drops
+  // native keyboard focus after every keystroke. Subsequent fetches just
+  // update the list in place instead.
+  const hasLoadedOnce = useRef(false);
+
+  const fetchEstablishments = useCallback(async (searchTerm: string, f: EstablishmentFilters) => {
     const id = ++requestId.current;
     try {
-      setLoading(true);
+      if (!hasLoadedOnce.current) setLoading(true);
       setError(null);
 
       const q = searchTerm.trim().toLowerCase();
@@ -118,20 +139,24 @@ export function useEstablishments(search = ''): UseEstablishmentsReturn {
         .query()
         .fetch();
 
-      const filtered = q
-        ? all.filter(
-            e =>
-              e.name.toLowerCase().includes(q) ||
-              e.addressLine.toLowerCase().includes(q) ||
-              e.city.toLowerCase().includes(q) ||
-              e.province.toLowerCase().includes(q),
-          )
+      // Name-only — matching on address/city/province too used to pull in
+      // unrelated establishments that merely shared a location with the
+      // search term, which read as inaccurate results.
+      let filtered = q
+        ? all.filter(e => e.name.toLowerCase().includes(q))
         : all;
+
+      if (f.province) filtered = filtered.filter(e => e.province === f.province);
+      if (f.inspectorUid) filtered = filtered.filter(e => e.inspectorUid === f.inspectorUid);
 
       // Sort by name ascending
       filtered.sort((a, b) => a.name.localeCompare(b.name));
 
-      const dtos = await Promise.all(filtered.map(modelToDTO));
+      let dtos = await Promise.all(filtered.map(modelToDTO));
+
+      if (f.complianceTag) {
+        dtos = dtos.filter(d => d.complianceTags.includes(f.complianceTag as ComplianceTag));
+      }
 
       if (id === requestId.current) {
         setEstablishments(dtos);
@@ -146,20 +171,81 @@ export function useEstablishments(search = ''): UseEstablishmentsReturn {
         console.error('[useEstablishments]', err);
       }
     } finally {
-      if (id === requestId.current) setLoading(false);
+      if (id === requestId.current) {
+        setLoading(false);
+        hasLoadedOnce.current = true;
+      }
     }
   }, []);
 
   useEffect(() => {
-    fetchEstablishments(search);
-  }, [search, fetchEstablishments]);
+    fetchEstablishments(search, filters);
+  }, [search, filters, fetchEstablishments]);
 
   const refetch = useCallback(
-    () => fetchEstablishments(search),
-    [fetchEstablishments, search],
+    () => fetchEstablishments(search, filters),
+    [fetchEstablishments, search, filters],
   );
 
   return { establishments, loading, error, refetch };
+}
+
+// ── useEstablishmentFilterOptions ─────────────────────────────────────────────
+// Derives the option lists for the Manage Establishments filter sheet: every
+// province actually in use, and every inspector actually assigned to at
+// least one establishment (resolved to a display name). Independent of the
+// search/filter state above so the option lists don't shrink as filters
+// are applied.
+interface InspectorOption {
+  uid: string;
+  name: string;
+}
+
+interface UseEstablishmentFilterOptionsReturn {
+  provinceOptions: string[];
+  inspectorOptions: InspectorOption[];
+  loading: boolean;
+}
+
+export function useEstablishmentFilterOptions(): UseEstablishmentFilterOptionsReturn {
+  const [provinceOptions, setProvinceOptions] = useState<string[]>([]);
+  const [inspectorOptions, setInspectorOptions] = useState<InspectorOption[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const all = await database.collections
+          .get<Establishment>('establishments')
+          .query()
+          .fetch();
+
+        const provinces = Array.from(new Set(all.map(e => e.province).filter(Boolean))).sort();
+        const inspectorUids = Array.from(new Set(all.map(e => e.inspectorUid).filter(Boolean)));
+
+        const names = await resolveInspectorNames(inspectorUids);
+        const inspectors = inspectorUids
+          .map(uid => ({ uid, name: names[uid] ?? uid }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+        if (!cancelled) {
+          setProvinceOptions(provinces);
+          setInspectorOptions(inspectors);
+        }
+      } catch (err) {
+        console.error('[useEstablishmentFilterOptions]', err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  return { provinceOptions, inspectorOptions, loading };
 }
 
 // ── Hook return type for a single establishment ──────────────────────────────
@@ -237,11 +323,12 @@ export interface EstablishmentReportItem {
   purposeId?: string;
 }
 
-const INSPECTION_TYPE_LABELS: Record<string, string> = {
+export const INSPECTION_TYPE_LABELS: Record<string, string> = {
   air_monitoring: 'Air Monitoring',
   water_monitoring: 'Water Monitoring',
   hazardous_waste: 'Hazwaste Monitoring',
   eia: 'EIA',
+  survey: 'Survey',
 };
 
 interface UseEstablishmentReportsReturn {
@@ -333,11 +420,23 @@ export function useEstablishmentReports(estabId: string | undefined): UseEstabli
 
 // ── All reports across establishments, for the "Manage Reports" tab ───────────
 export type ReportStatusFilter = 'all' | 'draft' | 'submitted';
+export type ReportSortOrder = 'newest' | 'oldest';
 
 export interface AllReportItem extends EstablishmentReportItem {
   estabId: string;
   estabName: string;
+  estabProvince: string;
 }
+
+export interface ReportFilters {
+  province?: string;
+  reportType?: string;
+  dateFrom?: string; // YYYY-MM-DD, inclusive
+  dateTo?: string;   // YYYY-MM-DD, inclusive
+  sortOrder?: ReportSortOrder;
+}
+
+const EMPTY_REPORT_FILTERS: ReportFilters = {};
 
 interface UseAllReportsReturn {
   reports: AllReportItem[];
@@ -348,20 +447,34 @@ interface UseAllReportsReturn {
 
 // Fetches inspection + survey reports across ALL establishments (unlike
 // useEstablishmentReports, which is scoped to one). Filters by search text
-// (establishment name, report title, or control number) and by draft/
-// submitted status. Survey reports have no backend-synced status yet, so
-// they default to 'draft' — see AllReportItem/EstablishmentReportItem.
-export function useAllReports(search = '', statusFilter: ReportStatusFilter = 'all'): UseAllReportsReturn {
+// (establishment name, report title, or control number), draft/submitted
+// status, and optional region/report-type/date-range filters. Survey
+// reports have no backend-synced status yet, so they default to 'draft' —
+// see AllReportItem/EstablishmentReportItem.
+export function useAllReports(
+  search = '',
+  statusFilter: ReportStatusFilter = 'all',
+  filters: ReportFilters = EMPTY_REPORT_FILTERS,
+): UseAllReportsReturn {
   const [reports, setReports] = useState<AllReportItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const requestId = useRef(0);
 
-  const fetchAllReports = useCallback(async (searchTerm: string, status: ReportStatusFilter) => {
+  // Same rationale as useEstablishments — only gate the full-screen
+  // spinner on the very first load, so search/filter changes don't
+  // unmount (and defocus) the search TextInput on every keystroke.
+  const hasLoadedOnce = useRef(false);
+
+  const fetchAllReports = useCallback(async (
+    searchTerm: string,
+    status: ReportStatusFilter,
+    f: ReportFilters,
+  ) => {
     const id = ++requestId.current;
     try {
-      setLoading(true);
+      if (!hasLoadedOnce.current) setLoading(true);
       setError(null);
 
       const [establishments, inspectionReports, surveyReports] = await Promise.all([
@@ -371,6 +484,7 @@ export function useAllReports(search = '', statusFilter: ReportStatusFilter = 'a
       ]);
 
       const estabNameById = new Map(establishments.map(e => [e.estabId, e.name]));
+      const estabProvinceById = new Map(establishments.map(e => [e.estabId, e.province]));
 
       const items: AllReportItem[] = [
         ...inspectionReports.map(r => ({
@@ -379,6 +493,7 @@ export function useAllReports(search = '', statusFilter: ReportStatusFilter = 'a
           reportId: r.reportId,
           estabId: r.estabId,
           estabName: estabNameById.get(r.estabId) ?? 'Unknown establishment',
+          estabProvince: estabProvinceById.get(r.estabId) ?? '',
           reportType: r.reportType,
           title: INSPECTION_TYPE_LABELS[r.reportType] ?? r.reportType,
           date: r.inspectionDate,
@@ -392,6 +507,7 @@ export function useAllReports(search = '', statusFilter: ReportStatusFilter = 'a
           reportId: r.surveyId,
           estabId: r.estabId,
           estabName: estabNameById.get(r.estabId) ?? 'Unknown establishment',
+          estabProvince: estabProvinceById.get(r.estabId) ?? '',
           reportType: 'survey',
           title: r.projectName || 'Survey Report',
           date: r.inspectionDate,
@@ -403,16 +519,26 @@ export function useAllReports(search = '', statusFilter: ReportStatusFilter = 'a
       const q = searchTerm.trim().toLowerCase();
       const filtered = items.filter(item => {
         const matchesStatus = status === 'all' || item.status === status;
-        const matchesSearch =
-          !q ||
-          item.estabName.toLowerCase().includes(q) ||
-          item.title.toLowerCase().includes(q) ||
-          (item.controlNo?.toLowerCase().includes(q) ?? false);
-        return matchesStatus && matchesSearch;
+        // Name-only — matching on report title/control-no too used to pull
+        // in unrelated reports that merely shared a word with the search
+        // term, which read as inaccurate results.
+        const matchesSearch = !q || item.estabName.toLowerCase().includes(q);
+        const matchesProvince = !f.province || item.estabProvince === f.province;
+        const matchesReportType = !f.reportType || item.reportType === f.reportType;
+        const matchesDateFrom = !f.dateFrom || item.date >= f.dateFrom;
+        const matchesDateTo = !f.dateTo || item.date <= f.dateTo;
+        return (
+          matchesStatus &&
+          matchesSearch &&
+          matchesProvince &&
+          matchesReportType &&
+          matchesDateFrom &&
+          matchesDateTo
+        );
       });
 
-      // Most recent first
-      filtered.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+      const sortDir = f.sortOrder === 'oldest' ? 1 : -1;
+      filtered.sort((a, b) => (a.date < b.date ? -sortDir : a.date > b.date ? sortDir : 0));
 
       if (id === requestId.current) {
         setReports(filtered);
@@ -424,17 +550,20 @@ export function useAllReports(search = '', statusFilter: ReportStatusFilter = 'a
         console.error('[useAllReports]', err);
       }
     } finally {
-      if (id === requestId.current) setLoading(false);
+      if (id === requestId.current) {
+        setLoading(false);
+        hasLoadedOnce.current = true;
+      }
     }
   }, []);
 
   useEffect(() => {
-    fetchAllReports(search, statusFilter);
-  }, [search, statusFilter, fetchAllReports]);
+    fetchAllReports(search, statusFilter, filters);
+  }, [search, statusFilter, filters, fetchAllReports]);
 
   const refetch = useCallback(
-    () => fetchAllReports(search, statusFilter),
-    [fetchAllReports, search, statusFilter],
+    () => fetchAllReports(search, statusFilter, filters),
+    [fetchAllReports, search, statusFilter, filters],
   );
 
   return { reports, loading, error, refetch };

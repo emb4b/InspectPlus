@@ -14,6 +14,7 @@ import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
+import { PROVINCE_OPTIONS } from '../../../constants/provinces';
 import { TextField, SelectField, DateField, RadioGroup, useScrollToInput, focusInput } from '../../../components/form';
 import { emptyGeneralInfoForm, GeneralInfoFormState } from '../types';
 
@@ -21,17 +22,6 @@ import { emptyGeneralInfoForm, GeneralInfoFormState } from '../types';
 // past 85% of the window when the keyboard is hidden.
 const WINDOW_HEIGHT = Dimensions.get('window').height;
 const MAX_CARD_HEIGHT = WINDOW_HEIGHT * 0.85;
-
-// EMB Region 4-B provinces — the region every sample fixture and constant in
-// this app is scoped to (see supabase/tests and the "EMB Region 4-B" copy
-// throughout the home screen). Not an exhaustive PH province list.
-const PROVINCE_OPTIONS = [
-  'Occidental Mindoro',
-  'Oriental Mindoro',
-  'Marinduque',
-  'Romblon',
-  'Palawan',
-];
 
 const OPERATING_STATUS_OPTIONS = [
   { label: 'Operational', value: 'Operational' },
