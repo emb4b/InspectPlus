@@ -3,6 +3,6 @@
 export const envConfig = {
   enableDebugLogs: true,
   shortCacheMs: 30 * 60 * 1000,           // 30 minutes
-  credentialWindowMs: 24 * 60 * 60 * 1000, // 24 hours
+  credentialWindowMs: 7 * 24 * 60 * 60 * 1000, // 1 week
   syncIntervalMs: 30 * 1000,               // 30 seconds
 };

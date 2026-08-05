@@ -2,6 +2,7 @@ import * as SecureStore from 'expo-secure-store';
 import { supabase } from './client';
 import { checkOnline } from '../../utils/network';
 import { hashString } from '../../utils/crypto';
+import { ENV } from '../../core/config/env';
 
 // ── Storage keys ──────────────────────────────────────────
 const SESSION_KEY       = 'inspectplus.session';
@@ -14,8 +15,10 @@ const CRED_FULLNAME_KEY = 'inspectplus.cred.fullname';
 const CRED_USERS_KEY    = 'inspectplus.cred.users';
 
 // ── Timeouts ──────────────────────────────────────────────
-const SHORT_CACHE_MS    = 30 * 60 * 1000;
-const CREDENTIAL_WINDOW = 24 * 60 * 60 * 1000;
+// Sourced from ENV (per-environment default, overridable via .env) so these
+// can be tuned without a code change — see src/core/config/env.ts.
+const SHORT_CACHE_MS    = ENV.shortCacheMs;
+const CREDENTIAL_WINDOW = ENV.credentialWindowMs;
 
 // ── Types ───────────────────────────────────────────────────
 interface CachedCredential {
@@ -27,7 +30,7 @@ interface CachedCredential {
   // right one even when they're not the last person who used the device.
   session: object;
   // When this credential was last refreshed by a successful online
-  // sign-in — the 24h offline window is measured from here, per user.
+  // sign-in — the 1-week offline window is measured from here, per user.
   ts: number;
 }
 
@@ -61,7 +64,7 @@ async function writeCachedUsers(users: CachedCredential[]): Promise<void> {
 }
 
 // Adds this inspector's credential to the device's offline store, or
-// refreshes it (new hash, session, and 24h window) if they were already
+// refreshes it (new hash, session, and 1-week window) if they were already
 // cached from a previous online sign-in — every other cached inspector on
 // this device keeps their own entry untouched.
 async function upsertCachedUser(entry: CachedCredential): Promise<void> {
@@ -229,7 +232,7 @@ export const authService = {
     }
   },
 
-  // True if ANY inspector cached on this device still has an active 24h
+  // True if ANY inspector cached on this device still has an active 1-week
   // offline window — not tied to whoever is currently signed in.
   async hasActiveCredentialWindow(): Promise<boolean> {
     try {
@@ -244,15 +247,15 @@ export const authService = {
     // IMPORTANT: we deliberately do NOT delete CRED_USERS_KEY (or any one
     // user's entry in it) here. Those are what let ANY inspector who has
     // signed in online on this device log back in OFFLINE for the rest of
-    // their own 24-hour window — wiping them on every logout would defeat
+    // their own 1-week window — wiping them on every logout would defeat
     // that entirely, for this user and every other cached inspector.
     //
     // We only delete SESSION_TS_KEY — this is the marker that lets the
     // app silently auto-restore a session within 30 minutes with no
     // password at all. Removing it means logout actually requires the
     // password to be re-entered next time, even though that re-entry
-    // can still succeed fully offline via the preserved CRED_USERS_KEY
-    // entry for whoever logs back in.
+    // can still succeed fully offline (for up to a week) via the
+    // preserved CRED_USERS_KEY entry for whoever logs back in.
     await SecureStore.deleteItemAsync(SESSION_TS_KEY);
 
     try {
