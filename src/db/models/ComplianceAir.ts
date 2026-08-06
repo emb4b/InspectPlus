@@ -33,4 +33,8 @@ export class ComplianceAir extends Model {
   // Values: 'Synology' | 'OPMS' | 'IIS Transactions' | 'CMR Online' |
   //         'SMR Online' | 'PCO Online' | 'Others'
   @json('documentsReviewed', asArray)  documentsReviewed!: string[];
+
+  // ↓ 'syncState' instead of 'syncStatus' — avoids collision with
+  //   WatermelonDB's internal Model.syncStatus property
+  @field('syncState')                  syncState!: string;
 }

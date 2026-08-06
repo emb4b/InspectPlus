@@ -26,7 +26,7 @@ async function patchEstablishmentSnapshot(reportId: string, patch: Partial<Estab
     await rec.update(r => {
       r.establishmentSnapshot = { ...r.establishmentSnapshot, ...patch };
       r.updatedAt = new Date().toISOString();
-      r.syncState = 'pending';
+      r.syncState = 'pending_update';
     });
   });
 }
@@ -37,7 +37,7 @@ async function patchPermitsSnapshot(reportId: string, permits: PermitSnapshotIte
     await rec.update(r => {
       r.permitsSnapshot = permits;
       r.updatedAt = new Date().toISOString();
-      r.syncState = 'pending';
+      r.syncState = 'pending_update';
     });
   });
 }

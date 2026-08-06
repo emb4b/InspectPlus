@@ -25,7 +25,7 @@ import { appSchema, tableSchema } from '@nozbe/watermelondb';
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const schema = appSchema({
-  version: 5,
+  version: 6,
   tables: [
 
     // ── ESTABLISHMENTS ───────────────────────────────────────────────────────
@@ -175,6 +175,7 @@ export const schema = appSchema({
         { name: 'otherObservations',      type: 'string', isOptional: true },
         { name: 'remarksRecommendations', type: 'string', isOptional: true },
         { name: 'documentsReviewed',      type: 'string', isOptional: true },
+        { name: 'syncState',              type: 'string', isOptional: true }, // ← not syncStatus
       ],
     }),
 
@@ -200,6 +201,7 @@ export const schema = appSchema({
         { name: 'otherObservations',          type: 'string', isOptional: true },
         { name: 'remarksRecommendations',     type: 'string', isOptional: true },
         { name: 'documentsReviewed',          type: 'string', isOptional: true },
+        { name: 'syncState',                  type: 'string', isOptional: true }, // ← not syncStatus
       ],
     }),
 
@@ -224,6 +226,7 @@ export const schema = appSchema({
         { name: 'otherObservations',          type: 'string', isOptional: true },
         { name: 'remarksRecommendations',     type: 'string', isOptional: true },
         { name: 'documentsReviewed',          type: 'string', isOptional: true },
+        { name: 'syncState',                  type: 'string', isOptional: true }, // ← not syncStatus
       ],
     }),
 
@@ -238,6 +241,7 @@ export const schema = appSchema({
         { name: 'otherObservations',      type: 'string', isOptional: true },
         { name: 'remarksRecommendations', type: 'string', isOptional: true },
         { name: 'documentsReviewed',      type: 'string', isOptional: true },
+        { name: 'syncState',              type: 'string', isOptional: true }, // ← not syncStatus
       ],
     }),
 

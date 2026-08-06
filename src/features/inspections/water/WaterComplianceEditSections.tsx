@@ -60,6 +60,7 @@ async function patchComplianceWater(complianceId: string, patch: Partial<Complia
     const rec = await collections.complianceWater.find(complianceId);
     await rec.update(r => {
       Object.assign(r, patch);
+      r.syncState = 'pending_update';
     });
   });
 }

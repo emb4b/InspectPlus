@@ -80,6 +80,7 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
             rec.otherObservations = waterCompliance.otherObservations || null;
             rec.remarksRecommendations = waterCompliance.remarksRecommendations || null;
             rec.documentsReviewed = waterCompliance.documentsReviewed;
+            rec.syncState = 'pending_create';
           });
         });
 

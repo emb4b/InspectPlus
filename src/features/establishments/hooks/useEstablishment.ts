@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { database } from '../../../db/database';
 import { Establishment, InspectionReport, SurveyReport } from '../../../db/models';
 import { Q } from '@nozbe/watermelondb';
-import type { EstablishmentDTO, ComplianceTag } from '../types';
+import type { EstablishmentDTO, ComplianceTag, SyncStatus } from '../types';
+import { toDisplaySyncStatus } from '../types';
 import { resolveInspectorNames } from '../../../services/inspectorNames';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 
@@ -105,7 +106,7 @@ async function modelToDTO(model: Establishment): Promise<EstablishmentDTO> {
     denrPermits:            model.denrPermits ?? [],
     createdAt:              model.createdAt,
     updatedAt:              model.updatedAt,
-    syncStatus:             model.syncState as any,
+    syncStatus:             toDisplaySyncStatus(model.syncState),
     deviceId:               model.deviceId,
     isArchived:             model.isArchived,
     complianceTags:         Array.from(tagSet),
@@ -385,6 +386,7 @@ export interface EstablishmentReportItem {
   date: string;
   controlNo: string | null;
   status: string | null;
+  syncStatus: SyncStatus;
   // Linked purpose_of_inspection row id — only set for inspection-kind
   // items, used by "Reuse Existing" to copy a past report's purpose
   // answers into a new one. Survey reports have no linked purpose row.
@@ -448,6 +450,7 @@ export function useEstablishmentReports(estabId: string | undefined): UseEstabli
             date: r.inspectionDate,
             controlNo: r.reportControlNo,
             status: r.reportStatus,
+            syncStatus: toDisplaySyncStatus(r.syncState),
             purposeId: r.purposeId,
           })),
           ...surveyReports.map(r => ({
@@ -460,6 +463,7 @@ export function useEstablishmentReports(estabId: string | undefined): UseEstabli
             controlNo: r.reportControlNumber,
             // Mobile-only field, absent on rows written before it existed.
             status: r.reportStatus ?? 'draft',
+            syncStatus: toDisplaySyncStatus(r.syncState),
           })),
         ];
 
@@ -591,6 +595,7 @@ export function useAllReports(
           date: r.inspectionDate,
           controlNo: r.reportControlNo,
           status: r.reportStatus,
+          syncStatus: toDisplaySyncStatus(r.syncState),
           purposeId: r.purposeId,
         })),
         ...surveyReports.map(r => ({
@@ -606,6 +611,7 @@ export function useAllReports(
           date: r.inspectionDate,
           controlNo: r.reportControlNumber,
           status: r.reportStatus ?? 'draft',
+          syncStatus: toDisplaySyncStatus(r.syncState),
         })),
       ];
 

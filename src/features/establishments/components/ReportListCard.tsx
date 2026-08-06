@@ -63,6 +63,21 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({ item, onPress })
           <Ionicons name="business-outline" size={10} color={Colors.textMuted} />
           <Text style={styles.estabName} numberOfLines={1}>{item.estabName}</Text>
         </View>
+
+        {/* Sync status indicator */}
+        {item.syncStatus === 'pending' && (
+          <View style={styles.syncRow}>
+            <Ionicons name="cloud-upload-outline" size={10} color={Colors.pending} />
+            <Text style={styles.syncText}>Pending sync</Text>
+          </View>
+        )}
+        {item.syncStatus === 'conflict' && (
+          <View style={styles.syncRow}>
+            <Ionicons name="alert-circle-outline" size={10} color={Colors.conflict} />
+            <Text style={[styles.syncText, { color: Colors.conflict }]}>Sync conflict</Text>
+          </View>
+        )}
+
         <View style={styles.dateRow}>
           <Ionicons name="calendar-outline" size={10} color={Colors.textMuted} />
           <Text style={styles.date}>{formatDate(item.date)}</Text>
@@ -160,6 +175,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.textSecondary,
     flexShrink: 1,
+  },
+  syncRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 3,
+  },
+  syncText: {
+    fontSize: 9,
+    color: Colors.pending,
+    fontWeight: '600',
   },
   dateRow: {
     flexDirection: 'row',

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Image, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import Reanimated, {
   Extrapolation,
@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { Logo } from '../../../components/Logo';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
+import { runManagedSync } from '../../../services/sync/syncOrchestrator';
 
 interface HomeHeaderProps {
   // Hide the avatar/logout control on pages with no active session (e.g. login).
@@ -30,7 +31,33 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
   collapsed,
   disableCollapse = false,
 }) => {
-  const { signOut } = useAuthContext();
+  const { session, signOut } = useAuthContext();
+  const [syncing, setSyncing] = useState(false);
+  const uid = (session as { user?: { id?: string } } | null)?.user?.id;
+
+  // Manual trigger — goes through the same runManagedSync path as the
+  // post-login sync, so a manual tap also picks up a user switch on a
+  // shared device and notifies listeners (e.g. the home lists) the same way.
+  const handleSyncNow = async () => {
+    if (syncing || !uid) return;
+    setSyncing(true);
+    try {
+      const result = await runManagedSync(uid);
+      if (!result) {
+        Alert.alert('Sync skipped', 'No internet connection right now.');
+        return;
+      }
+      Alert.alert(
+        'Sync complete',
+        `Pushed: ${result.pushed ? 'yes' : 'no changes'}\nPulled: ${result.pulled ? 'yes' : 'no'}`
+      );
+    } catch (err) {
+      console.error('[HomeHeader] Sync failed:', err);
+      Alert.alert('Sync failed', err instanceof Error ? err.message : 'Something went wrong while syncing.');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -106,13 +133,24 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
           </Reanimated.View>
         </View>
 
-        {/* Right: avatar / logout button */}
+        {/* Right: sync + avatar/logout buttons */}
         {showAccountButton && (
-          <TouchableOpacity onPress={handleLogout} activeOpacity={0.8}>
-            <Reanimated.View style={[styles.avatarBtn, avatarStyle]}>
-              <Ionicons name="person-circle-outline" size={26} color={Colors.textWhite} />
-            </Reanimated.View>
-          </TouchableOpacity>
+          <View style={styles.actions}>
+            <TouchableOpacity onPress={handleSyncNow} activeOpacity={0.8} disabled={syncing}>
+              <Reanimated.View style={[styles.avatarBtn, avatarStyle]}>
+                <Ionicons
+                  name={syncing ? 'sync-circle-outline' : 'cloud-upload-outline'}
+                  size={22}
+                  color={Colors.textWhite}
+                />
+              </Reanimated.View>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleLogout} activeOpacity={0.8}>
+              <Reanimated.View style={[styles.avatarBtn, avatarStyle]}>
+                <Ionicons name="person-circle-outline" size={26} color={Colors.textWhite} />
+              </Reanimated.View>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
     </LinearGradient>
@@ -132,6 +170,10 @@ const styles = StyleSheet.create({
   },
   left: {
     flex: 1,
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   logoRow: {
     flexDirection: 'row',

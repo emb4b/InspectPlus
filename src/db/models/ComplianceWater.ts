@@ -55,4 +55,8 @@ export class ComplianceWater extends Model {
   @field('otherObservations')                otherObservations!: string | null;
   @field('remarksRecommendations')           remarksRecommendations!: string | null;
   @json('documentsReviewed', asArray)        documentsReviewed!: string[];
+
+  // ↓ 'syncState' instead of 'syncStatus' — avoids collision with
+  //   WatermelonDB's internal Model.syncStatus property
+  @field('syncState')                        syncState!: string;
 }

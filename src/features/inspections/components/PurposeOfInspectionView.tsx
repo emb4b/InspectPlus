@@ -23,7 +23,7 @@ async function patchPurpose(purposeId: string, patch: Partial<PurposeOfInspectio
     await rec.update(r => {
       Object.assign(r, patch);
       r.updatedAt = new Date().toISOString();
-      r.syncState = 'pending';
+      r.syncState = 'pending_update';
     });
   });
 }

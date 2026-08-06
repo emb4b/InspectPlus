@@ -7,6 +7,7 @@ const DEFAULT_SYNC_METADATA: SyncMetadata = {
   lastPulledAt: null,
   lastSyncAt: null,
   isSyncing: false,
+  lastSyncedUserId: null,
 };
 
 function isValidSyncMetadata(value: unknown): value is SyncMetadata {
@@ -25,7 +26,12 @@ function isValidSyncMetadata(value: unknown): value is SyncMetadata {
   const validIsSyncing =
     v.isSyncing === undefined || typeof v.isSyncing === 'boolean';
 
-  return validLastPulledAt && validLastSyncAt && validIsSyncing;
+  const validLastSyncedUserId =
+    v.lastSyncedUserId === undefined ||
+    v.lastSyncedUserId === null ||
+    typeof v.lastSyncedUserId === 'string';
+
+  return validLastPulledAt && validLastSyncAt && validIsSyncing && validLastSyncedUserId;
 }
 
 export async function getSyncMetadata(): Promise<SyncMetadata> {
@@ -97,4 +103,13 @@ export async function setIsSyncing(isSyncing: boolean): Promise<void> {
 
 export async function resetSyncMetadata(): Promise<void> {
   await setSyncMetadata(DEFAULT_SYNC_METADATA);
+}
+
+export async function getLastSyncedUserId(): Promise<string | null> {
+  const metadata = await getSyncMetadata();
+  return metadata.lastSyncedUserId ?? null;
+}
+
+export async function setLastSyncedUserId(userId: string): Promise<void> {
+  await patchSyncMetadata({ lastSyncedUserId: userId });
 }
