@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
+import { getReportUrgency } from '../../../utils/reportUrgency';
 import type { AllReportItem } from '../hooks/useEstablishment';
 
 interface ReportListCardProps {
@@ -25,9 +26,17 @@ function formatDate(iso: string): string {
 
 export const ReportListCard: React.FC<ReportListCardProps> = ({ item, onPress }) => {
   const isSubmitted = item.status === 'submitted';
+  const urgency = getReportUrgency(item.date, item.status);
 
   return (
-    <TouchableOpacity style={styles.card} onPress={() => onPress(item)} activeOpacity={0.75}>
+    <TouchableOpacity
+      style={[
+        styles.card,
+        urgency === 'overdue' && styles.cardOverdue,
+        urgency === 'due-soon' && styles.cardDueSoon,
+      ]}
+      onPress={() => onPress(item)}
+      activeOpacity={0.75}>
       <View style={styles.iconWrap}>
         <Ionicons name={REPORT_ICONS[item.reportType] ?? 'document-outline'} size={17} color={Colors.water.text} />
       </View>
@@ -57,6 +66,26 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({ item, onPress })
         <View style={styles.dateRow}>
           <Ionicons name="calendar-outline" size={10} color={Colors.textMuted} />
           <Text style={styles.date}>{formatDate(item.date)}</Text>
+          {urgency !== 'none' && (
+            <View
+              style={[
+                styles.urgencyBadge,
+                { backgroundColor: urgency === 'overdue' ? Colors.hazwaste.badgeBg : Colors.warning.badgeBg },
+              ]}>
+              <Ionicons
+                name="alert-circle"
+                size={9}
+                color={urgency === 'overdue' ? Colors.hazwaste.badgeText : Colors.warning.text}
+              />
+              <Text
+                style={[
+                  styles.urgencyBadgeText,
+                  { color: urgency === 'overdue' ? Colors.hazwaste.badgeText : Colors.warning.text },
+                ]}>
+                {urgency === 'overdue' ? 'Overdue' : 'Due soon'}
+              </Text>
+            </View>
+          )}
         </View>
         <Text style={styles.controlNo}>{item.controlNo || 'No control number yet'}</Text>
       </View>
@@ -76,6 +105,14 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 12,
     marginBottom: 10,
+  },
+  cardDueSoon: {
+    borderColor: Colors.warning.border,
+    backgroundColor: Colors.warning.bg,
+  },
+  cardOverdue: {
+    borderColor: Colors.hazwaste.border,
+    backgroundColor: Colors.hazwaste.bg,
   },
   iconWrap: {
     width: 38,
@@ -133,6 +170,19 @@ const styles = StyleSheet.create({
   date: {
     fontSize: 10.5,
     color: Colors.textMuted,
+  },
+  urgencyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 20,
+    marginLeft: 4,
+  },
+  urgencyBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
   },
   controlNo: {
     fontSize: 10,

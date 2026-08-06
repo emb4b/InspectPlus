@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Colors } from '../../../constants/colors';
+import { useGuardedPress } from '../../../utils/useGuardedPress';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { SelectField } from '../../../components/form';
 import { EstablishmentCard } from './EstablishmentCard';
@@ -86,18 +87,18 @@ export const ManageEstablishmentsTab = forwardRef<ManageEstablishmentsTabHandle>
 
   // ── Action handlers ─────────────────────────────────────────────────────────
   // Tap the card itself → open the establishment detail screen.
-  const handleOpen = useCallback((item: EstablishmentDTO) => {
+  const handleOpen = useGuardedPress((item: EstablishmentDTO) => {
     router.push({ pathname: '/establishment/[id]', params: { id: item.estabId } });
-  }, []);
+  });
 
   // + Add → navigate to report type selection, carrying the establishment id
   // as a param so the form can pre-fill the snapshot from the master record.
-  const handleAdd = useCallback((item: EstablishmentDTO) => {
+  const handleAdd = useGuardedPress((item: EstablishmentDTO) => {
     router.push({
       pathname: '/report/new',
       params: { estabId: item.estabId },
     });
-  }, []);
+  });
 
   const handleEdit = useCallback((item: EstablishmentDTO) => {
     // TODO: navigate to establishment edit screen

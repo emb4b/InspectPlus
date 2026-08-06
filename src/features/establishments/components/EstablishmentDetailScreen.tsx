@@ -6,6 +6,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { Colors } from '../../../constants/colors';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { useInspectorName } from '../../../core/hooks/useInspectorName';
+import { useGuardedPress } from '../../../utils/useGuardedPress';
 import { useEstablishment, useEstablishmentReports, EstablishmentReportItem } from '../hooks/useEstablishment';
 import { EstablishmentHeaderCard } from './EstablishmentHeaderCard';
 import { EstablishmentInfoSections } from './EstablishmentInfoSections';
@@ -35,13 +36,17 @@ export const EstablishmentDetailScreen: React.FC<EstablishmentDetailScreenProps>
     ? fullName || 'You'
     : resolvedInspectorName ?? (inspectorNameLoading ? 'Loading…' : establishment ? 'Unknown inspector' : '—');
 
-  const handleAddReport = useCallback(() => {
-    router.push({ pathname: '/report/new', params: { estabId } });
-  }, [estabId]);
+  const handleAddReport = useGuardedPress(
+    useCallback(() => {
+      router.push({ pathname: '/report/new', params: { estabId } });
+    }, [estabId]),
+  );
 
-  const handleEdit = useCallback(() => {
-    router.push({ pathname: '/establishment/edit', params: { estabId } });
-  }, [estabId]);
+  const handleEdit = useGuardedPress(
+    useCallback(() => {
+      router.push({ pathname: '/establishment/edit', params: { estabId } });
+    }, [estabId]),
+  );
 
   // The native Stack doesn't remount this screen when navigating back to
   // it, so without this the card/info sections would keep showing pre-edit
@@ -57,13 +62,13 @@ export const EstablishmentDetailScreen: React.FC<EstablishmentDetailScreenProps>
     console.log('[EstablishmentDetail] Update permits:', estabId);
   }, [estabId]);
 
-  const handleOpenReport = useCallback((item: EstablishmentReportItem) => {
+  const handleOpenReport = useGuardedPress((item: EstablishmentReportItem) => {
     if (item.kind === 'inspection') {
       router.push({ pathname: '/inspection/[id]', params: { id: item.reportId } });
     } else {
       router.push({ pathname: '/survey/[id]', params: { id: item.reportId } });
     }
-  }, []);
+  });
 
   const handleDeleteReport = useCallback((item: EstablishmentReportItem) => {
     // TODO: show confirmation modal then soft-delete

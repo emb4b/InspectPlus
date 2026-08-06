@@ -46,22 +46,79 @@ export const EstablishmentInfoSections: React.FC<EstablishmentInfoSectionsProps>
 
   return (
     <View>
-      <FormSection icon="person-outline" title="Key Personnel">
+      <FormSection icon="business-outline" title="Establishment Details">
         <View style={styles.row}>
-          <TextField label="Managing Head" value={establishment.managingHeadName || '—'} readOnly />
-          <TextField label="PCO Name" value={establishment.pcoName || '—'} readOnly />
+          <TextField label="Establishment Name" value={establishment.name || '—'} readOnly />
+          <TextField label="Former Establishment Name" value={establishment.formerName || '—'} readOnly />
         </View>
         <View style={styles.row}>
-          <TextField label="PCO Accreditation No." value={establishment.pcoAccreditationNo || '—'} readOnly />
-          <TextField label="PCO Accreditation Effectivity" value={establishment.pcoEffectivity || '—'} readOnly />
+          <TextField label="Address" value={establishment.addressLine || '—'} readOnly />
+          <TextField label="Barangay" value={establishment.barangay || '—'} readOnly />
+        </View>
+        <View style={styles.row}>
+          <TextField label="City / Municipality" value={establishment.city || '—'} readOnly />
+          <TextField label="Province" value={establishment.province || '—'} readOnly />
+        </View>
+        <View style={styles.row}>
+          <TextField label="Nature of Business" value={establishment.natureOfBusiness || '—'} readOnly />
+          <TextField label="PSIC Code" value={establishment.psicCode || '—'} readOnly />
+        </View>
+        <View style={styles.row}>
+          <TextField
+            label="Latitude"
+            value={establishment.geoLat != null ? String(establishment.geoLat) : '—'}
+            readOnly
+          />
+          <TextField
+            label="Longitude"
+            value={establishment.geoLng != null ? String(establishment.geoLng) : '—'}
+            readOnly
+          />
+        </View>
+        <View style={styles.row}>
+          <TextField label="Status of Operation" value={establishment.operatingStatus || '—'} readOnly />
+        </View>
+        <View style={styles.row3}>
+          <TextField
+            label="Operating Hours/Day"
+            value={establishment.operatingHoursDay != null ? String(establishment.operatingHoursDay) : '—'}
+            readOnly
+          />
+          <TextField
+            label="Operating Days/Week"
+            value={establishment.operatingDaysWeek != null ? String(establishment.operatingDaysWeek) : '—'}
+            readOnly
+          />
+          <TextField
+            label="Operating Days/Year"
+            value={establishment.operatingDaysYear != null ? String(establishment.operatingDaysYear) : '—'}
+            readOnly
+          />
+        </View>
+      </FormSection>
+
+      <FormSection icon="person-outline" title="Key Personnel">
+        <View style={styles.row}>
+          <TextField label="Owner" value={establishment.ownerName || '—'} readOnly />
+          <TextField label="Managing Head / Plant Manager" value={establishment.managingHeadName || '—'} readOnly />
         </View>
         <View style={styles.row}>
           <TextField label="Contact Person" value={establishment.contactPersonName || '—'} readOnly />
-          <TextField label="Contact Position" value={establishment.contactPersonPosition || '—'} readOnly />
+          <TextField label="Contact Person Position" value={establishment.contactPersonPosition || '—'} readOnly />
         </View>
         <View style={styles.row}>
-          <TextField label="Phone/Fax" value={establishment.phoneFax || '—'} readOnly />
-          <TextField label="Email" value={establishment.email || '—'} readOnly />
+          <TextField label="Phone / Fax" value={establishment.phoneFax || '—'} readOnly />
+          <TextField label="Email Address" value={establishment.email || '—'} readOnly />
+        </View>
+      </FormSection>
+
+      <FormSection icon="leaf-outline" title="Pollution Control Officer">
+        <View style={styles.row}>
+          <TextField label="PCO Full Name" value={establishment.pcoName || '—'} readOnly />
+          <TextField label="PCO Accreditation No." value={establishment.pcoAccreditationNo || '—'} readOnly />
+        </View>
+        <View style={styles.row}>
+          <TextField label="PCO Accreditation Effectivity" value={establishment.pcoEffectivity || '—'} readOnly />
         </View>
       </FormSection>
 
@@ -115,6 +172,10 @@ export const EstablishmentInfoSections: React.FC<EstablishmentInfoSectionsProps>
 
 const styles = StyleSheet.create({
   row: {
+    flexDirection: 'row',
+    gap: 14,
+  },
+  row3: {
     flexDirection: 'row',
     gap: 14,
   },

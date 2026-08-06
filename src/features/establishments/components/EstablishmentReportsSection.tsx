@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
+import { getReportUrgency } from '../../../utils/reportUrgency';
 import type { EstablishmentReportItem } from '../hooks/useEstablishment';
 
 interface EstablishmentReportsSectionProps {
@@ -30,27 +31,58 @@ const ReportRow: React.FC<{
   item: EstablishmentReportItem;
   onOpen: () => void;
   onDelete: () => void;
-}> = ({ item, onOpen, onDelete }) => (
-  <TouchableOpacity style={styles.row} onPress={onOpen} activeOpacity={0.75}>
-    <View style={styles.iconWrap}>
-      <Ionicons name={REPORT_ICONS[item.reportType] ?? 'document-outline'} size={17} color={Colors.water.text} />
-    </View>
-    <View style={styles.content}>
-      <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-      <View style={styles.dateRow}>
-        <Ionicons name="calendar-outline" size={10} color={Colors.textMuted} />
-        <Text style={styles.date}>{formatDate(item.date)}</Text>
+}> = ({ item, onOpen, onDelete }) => {
+  const urgency = getReportUrgency(item.date, item.status);
+
+  return (
+    <TouchableOpacity
+      style={[
+        styles.row,
+        urgency === 'overdue' && styles.rowOverdue,
+        urgency === 'due-soon' && styles.rowDueSoon,
+      ]}
+      onPress={onOpen}
+      activeOpacity={0.75}>
+      <View style={styles.iconWrap}>
+        <Ionicons name={REPORT_ICONS[item.reportType] ?? 'document-outline'} size={17} color={Colors.water.text} />
       </View>
-      <Text style={styles.controlNo}>{item.controlNo || 'No control number yet'}</Text>
-    </View>
-    <View style={styles.actions}>
-      <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
-      <TouchableOpacity style={styles.deleteBtn} onPress={onDelete} activeOpacity={0.75}>
-        <Ionicons name="trash-outline" size={12} color={Colors.textWhite} />
-      </TouchableOpacity>
-    </View>
-  </TouchableOpacity>
-);
+      <View style={styles.content}>
+        <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+        <View style={styles.dateRow}>
+          <Ionicons name="calendar-outline" size={10} color={Colors.textMuted} />
+          <Text style={styles.date}>{formatDate(item.date)}</Text>
+          {urgency !== 'none' && (
+            <View
+              style={[
+                styles.urgencyBadge,
+                { backgroundColor: urgency === 'overdue' ? Colors.hazwaste.badgeBg : Colors.warning.badgeBg },
+              ]}>
+              <Ionicons
+                name="alert-circle"
+                size={9}
+                color={urgency === 'overdue' ? Colors.hazwaste.badgeText : Colors.warning.text}
+              />
+              <Text
+                style={[
+                  styles.urgencyBadgeText,
+                  { color: urgency === 'overdue' ? Colors.hazwaste.badgeText : Colors.warning.text },
+                ]}>
+                {urgency === 'overdue' ? 'Overdue' : 'Due soon'}
+              </Text>
+            </View>
+          )}
+        </View>
+        <Text style={styles.controlNo}>{item.controlNo || 'No control number yet'}</Text>
+      </View>
+      <View style={styles.actions}>
+        <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
+        <TouchableOpacity style={styles.deleteBtn} onPress={onDelete} activeOpacity={0.75}>
+          <Ionicons name="trash-outline" size={12} color={Colors.textWhite} />
+        </TouchableOpacity>
+      </View>
+    </TouchableOpacity>
+  );
+};
 
 export const EstablishmentReportsSection: React.FC<EstablishmentReportsSectionProps> = ({
   reports,
@@ -151,6 +183,14 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 10,
   },
+  rowDueSoon: {
+    borderColor: Colors.warning.border,
+    backgroundColor: Colors.warning.bg,
+  },
+  rowOverdue: {
+    borderColor: Colors.hazwaste.border,
+    backgroundColor: Colors.hazwaste.bg,
+  },
   iconWrap: {
     width: 38,
     height: 38,
@@ -178,6 +218,19 @@ const styles = StyleSheet.create({
   date: {
     fontSize: 10.5,
     color: Colors.textMuted,
+  },
+  urgencyBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 20,
+    marginLeft: 4,
+  },
+  urgencyBadgeText: {
+    fontSize: 9,
+    fontWeight: '700',
   },
   controlNo: {
     fontSize: 10,
