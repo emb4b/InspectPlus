@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Q } from '@nozbe/watermelondb';
 import { collections } from '../../../db/database';
+import { useAuthContext } from '../../../core/providers/AuthProvider';
+import { isEstablishmentVisible, isPrivilegedRole } from '../../establishments/hooks/useEstablishment';
 import { buildPurposeFormFromModel, PurposeFormState } from '../types';
 import type { EstablishmentSnapshot, PermitSnapshotItem } from '../../../services/sync/syncTypes';
 import type { YnValue } from '../../../components/form';
@@ -140,6 +142,11 @@ export function useInspectionReport(reportId: string | undefined): UseInspection
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const { session, province, role } = useAuthContext();
+  const myUid = (session as { user?: { id?: string } } | null)?.user?.id ?? '';
+  const myProvince = province ?? '';
+  const myRole = role ?? '';
+  const ready = !!myUid && !!myProvince;
 
   const refetch = () => setTick(t => t + 1);
 
@@ -147,7 +154,7 @@ export function useInspectionReport(reportId: string | undefined): UseInspection
     let cancelled = false;
 
     async function run() {
-      if (!reportId) {
+      if (!reportId || !ready) {
         setReport(null);
         setPurpose(null);
         setCompliance({ kind: 'none' });
@@ -161,7 +168,23 @@ export function useInspectionReport(reportId: string | undefined): UseInspection
         const reportMatches = await collections.inspectionReports
           .query(Q.where('reportId', reportId))
           .fetch();
-        const reportModel = reportMatches[0];
+        let reportModel: typeof reportMatches[number] | undefined = reportMatches[0];
+
+        // Jurisdiction check, mirroring the "inspectors can read
+        // jurisdiction inspection reports" / "admins and developers can
+        // read all inspection reports" RLS policies: visible if this
+        // inspector wrote it, the role is unrestricted, or its
+        // establishment is jurisdiction-visible. A non-visible report is
+        // treated exactly like "not found".
+        if (reportModel && reportModel.inspectorUid !== myUid && !isPrivilegedRole(myRole)) {
+          const estabMatches = await collections.establishments
+            .query(Q.where('estabId', reportModel.estabId))
+            .fetch();
+          const estab = estabMatches[0];
+          if (!estab || !isEstablishmentVisible(estab, myProvince, myUid, myRole)) {
+            reportModel = undefined;
+          }
+        }
 
         if (!reportModel) {
           if (!cancelled) {
@@ -312,7 +335,7 @@ export function useInspectionReport(reportId: string | undefined): UseInspection
     return () => {
       cancelled = true;
     };
-  }, [reportId, tick]);
+  }, [reportId, tick, ready, myProvince, myUid, myRole]);
 
   return { report, purpose, compliance, loading, error, refetch };
 }

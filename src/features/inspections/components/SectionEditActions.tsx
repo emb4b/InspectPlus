@@ -9,6 +9,11 @@ interface SectionEditActionsProps {
   onStartEdit: () => void;
   onCancel: () => void;
   onSave: () => void;
+  // False for a report the current inspector isn't allowed to edit (not the
+  // creator, or the report is no longer a draft) — renders nothing instead
+  // of an Edit button, so the section is plain read-only. See
+  // InspectionReportDetailScreen's canEdit.
+  canEdit?: boolean;
 }
 
 // Edit/Save/Cancel trio for a single FormSection, passed as its
@@ -20,7 +25,11 @@ export const SectionEditActions: React.FC<SectionEditActionsProps> = ({
   onStartEdit,
   onCancel,
   onSave,
+  canEdit = true,
 }) => {
+  if (!canEdit) {
+    return null;
+  }
   if (!editing) {
     return (
       <TouchableOpacity style={styles.editBtn} onPress={onStartEdit} activeOpacity={0.75}>

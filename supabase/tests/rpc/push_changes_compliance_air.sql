@@ -3,7 +3,7 @@ begin;
 select plan(6);
 
 insert into public.user_accounts (
-  uid, first_name, last_name, username, password_hash, role, region, area_of_assignment,
+  uid, first_name, last_name, username, password_hash, role, region, province,
   email, is_active, sync_status, device_id
 ) values (
   '55555555-5555-5555-5555-555555555555',
@@ -42,6 +42,12 @@ insert into public.inspection_reports (
   '{"name":"Air Plant"}'::jsonb, '[]'::jsonb,
   now(), now(), false, 'pending', 'device-e'
 );
+
+-- Switch to the authenticated role (the same one push_changes runs as for
+-- a real client) to prove the RPC's table-level GRANT on compliance_air is
+-- actually in place — see 20260806010000_grant_authenticated_on_compliance_tables.sql.
+select set_config('role', 'authenticated', true);
+select set_config('request.jwt.claim.sub', '55555555-5555-5555-5555-555555555555', true);
 
 -- Compliance air: create
 select is(

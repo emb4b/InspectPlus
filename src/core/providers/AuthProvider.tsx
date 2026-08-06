@@ -23,6 +23,19 @@ interface AuthContextValue {
   // user_accounts at sign-in and cached alongside the other CRED_* keys so
   // it survives offline re-entry — session.user only carries email/id.
   fullName: string | null;
+  // The signed-in inspector's jurisdiction (user_accounts.province), cached
+  // the same way as fullName. Establishments are only rendered when their
+  // province matches this — see useEstablishments/useAllReports.
+  province: string | null;
+  // The specific municipalities within that province the inspector is
+  // assigned to (public.inspector_municipalities). Used only to populate
+  // the municipality filter in the list screens — visibility itself stays
+  // province-wide, this never gates what renders.
+  municipalities: string[];
+  // 'Inspector' | 'Administrator' | 'Developer'. Administrator/Developer
+  // bypass province scoping entirely (see the matching RLS policies) —
+  // see useEstablishment.ts's isEstablishmentVisible.
+  role: string | null;
   loading: boolean;
   signIn: (emailOrUsername: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -31,6 +44,9 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue>({
   session: null,
   fullName: null,
+  province: null,
+  municipalities: [],
+  role: null,
   loading: true,
   signIn: async () => {},
   signOut: async () => {},
@@ -43,6 +59,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [session, setSession] = useState<object | null>(null);
   const [fullName, setFullName] = useState<string | null>(null);
+  const [province, setProvince] = useState<string | null>(null);
+  const [municipalities, setMunicipalities] = useState<string[]>([]);
+  const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Tracks authService.signOut()'s background network cleanup (see signOut
@@ -78,6 +97,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (name) setFullName(name);
     });
 
+    // Same as above, for the cached jurisdiction (province).
+    authService.getCachedProvince().then(p => {
+      if (p) setProvince(p);
+    });
+
+    // Same as above, for the cached municipality assignments.
+    authService.getCachedMunicipalities().then(m => {
+      if (m.length > 0) setMunicipalities(m);
+    });
+
+    // Same as above, for the cached role.
+    authService.getCachedRole().then(r => {
+      if (r) setRole(r);
+    });
+
     // onAuthStateChange fires once immediately with the client's own
     // current session (an INITIAL_SESSION event — the passive equivalent
     // of calling getSession() ourselves) and again on every later
@@ -105,13 +139,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   // Self-healing backfill: a session restored via the short-cache path (or
-  // one whose credential cache predates fullName ever being stored) can
-  // reach here with a real session but no cached name — that's what showed
-  // up as a bare "You" instead of an actual name on the establishment/report
-  // screens. Only signInOnline() normally resolves+caches fullName, so a
-  // session that never went through it needs this fallback to ever get one.
+  // one whose credential cache predates fullName/province/municipalities
+  // ever being stored) can reach here with a real session but no cached
+  // name — that's what showed up as a bare "You" instead of an actual name
+  // on the establishment/report screens. Only signInOnline() normally
+  // resolves+caches these, so a session that never went through it needs
+  // this fallback to ever get them.
   useEffect(() => {
-    if (loading || !session || fullName) return;
+    if (loading || !session || (fullName && province && role && municipalities.length > 0)) return;
     const uid = (session as { user?: { id?: string } }).user?.id;
     if (!uid) return;
 
@@ -120,21 +155,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       if (!(await checkOnline())) return;
       const { data, error } = await supabase
         .from('user_accounts')
-        .select('first_name, middle_name, last_name')
+        .select('first_name, middle_name, last_name, province, role')
         .eq('uid', uid)
         .single();
       if (cancelled || error || !data) return;
-      const resolved = [data.first_name, data.middle_name, data.last_name].filter(Boolean).join(' ');
-      if (resolved) {
-        setFullName(resolved);
-        await authService.cacheFullName(resolved);
+
+      if (!fullName) {
+        const resolvedName = [data.first_name, data.middle_name, data.last_name].filter(Boolean).join(' ');
+        if (resolvedName) {
+          setFullName(resolvedName);
+          await authService.cacheFullName(resolvedName);
+        }
+      }
+
+      if (!province && data.province) {
+        setProvince(data.province);
+        await authService.cacheProvince(data.province);
+      }
+
+      if (!role && data.role) {
+        setRole(data.role);
+        await authService.cacheRole(data.role);
+      }
+
+      if (municipalities.length === 0) {
+        const { data: municipalityRows, error: municipalityError } = await supabase
+          .from('inspector_municipalities')
+          .select('municipality')
+          .eq('inspector_uid', uid);
+        if (!cancelled && !municipalityError && municipalityRows && municipalityRows.length > 0) {
+          const resolved = municipalityRows.map(r => r.municipality).sort();
+          setMunicipalities(resolved);
+          await authService.cacheMunicipalities(resolved);
+        }
       }
     })();
 
     return () => {
       cancelled = true;
     };
-  }, [loading, session, fullName]);
+  }, [loading, session, fullName, province, role, municipalities]);
 
   // Called from the login screen. Handles BOTH paths:
   //  - Online: supabase.auth.signInWithPassword() also triggers
@@ -157,6 +217,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       }
       if (result?.fullName) {
         setFullName(result.fullName);
+      }
+      if (result?.province) {
+        setProvince(result.province);
+      }
+      if (result?.municipalities) {
+        setMunicipalities(result.municipalities);
+      }
+      if (result?.role) {
+        setRole(result.role);
       }
     },
     [],
@@ -181,7 +250,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   }, []);
 
   return (
-    <AuthContext.Provider value={{ session, fullName, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ session, fullName, province, municipalities, role, loading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

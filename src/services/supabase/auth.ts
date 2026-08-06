@@ -8,6 +8,22 @@ import { ENV } from '../../core/config/env';
 const SESSION_KEY       = 'inspectplus.session';
 const SESSION_TS_KEY    = 'inspectplus.session.ts';
 const CRED_FULLNAME_KEY = 'inspectplus.cred.fullname';
+// The signed-in inspector's jurisdiction, cached the same way as fullName —
+// resolved from user_accounts.province at sign-in, needed offline to gate
+// which establishments/reports render (see AuthProvider).
+const CRED_PROVINCE_KEY = 'inspectplus.cred.province';
+// The specific municipalities within that province the inspector is
+// assigned to (public.inspector_municipalities — many rows per inspector),
+// cached as a JSON string array. Used only to populate the municipality
+// filter in the establishments/reports list screens — NOT an access-control
+// boundary, jurisdiction visibility stays province-wide (see the
+// 2026-08-06 migration).
+const CRED_MUNICIPALITIES_KEY = 'inspectplus.cred.municipalities';
+// The signed-in user's role ('Inspector' | 'Administrator' | 'Developer'),
+// cached the same way as province. Administrator/Developer bypass province
+// scoping entirely (see the establishments/inspection_reports RLS policies
+// added alongside this) — cached here so that also holds true offline.
+const CRED_ROLE_KEY     = 'inspectplus.cred.role';
 // Every inspector who has signed in online on this device, keyed by email,
 // each with their own password hash + session so any of them (not just
 // whoever logged in most recently) can sign back in offline. See
@@ -25,6 +41,9 @@ interface CachedCredential {
   email: string;
   username: string;
   fullName: string;
+  province: string;
+  municipalities: string[];
+  role: string;
   credHash: string;
   // This user's own Supabase session, so offline sign-in can restore the
   // right one even when they're not the last person who used the device.
@@ -100,10 +119,13 @@ async function signInOnline(
 
   let resolvedUsername = '';
   let resolvedFullName = '';
+  let resolvedProvince = '';
+  let resolvedMunicipalities: string[] = [];
+  let resolvedRole = '';
   if (data.user) {
     const { data: profile, error: profileError } = await supabase
       .from('user_accounts')
-      .select('username, first_name, middle_name, last_name')
+      .select('username, first_name, middle_name, last_name, province, role')
       .eq('uid', data.user.id)
       .single();
     if (profileError) {
@@ -113,6 +135,18 @@ async function signInOnline(
       resolvedFullName = [profile?.first_name, profile?.middle_name, profile?.last_name]
         .filter(Boolean)
         .join(' ');
+      resolvedProvince = profile?.province ?? '';
+      resolvedRole = profile?.role ?? '';
+    }
+
+    const { data: municipalityRows, error: municipalityError } = await supabase
+      .from('inspector_municipalities')
+      .select('municipality')
+      .eq('inspector_uid', data.user.id);
+    if (municipalityError) {
+      console.log('[Auth] Could not resolve municipality assignments for offline cache:', municipalityError.message);
+    } else {
+      resolvedMunicipalities = (municipalityRows ?? []).map(r => r.municipality).sort();
     }
   }
 
@@ -123,10 +157,16 @@ async function signInOnline(
     SecureStore.setItemAsync(SESSION_KEY,       JSON.stringify(data.session)),
     SecureStore.setItemAsync(SESSION_TS_KEY,    now.toString()),
     SecureStore.setItemAsync(CRED_FULLNAME_KEY, resolvedFullName),
+    SecureStore.setItemAsync(CRED_PROVINCE_KEY, resolvedProvince),
+    SecureStore.setItemAsync(CRED_MUNICIPALITIES_KEY, JSON.stringify(resolvedMunicipalities)),
+    SecureStore.setItemAsync(CRED_ROLE_KEY,     resolvedRole),
     upsertCachedUser({
       email,
       username: resolvedUsername,
       fullName: resolvedFullName,
+      province: resolvedProvince,
+      municipalities: resolvedMunicipalities,
+      role: resolvedRole,
       credHash,
       session: data.session as object,
       ts: now,
@@ -136,7 +176,13 @@ async function signInOnline(
   console.log('[Auth] Online sign-in success. Credentials cached at', now,
     '| email:', email, '| username:', resolvedUsername);
 
-  return { ...data, fullName: resolvedFullName };
+  return {
+    ...data,
+    fullName: resolvedFullName,
+    province: resolvedProvince,
+    municipalities: resolvedMunicipalities,
+    role: resolvedRole,
+  };
 }
 
 async function signInOffline(
@@ -184,9 +230,19 @@ async function signInOffline(
     SecureStore.setItemAsync(SESSION_KEY,       JSON.stringify(match.session)),
     SecureStore.setItemAsync(SESSION_TS_KEY,    now),
     SecureStore.setItemAsync(CRED_FULLNAME_KEY, match.fullName),
+    SecureStore.setItemAsync(CRED_PROVINCE_KEY, match.province ?? ''),
+    SecureStore.setItemAsync(CRED_MUNICIPALITIES_KEY, JSON.stringify(match.municipalities ?? [])),
+    SecureStore.setItemAsync(CRED_ROLE_KEY,     match.role ?? ''),
   ]);
 
-  return { session: match.session, user: null, fullName: match.fullName };
+  return {
+    session: match.session,
+    user: null,
+    fullName: match.fullName,
+    province: match.province ?? '',
+    municipalities: match.municipalities ?? [],
+    role: match.role ?? '',
+  };
 }
 
 // ── Public API ────────────────────────────────────────────
@@ -227,6 +283,61 @@ export const authService = {
   async cacheFullName(fullName: string): Promise<void> {
     try {
       await SecureStore.setItemAsync(CRED_FULLNAME_KEY, fullName);
+    } catch {
+      // Best effort — worst case it re-resolves next boot too.
+    }
+  },
+
+  async getCachedProvince(): Promise<string> {
+    try {
+      return (await SecureStore.getItemAsync(CRED_PROVINCE_KEY)) ?? '';
+    } catch {
+      return '';
+    }
+  },
+
+  // Backfills CRED_PROVINCE_KEY for a session restored without going through
+  // signInOnline — same rationale as cacheFullName above.
+  async cacheProvince(province: string): Promise<void> {
+    try {
+      await SecureStore.setItemAsync(CRED_PROVINCE_KEY, province);
+    } catch {
+      // Best effort — worst case it re-resolves next boot too.
+    }
+  },
+
+  async getCachedMunicipalities(): Promise<string[]> {
+    try {
+      const raw = await SecureStore.getItemAsync(CRED_MUNICIPALITIES_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  },
+
+  // Backfills CRED_MUNICIPALITIES_KEY — same rationale as cacheFullName above.
+  async cacheMunicipalities(municipalities: string[]): Promise<void> {
+    try {
+      await SecureStore.setItemAsync(CRED_MUNICIPALITIES_KEY, JSON.stringify(municipalities));
+    } catch {
+      // Best effort — worst case it re-resolves next boot too.
+    }
+  },
+
+  async getCachedRole(): Promise<string> {
+    try {
+      return (await SecureStore.getItemAsync(CRED_ROLE_KEY)) ?? '';
+    } catch {
+      return '';
+    }
+  },
+
+  // Backfills CRED_ROLE_KEY — same rationale as cacheFullName above.
+  async cacheRole(role: string): Promise<void> {
+    try {
+      await SecureStore.setItemAsync(CRED_ROLE_KEY, role);
     } catch {
       // Best effort — worst case it re-resolves next boot too.
     }

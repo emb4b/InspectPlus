@@ -2,7 +2,7 @@ begin;
 select plan(6);
 
 insert into public.user_accounts (
-  uid, first_name, last_name, username, password_hash, role, region, area_of_assignment,
+  uid, first_name, last_name, username, password_hash, role, region, province,
   email, is_active, sync_status, device_id
 ) values (
   '11111111-1111-1111-1111-111111111111',
@@ -41,6 +41,12 @@ insert into public.inspection_reports (
   '{"name":"HazWaste Push Plant"}'::jsonb, '[]'::jsonb,
   now(), now(), false, 'pending', 'device-a'
 );
+
+-- Switch to the authenticated role (the same one push_changes runs as for
+-- a real client) to prove the RPC's table-level GRANT on compliance_hazwaste
+-- is actually in place — see 20260806010000_grant_authenticated_on_compliance_tables.sql.
+select set_config('role', 'authenticated', true);
+select set_config('request.jwt.claim.sub', '11111111-1111-1111-1111-111111111111', true);
 
 select is(
   public.push_changes(

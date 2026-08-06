@@ -5,6 +5,7 @@ import type { KeyboardAwareScrollViewRef } from 'react-native-keyboard-controlle
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Colors } from '../../../constants/colors';
+import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { useInspectionReport } from '../hooks/useInspectionReport';
 import { InspectionReportHeader, ReportDetailTabKey } from './InspectionReportHeader';
 import { GeneralInformationView } from './GeneralInformationView';
@@ -21,6 +22,14 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
   const { report, purpose, compliance, loading, error, refetch } = useInspectionReport(reportId);
   const scrollRef = useRef<ScrollView>(null);
   const { onScroll } = useHeaderScroll();
+  const { session } = useAuthContext();
+  const currentUid = (session as { user?: { id?: string } } | null)?.user?.id ?? '';
+
+  // Only the inspector who created the report can edit it, and only while
+  // it's still a draft — jurisdiction-visible reports from other inspectors
+  // (or a report that's already been submitted) render read-only. See
+  // SectionEditActions.
+  const canEdit = !!report && report.inspectorUid === currentUid && report.reportStatus === 'draft';
 
   if (loading) {
     return (
@@ -81,8 +90,17 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
       <View style={styles.noteBar}>
         <Ionicons name="information-circle-outline" size={13} color={Colors.navy} />
         <Text style={styles.noteText}>
-          Use <Text style={styles.noteTextStrong}>Edit</Text> on any section below to make changes, then{' '}
-          <Text style={styles.noteTextStrong}>Save</Text> to update just that section.
+          {canEdit ? (
+            <>
+              Use <Text style={styles.noteTextStrong}>Edit</Text> on any section below to make changes, then{' '}
+              <Text style={styles.noteTextStrong}>Save</Text> to update just that section.
+            </>
+          ) : (
+            <>
+              This report is <Text style={styles.noteTextStrong}>view only</Text> — only the inspector who
+              created it can make changes{report.reportStatus === 'submitted' ? ', and it has already been submitted' : ''}.
+            </>
+          )}
         </Text>
       </View>
 
@@ -100,6 +118,7 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
             reportId={report.reportId}
             snapshot={report.establishmentSnapshot}
             permits={report.permitsSnapshot}
+            canEdit={canEdit}
             onSaved={refetch}
           />
         )}
@@ -108,6 +127,7 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
             <PurposeOfInspectionView
               purposeId={report.purposeId}
               value={purpose}
+              canEdit={canEdit}
               onSaved={refetch}
             />
           ) : (
@@ -117,6 +137,7 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
           <ComplianceStatusView
             reportId={report.reportId}
             compliance={compliance}
+            canEdit={canEdit}
             onSaved={refetch}
           />
         )}

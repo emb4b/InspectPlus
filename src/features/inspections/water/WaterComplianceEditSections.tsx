@@ -76,8 +76,9 @@ const AddCardButton: React.FC<{ label: string; onPress: () => void }> = ({ label
 const WaterSourcesSection: React.FC<{
   complianceId: string;
   value: DynamicRow[];
+  canEdit: boolean;
   onSaved: () => void;
-}> = ({ complianceId, value, onSaved }) => {
+}> = ({ complianceId, value, canEdit, onSaved }) => {
   const section = useEditableSection<DynamicRow[]>({
     value,
     onSave: async rows => {
@@ -93,7 +94,7 @@ const WaterSourcesSection: React.FC<{
       icon="water-outline"
       title="Water Sources"
       headerRight={
-        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} />
+        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
       {section.editing ? (
         <DynamicRowTable
@@ -128,8 +129,9 @@ const WaterSourcesSection: React.FC<{
 const WastewaterSourcesSection: React.FC<{
   complianceId: string;
   value: DynamicRow[];
+  canEdit: boolean;
   onSaved: () => void;
-}> = ({ complianceId, value, onSaved }) => {
+}> = ({ complianceId, value, canEdit, onSaved }) => {
   const section = useEditableSection<DynamicRow[]>({
     value,
     onSave: async rows => {
@@ -145,7 +147,7 @@ const WastewaterSourcesSection: React.FC<{
       icon="business-outline"
       title="Wastewater Sources"
       headerRight={
-        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} />
+        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
       {section.editing ? (
         <DynamicRowTable
@@ -180,8 +182,9 @@ const WastewaterSourcesSection: React.FC<{
 const AbstractedWaterQualitySection: React.FC<{
   complianceId: string;
   value: DynamicRow[];
+  canEdit: boolean;
   onSaved: () => void;
-}> = ({ complianceId, value, onSaved }) => {
+}> = ({ complianceId, value, canEdit, onSaved }) => {
   const section = useEditableSection<DynamicRow[]>({
     value,
     onSave: async rows => {
@@ -197,7 +200,7 @@ const AbstractedWaterQualitySection: React.FC<{
       icon="flask-outline"
       title="Abstracted Water Quality"
       headerRight={
-        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} />
+        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
       {section.editing ? (
         <DynamicRowTable
@@ -243,10 +246,12 @@ interface WwtpFields {
 const WwtpSection: React.FC<{
   complianceId: string;
   value: WwtpFields;
+  canEdit: boolean;
   onSaved: () => void;
 }> = ({
   complianceId,
   value,
+  canEdit,
   onSaved,
 }) => {
   const fieldRefs = useRef<Record<string, TextInput | null>>({});
@@ -289,7 +294,7 @@ const WwtpSection: React.FC<{
       icon="cog-outline"
       title="Wastewater Treatment Plant (WWTP)"
       headerRight={
-        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} />
+        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
       <View style={styles.row}>
         {section.editing ? (
@@ -559,10 +564,12 @@ const WwtpSection: React.FC<{
 const SamplingPointsSection: React.FC<{
   complianceId: string;
   value: SamplingPointCard[];
+  canEdit: boolean;
   onSaved: () => void;
 }> = ({
   complianceId,
   value,
+  canEdit,
   onSaved,
 }) => {
   const fieldRefs = useRef<Record<string, TextInput | null>>({});
@@ -612,7 +619,7 @@ const SamplingPointsSection: React.FC<{
       icon="stats-chart-outline"
       title="Sampling Points"
       headerRight={
-        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} />
+        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
       {section.draft.map((pt, i) => {
         const k = (field: string) => `samplingPoint:${i}:${field}`;
@@ -779,8 +786,9 @@ const SamplingPointsSection: React.FC<{
 const PreviousInspectionSection: React.FC<{
   complianceId: string;
   value: PreviousInspectionState;
+  canEdit: boolean;
   onSaved: () => void;
-}> = ({ complianceId, value, onSaved }) => {
+}> = ({ complianceId, value, canEdit, onSaved }) => {
   const fieldRefs = useRef<Record<string, TextInput | null>>({});
   const focus = (key: string) => focusInput(fieldRefs.current[key]);
   const setRef = (key: string) => (el: TextInput | null) => { fieldRefs.current[key] = el; };
@@ -812,7 +820,7 @@ const PreviousInspectionSection: React.FC<{
       icon="time-outline"
       title="Previous Inspection Summary"
       headerRight={
-        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} />
+        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
       {!hasData && !section.editing ? (
         <Text style={sharedStyles.emptyText}>No previous inspection summary recorded.</Text>
@@ -956,10 +964,12 @@ const PreviousInspectionSection: React.FC<{
 const ChecklistSection: React.FC<{
   complianceId: string;
   value: ChecklistValue[];
+  canEdit: boolean;
   onSaved: () => void;
 }> = ({
   complianceId,
   value,
+  canEdit,
   onSaved,
 }) => {
   const section = useEditableSection<ChecklistValue[]>({
@@ -981,7 +991,7 @@ const ChecklistSection: React.FC<{
       icon="list-outline"
       title="Checklist — DAO 2005-10 (Water Quality)"
       headerRight={
-        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} />
+        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
       {section.editing ? (
         <ChecklistTable
@@ -1013,10 +1023,12 @@ const ChecklistSection: React.FC<{
 const DpConditionsSection: React.FC<{
   complianceId: string;
   value: DpConditionRow[];
+  canEdit: boolean;
   onSaved: () => void;
 }> = ({
   complianceId,
   value,
+  canEdit,
   onSaved,
 }) => {
   const fieldRefs = useRef<Record<string, TextInput | null>>({});
@@ -1046,7 +1058,7 @@ const DpConditionsSection: React.FC<{
       icon="document-text-outline"
       title="Discharge Permit Conditions"
       headerRight={
-        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} />
+        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
       {section.editing ? (
         <>
@@ -1128,10 +1140,12 @@ interface ObservationsFields {
 const ObservationsSection: React.FC<{
   complianceId: string;
   value: ObservationsFields;
+  canEdit: boolean;
   onSaved: () => void;
 }> = ({
   complianceId,
   value,
+  canEdit,
   onSaved,
 }) => {
   const observationsRef = useRef<TextInput>(null);
@@ -1162,7 +1176,7 @@ const ObservationsSection: React.FC<{
       icon="clipboard-outline"
       title="Observations & Recommendations"
       headerRight={
-        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} />
+        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
       <TextField
         ref={observationsRef}
@@ -1208,10 +1222,11 @@ const ObservationsSection: React.FC<{
 interface WaterComplianceEditSectionsProps {
   reportId: string;
   compliance: WaterComplianceData;
+  canEdit: boolean;
   onSaved: () => void;
 }
 
-export const WaterComplianceEditSections: React.FC<WaterComplianceEditSectionsProps> = ({ compliance, onSaved }) => {
+export const WaterComplianceEditSections: React.FC<WaterComplianceEditSectionsProps> = ({ compliance, canEdit, onSaved }) => {
   const checklistValues: ChecklistValue[] = DAO_2005_10_CHECKLIST.map((_, i) => ({
     compliant: compliance.checklistDao200510[i]?.compliant ?? null,
     remarks: compliance.checklistDao200510[i]?.remarks ?? '',
@@ -1222,16 +1237,19 @@ export const WaterComplianceEditSections: React.FC<WaterComplianceEditSectionsPr
       <WaterSourcesSection
         complianceId={compliance.complianceId}
         value={compliance.waterSources as DynamicRow[]}
+        canEdit={canEdit}
         onSaved={onSaved}
       />
       <WastewaterSourcesSection
         complianceId={compliance.complianceId}
         value={compliance.wastewaterSources as DynamicRow[]}
+        canEdit={canEdit}
         onSaved={onSaved}
       />
       <AbstractedWaterQualitySection
         complianceId={compliance.complianceId}
         value={compliance.abstractedWaterQuality as DynamicRow[]}
+        canEdit={canEdit}
         onSaved={onSaved}
       />
       <WwtpSection
@@ -1244,16 +1262,18 @@ export const WaterComplianceEditSections: React.FC<WaterComplianceEditSectionsPr
           wwtpDetails: compliance.wwtpDetails,
           wwtpComponents: compliance.wwtpComponents,
         }}
+        canEdit={canEdit}
         onSaved={onSaved}
       />
-      <SamplingPointsSection complianceId={compliance.complianceId} value={compliance.samplingPoints} onSaved={onSaved} />
+      <SamplingPointsSection complianceId={compliance.complianceId} value={compliance.samplingPoints} canEdit={canEdit} onSaved={onSaved} />
       <PreviousInspectionSection
         complianceId={compliance.complianceId}
         value={compliance.previousInspectionSummary}
+        canEdit={canEdit}
         onSaved={onSaved}
       />
-      <ChecklistSection complianceId={compliance.complianceId} value={checklistValues} onSaved={onSaved} />
-      <DpConditionsSection complianceId={compliance.complianceId} value={compliance.dpConditions} onSaved={onSaved} />
+      <ChecklistSection complianceId={compliance.complianceId} value={checklistValues} canEdit={canEdit} onSaved={onSaved} />
+      <DpConditionsSection complianceId={compliance.complianceId} value={compliance.dpConditions} canEdit={canEdit} onSaved={onSaved} />
       <ObservationsSection
         complianceId={compliance.complianceId}
         value={{
@@ -1261,6 +1281,7 @@ export const WaterComplianceEditSections: React.FC<WaterComplianceEditSectionsPr
           remarksRecommendations: compliance.remarksRecommendations || '',
           documentsReviewed: compliance.documentsReviewed,
         }}
+        canEdit={canEdit}
         onSaved={onSaved}
       />
     </View>

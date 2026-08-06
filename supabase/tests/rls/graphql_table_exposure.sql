@@ -1,6 +1,6 @@
 begin;
 
-select plan(18);
+select plan(20);
 
 -- anon should not directly SELECT sensitive tables
 
@@ -59,7 +59,11 @@ select is(
 );
 
 -- authenticated access policy:
--- some tables are intentionally readable via direct SELECT with RLS enforced
+-- all synced tables are readable via direct SELECT with RLS enforced —
+-- pull_changes/push_changes run as SECURITY INVOKER, so authenticated needs
+-- a real table grant for the RPCs to work at all (see
+-- 20260806010000_grant_authenticated_on_compliance_tables.sql for the
+-- compliance_* tables specifically)
 
 select is(
   has_table_privilege('authenticated', 'public.user_accounts', 'SELECT'),
@@ -93,26 +97,38 @@ select is(
 
 select is(
   has_table_privilege('authenticated', 'public.compliance_air', 'SELECT'),
-  false,
-  'authenticated cannot directly SELECT compliance_air'
+  true,
+  'authenticated can directly SELECT compliance_air subject to RLS'
 );
 
 select is(
   has_table_privilege('authenticated', 'public.compliance_water', 'SELECT'),
-  false,
-  'authenticated cannot directly SELECT compliance_water'
+  true,
+  'authenticated can directly SELECT compliance_water subject to RLS'
 );
 
 select is(
   has_table_privilege('authenticated', 'public.compliance_hazwaste', 'SELECT'),
-  false,
-  'authenticated cannot directly SELECT compliance_hazwaste'
+  true,
+  'authenticated can directly SELECT compliance_hazwaste subject to RLS'
 );
 
 select is(
   has_table_privilege('authenticated', 'public.compliance_eia', 'SELECT'),
+  true,
+  'authenticated can directly SELECT compliance_eia subject to RLS'
+);
+
+select is(
+  has_table_privilege('anon', 'public.inspector_municipalities', 'SELECT'),
   false,
-  'authenticated cannot directly SELECT compliance_eia'
+  'anon cannot SELECT inspector_municipalities'
+);
+
+select is(
+  has_table_privilege('authenticated', 'public.inspector_municipalities', 'SELECT'),
+  true,
+  'authenticated can directly SELECT inspector_municipalities subject to RLS'
 );
 
 select * from finish();

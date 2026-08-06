@@ -8,7 +8,10 @@ interface EstablishmentHeaderCardProps {
   establishment: EstablishmentDTO;
   inspectorLabel: string;
   onAddReport: () => void;
-  onEdit: () => void;
+  // Omitted for an establishment the current inspector doesn't own — it's
+  // now visible to any inspector in the same jurisdiction, but only the
+  // owner may edit it, so the Edit button doesn't render at all otherwise.
+  onEdit?: () => void;
 }
 
 const StatChip: React.FC<{ label: string; value: string }> = ({ label, value }) => (
@@ -48,10 +51,12 @@ export const EstablishmentHeaderCard: React.FC<EstablishmentHeaderCardProps> = (
           <Ionicons name="add" size={14} color={Colors.textWhite} />
           <Text style={styles.btnAddReportText}>Add Report</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.btnEdit} onPress={onEdit} activeOpacity={0.75}>
-          <Ionicons name="pencil" size={11} color={Colors.textSecondary} />
-          <Text style={styles.btnEditText}>Edit</Text>
-        </TouchableOpacity>
+        {onEdit && (
+          <TouchableOpacity style={styles.btnEdit} onPress={onEdit} activeOpacity={0.75}>
+            <Ionicons name="pencil" size={11} color={Colors.textSecondary} />
+            <Text style={styles.btnEditText}>Edit</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.divider} />

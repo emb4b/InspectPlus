@@ -3,7 +3,7 @@ begin;
 select plan(2);
 
 insert into public.user_accounts (
-  uid, first_name, last_name, username, password_hash, role, region, area_of_assignment,
+  uid, first_name, last_name, username, password_hash, role, region, province,
   email, is_active, sync_status, device_id
 ) values (
   '22222222-2222-2222-2222-222222222222',

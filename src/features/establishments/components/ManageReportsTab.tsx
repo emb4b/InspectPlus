@@ -14,6 +14,7 @@ import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Colors } from '../../../constants/colors';
+import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { SelectField, DateField } from '../../../components/form';
 import { ReportListCard } from './ReportListCard';
 import {
@@ -62,12 +63,16 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
   const [page, setPage] = useState(1);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [province, setProvince] = useState('');
+  const [city, setCity] = useState('');
   const [reportType, setReportType] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [sortOrder, setSortOrder] = useState<ReportSortOrder>('newest');
 
   const { provinceOptions } = useEstablishmentFilterOptions();
+  // The inspector's own assigned municipalities — narrows the (already
+  // province-wide-visible) list further, it's not an access boundary.
+  const { municipalities } = useAuthContext();
 
   const { height: keyboardHeight } = useReanimatedKeyboardAnimation();
   const overlayAnimatedStyle = useAnimatedStyle(() => ({
@@ -81,10 +86,10 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
   // actually changes — a fresh object literal on every render would
   // re-trigger the data-fetching effect in useAllReports on a loop.
   const filters: ReportFilters = useMemo(
-    () => ({ province, reportType, dateFrom, dateTo, sortOrder }),
-    [province, reportType, dateFrom, dateTo, sortOrder],
+    () => ({ province, city, reportType, dateFrom, dateTo, sortOrder }),
+    [province, city, reportType, dateFrom, dateTo, sortOrder],
   );
-  const activeFilterCount = [province, reportType, dateFrom, dateTo].filter(Boolean).length;
+  const activeFilterCount = [province, city, reportType, dateFrom, dateTo].filter(Boolean).length;
 
   const { reports, loading, error, refetch } = useAllReports(search, statusFilter, filters);
 
@@ -105,6 +110,7 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
 
   const clearFilters = useCallback(() => {
     setProvince('');
+    setCity('');
     setReportType('');
     setDateFrom('');
     setDateTo('');
@@ -324,6 +330,19 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
               }}
               style={styles.filterField}
             />
+
+            {municipalities.length > 0 && (
+              <SelectField
+                label="Municipality"
+                value={city || ALL_OPTION}
+                options={[ALL_OPTION, ...municipalities]}
+                onSelect={v => {
+                  setCity(v === ALL_OPTION ? '' : v);
+                  setPage(1);
+                }}
+                style={styles.filterField}
+              />
+            )}
 
             <SelectField
               label="Inspection report type"
