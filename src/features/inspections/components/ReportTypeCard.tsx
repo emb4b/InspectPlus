@@ -8,6 +8,7 @@ import {
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import type { ReportType } from '../../../constants/reportTypes';
+import { useGuardedPress } from '../../../utils/useGuardedPress';
 
 interface ReportTypeCardProps {
   item: ReportType;
@@ -21,6 +22,7 @@ const ICON_SIZE = 40;
 export const ReportTypeCard: React.FC<ReportTypeCardProps> = ({ item }) => {
   const IconComponent = item.iconLibrary === 'MaterialCommunityIcons' ? MaterialCommunityIcons : Ionicons;
   const IconAsset = item.iconAsset;
+  const handlePress = useGuardedPress(() => router.push(item.route as any));
 
   return (
     <TouchableOpacity
@@ -32,7 +34,7 @@ export const ReportTypeCard: React.FC<ReportTypeCardProps> = ({ item }) => {
         },
       ]}
       activeOpacity={0.75}
-      onPress={() => router.push(item.route as any)}>
+      onPress={handlePress}>
       <View style={styles.iconWrap}>
         {IconAsset ? (
           <IconAsset width={ICON_SIZE} height={ICON_SIZE} />

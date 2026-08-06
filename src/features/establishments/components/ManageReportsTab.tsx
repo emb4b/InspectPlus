@@ -14,6 +14,7 @@ import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Colors } from '../../../constants/colors';
+import { useGuardedPress } from '../../../utils/useGuardedPress';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { SelectField, DateField } from '../../../components/form';
 import { ReportListCard } from './ReportListCard';
@@ -122,13 +123,13 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
     REPORT_TYPE_OPTIONS.find(o => o.value === reportType)?.label ?? ALL_OPTION;
   const selectedSortLabel = SORT_OPTIONS.find(o => o.key === sortOrder)?.label ?? SORT_OPTIONS[0].label;
 
-  const handleOpen = useCallback((item: AllReportItem) => {
+  const handleOpen = useGuardedPress((item: AllReportItem) => {
     if (item.kind === 'inspection') {
       router.push({ pathname: '/inspection/[id]', params: { id: item.reportId } });
     } else {
       router.push({ pathname: '/survey/[id]', params: { id: item.reportId } });
     }
-  }, []);
+  });
 
   if (loading) {
     return (
