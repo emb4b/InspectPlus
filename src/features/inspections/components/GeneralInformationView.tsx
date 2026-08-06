@@ -14,6 +14,7 @@ interface GeneralInformationViewProps {
   reportId: string;
   snapshot: EstablishmentSnapshot;
   permits: PermitSnapshotItem[];
+  canEdit: boolean;
   onSaved: () => void;
 }
 
@@ -292,6 +293,7 @@ export const GeneralInformationView: React.FC<GeneralInformationViewProps> = ({
   reportId,
   snapshot,
   permits,
+  canEdit,
   onSaved,
 }) => {
   const formerNameRef = useRef<TextInput>(null);
@@ -376,6 +378,7 @@ export const GeneralInformationView: React.FC<GeneralInformationViewProps> = ({
             onStartEdit={details.startEdit}
             onCancel={details.cancel}
             onSave={details.save}
+            canEdit={canEdit}
           />
         }>
         <View style={styles.row}>
@@ -430,6 +433,7 @@ export const GeneralInformationView: React.FC<GeneralInformationViewProps> = ({
             onStartEdit={personnel.startEdit}
             onCancel={personnel.cancel}
             onSave={personnel.save}
+            canEdit={canEdit}
           />
         }>
         <View style={styles.row}>
@@ -457,6 +461,7 @@ export const GeneralInformationView: React.FC<GeneralInformationViewProps> = ({
             onStartEdit={pco.startEdit}
             onCancel={pco.cancel}
             onSave={pco.save}
+            canEdit={canEdit}
           />
         }>
         <View style={styles.row}>
@@ -487,6 +492,7 @@ export const GeneralInformationView: React.FC<GeneralInformationViewProps> = ({
             onStartEdit={productLines.startEdit}
             onCancel={productLines.cancel}
             onSave={productLines.save}
+            canEdit={canEdit}
           />
         }>
         {productLines.editing ? (
@@ -523,6 +529,7 @@ export const GeneralInformationView: React.FC<GeneralInformationViewProps> = ({
             onStartEdit={permitsSection.startEdit}
             onCancel={permitsSection.cancel}
             onSave={permitsSection.save}
+            canEdit={canEdit}
           />
         }>
         {permitsSection.draft.length === 0 && (

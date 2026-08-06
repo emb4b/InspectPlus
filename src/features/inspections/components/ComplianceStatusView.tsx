@@ -14,6 +14,7 @@ import {
 interface ComplianceStatusViewProps {
   reportId: string;
   compliance: ComplianceView;
+  canEdit: boolean;
   onSaved: () => void;
 }
 
@@ -127,13 +128,14 @@ const EiaComplianceView: React.FC<{ c: Extract<ComplianceView, { kind: 'eia' }> 
   </View>
 );
 
-export const ComplianceStatusView: React.FC<ComplianceStatusViewProps> = ({ reportId, compliance, onSaved }) => {
+export const ComplianceStatusView: React.FC<ComplianceStatusViewProps> = ({ reportId, compliance, canEdit, onSaved }) => {
   switch (compliance.kind) {
     case 'water':
       return (
         <WaterComplianceEditSections
           reportId={reportId}
           compliance={compliance}
+          canEdit={canEdit}
           onSaved={onSaved}
         />
       );

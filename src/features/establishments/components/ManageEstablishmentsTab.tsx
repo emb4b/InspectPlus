@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Colors } from '../../../constants/colors';
+import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { SelectField } from '../../../components/form';
 import { EstablishmentCard } from './EstablishmentCard';
 import {
@@ -40,19 +41,23 @@ export const ManageEstablishmentsTab = forwardRef<ManageEstablishmentsTabHandle>
   const [page, setPage]       = useState(1);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [province, setProvince] = useState('');
+  const [city, setCity] = useState('');
   const [inspectorUid, setInspectorUid] = useState('');
   const [complianceTag, setComplianceTag] = useState<ComplianceTag | ''>('');
 
   const { provinceOptions, inspectorOptions } = useEstablishmentFilterOptions();
+  // The inspector's own assigned municipalities — narrows the (already
+  // province-wide-visible) list further, it's not an access boundary.
+  const { municipalities } = useAuthContext();
 
   // Stable reference so the filter object only changes when a filter
   // value actually changes — a fresh object literal on every render would
   // re-trigger the data-fetching effect in useEstablishments on a loop.
   const filters: EstablishmentFilters = useMemo(
-    () => ({ province, inspectorUid, complianceTag }),
-    [province, inspectorUid, complianceTag],
+    () => ({ province, city, inspectorUid, complianceTag }),
+    [province, city, inspectorUid, complianceTag],
   );
-  const activeFilterCount = [province, inspectorUid, complianceTag].filter(Boolean).length;
+  const activeFilterCount = [province, city, inspectorUid, complianceTag].filter(Boolean).length;
 
   // Real WatermelonDB query — replaces MOCK_ESTABLISHMENTS
   const { establishments, loading, error, refetch } = useEstablishments(search, filters);
@@ -70,6 +75,7 @@ export const ManageEstablishmentsTab = forwardRef<ManageEstablishmentsTabHandle>
 
   const clearFilters = useCallback(() => {
     setProvince('');
+    setCity('');
     setInspectorUid('');
     setComplianceTag('');
     setPage(1);
@@ -282,6 +288,19 @@ export const ManageEstablishmentsTab = forwardRef<ManageEstablishmentsTabHandle>
               }}
               style={styles.filterField}
             />
+
+            {municipalities.length > 0 && (
+              <SelectField
+                label="Municipality"
+                value={city || ALL_OPTION}
+                options={[ALL_OPTION, ...municipalities]}
+                onSelect={v => {
+                  setCity(v === ALL_OPTION ? '' : v);
+                  setPage(1);
+                }}
+                style={styles.filterField}
+              />
+            )}
 
             <SelectField
               label="Inspector assigned"

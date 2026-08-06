@@ -39,12 +39,18 @@ begin
   on conflict (provider_id, provider) do nothing;
 
   insert into public.user_accounts (
-    uid, first_name, last_name, username, role, region, area_of_assignment,
+    uid, first_name, last_name, username, role, region, province,
     email, is_active, sync_status, device_id
   ) values (
-    v_uid::text, 'Dev', 'Inspector', 'inspector1', 'Inspector',
+    v_uid::text, 'Dev', 'Inspector', 'inspector1', 'Developer',
     'Region 4-B', 'Palawan', 'inspector1@emb.test',
     true, 'synced', 'seed'
   )
   on conflict (uid) do nothing;
+
+  insert into public.inspector_municipalities (inspector_uid, municipality) values
+    (v_uid::text, 'Puerto Princesa City'),
+    (v_uid::text, 'Coron'),
+    (v_uid::text, 'El Nido')
+  on conflict (inspector_uid, municipality) do nothing;
 end $$;

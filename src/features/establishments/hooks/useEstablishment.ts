@@ -4,6 +4,43 @@ import { Establishment, InspectionReport, SurveyReport } from '../../../db/model
 import { Q } from '@nozbe/watermelondb';
 import type { EstablishmentDTO, ComplianceTag } from '../types';
 import { resolveInspectorNames } from '../../../services/inspectorNames';
+import { useAuthContext } from '../../../core/providers/AuthProvider';
+
+// ── Jurisdiction visibility ─────────────────────────────────────────────────
+// Mirrors the "inspectors can read jurisdiction establishments" and "admins
+// and developers can read all establishments" RLS policies (see
+// supabase/migrations/20260806030000_add_province_and_municipality_assignments.sql
+// and 20260806040000_add_developer_role_and_admin_visibility.sql)
+// client-side: establishments are only ever created locally on-device (there
+// is no pull-sync reconciliation that purges rows a device shouldn't see —
+// see docs/sync-contract.md), so this has to be enforced as a real query
+// constraint here, not just an optional filter the UI happens to default to.
+const UNRESTRICTED_ROLES = new Set(['Administrator', 'Developer']);
+
+// Administrator/Developer accounts see every establishment/report, full
+// stop — no need to even look up the establishment record for these roles.
+export function isPrivilegedRole(role: string): boolean {
+  return UNRESTRICTED_ROLES.has(role);
+}
+
+export function isEstablishmentVisible(
+  e: { province: string; inspectorUid: string },
+  myProvince: string,
+  myUid: string,
+  myRole: string,
+): boolean {
+  return isPrivilegedRole(myRole) || e.inspectorUid === myUid || e.province === myProvince;
+}
+
+// Resolves the signed-in user's own uid/province/role for the visibility
+// check above. Empty until auth finishes loading — callers should treat
+// "no province yet" as "show nothing" rather than "show everything", since
+// an empty check would otherwise fail open.
+function useJurisdiction(): { myUid: string; myProvince: string; myRole: string; ready: boolean } {
+  const { session, province, role } = useAuthContext();
+  const myUid = (session as { user?: { id?: string } } | null)?.user?.id ?? '';
+  return { myUid, myProvince: province ?? '', myRole: role ?? '', ready: !!myUid && !!province };
+}
 
 // ── Report type → compliance tag mapping ──────────────────────────────────────
 // 'air_monitoring' | 'water_monitoring' | 'hazardous_waste' | 'eia'
@@ -85,6 +122,7 @@ interface UseEstablishmentsReturn {
 
 export interface EstablishmentFilters {
   province?: string;
+  city?: string;
   inspectorUid?: string;
   complianceTag?: ComplianceTag | '';
 }
@@ -109,6 +147,7 @@ export function useEstablishments(
   const [establishments, setEstablishments] = useState<EstablishmentDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { myUid, myProvince, myRole, ready } = useJurisdiction();
 
   // Guards against a stale, slower request clobbering a fresher one when
   // refetch() overlaps with the search-driven effect (or a rapid double pull).
@@ -128,6 +167,13 @@ export function useEstablishments(
       if (!hasLoadedOnce.current) setLoading(true);
       setError(null);
 
+      // Auth hasn't resolved a province yet — show nothing rather than
+      // everything (fail closed, not open) until it does.
+      if (!ready) {
+        if (id === requestId.current) setEstablishments([]);
+        return;
+      }
+
       const q = searchTerm.trim().toLowerCase();
 
       // Fetch all, then filter — WatermelonDB SQLite adapter supports
@@ -139,14 +185,20 @@ export function useEstablishments(
         .query()
         .fetch();
 
+      // Jurisdiction baseline first — same-province or own establishments
+      // only (see isEstablishmentVisible) — then the name search and any
+      // user-chosen filters narrow further within that.
+      const visible = all.filter(e => isEstablishmentVisible(e, myProvince, myUid, myRole));
+
       // Name-only — matching on address/city/province too used to pull in
       // unrelated establishments that merely shared a location with the
       // search term, which read as inaccurate results.
       let filtered = q
-        ? all.filter(e => e.name.toLowerCase().includes(q))
-        : all;
+        ? visible.filter(e => e.name.toLowerCase().includes(q))
+        : visible;
 
       if (f.province) filtered = filtered.filter(e => e.province === f.province);
+      if (f.city) filtered = filtered.filter(e => e.city === f.city);
       if (f.inspectorUid) filtered = filtered.filter(e => e.inspectorUid === f.inspectorUid);
 
       // Sort by name ascending
@@ -176,7 +228,7 @@ export function useEstablishments(
         hasLoadedOnce.current = true;
       }
     }
-  }, []);
+  }, [ready, myProvince, myUid, myRole]);
 
   useEffect(() => {
     fetchEstablishments(search, filters);
@@ -211,19 +263,30 @@ export function useEstablishmentFilterOptions(): UseEstablishmentFilterOptionsRe
   const [provinceOptions, setProvinceOptions] = useState<string[]>([]);
   const [inspectorOptions, setInspectorOptions] = useState<InspectorOption[]>([]);
   const [loading, setLoading] = useState(true);
+  const { myUid, myProvince, myRole, ready } = useJurisdiction();
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
+      if (!ready) {
+        if (!cancelled) {
+          setProvinceOptions([]);
+          setInspectorOptions([]);
+          setLoading(false);
+        }
+        return;
+      }
       try {
         const all = await database.collections
           .get<Establishment>('establishments')
           .query()
           .fetch();
 
-        const provinces = Array.from(new Set(all.map(e => e.province).filter(Boolean))).sort();
-        const inspectorUids = Array.from(new Set(all.map(e => e.inspectorUid).filter(Boolean)));
+        const visible = all.filter(e => isEstablishmentVisible(e, myProvince, myUid, myRole));
+
+        const provinces = Array.from(new Set(visible.map(e => e.province).filter(Boolean))).sort();
+        const inspectorUids = Array.from(new Set(visible.map(e => e.inspectorUid).filter(Boolean)));
 
         const names = await resolveInspectorNames(inspectorUids);
         const inspectors = inspectorUids
@@ -243,7 +306,7 @@ export function useEstablishmentFilterOptions(): UseEstablishmentFilterOptionsRe
 
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, [ready, myProvince, myUid, myRole]);
 
   return { provinceOptions, inspectorOptions, loading };
 }
@@ -264,6 +327,7 @@ export function useEstablishment(estabId: string | undefined): UseEstablishmentR
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
+  const { myUid, myProvince, myRole, ready } = useJurisdiction();
 
   const refetch = useCallback(() => setTick(t => t + 1), []);
 
@@ -271,7 +335,7 @@ export function useEstablishment(estabId: string | undefined): UseEstablishmentR
     let cancelled = false;
 
     async function fetchEstablishment() {
-      if (!estabId) {
+      if (!estabId || !ready) {
         setEstablishment(null);
         setLoading(false);
         return;
@@ -285,8 +349,12 @@ export function useEstablishment(estabId: string | undefined): UseEstablishmentR
           .query(Q.where('estabId', estabId))
           .fetch();
 
+        // Not visible under jurisdiction rules -> treat exactly like "not
+        // found", same as RLS would for a row outside a user's grant.
+        const match = matches.find(e => isEstablishmentVisible(e, myProvince, myUid, myRole));
+
         if (!cancelled) {
-          setEstablishment(matches.length ? await modelToDTO(matches[0]) : null);
+          setEstablishment(match ? await modelToDTO(match) : null);
         }
       } catch (err) {
         if (!cancelled) {
@@ -302,7 +370,7 @@ export function useEstablishment(estabId: string | undefined): UseEstablishmentR
 
     fetchEstablishment();
     return () => { cancelled = true; };
-  }, [estabId, tick]);
+  }, [estabId, tick, ready, myProvince, myUid, myRole]);
 
   return { establishment, loading, error, refetch };
 }
@@ -426,10 +494,12 @@ export interface AllReportItem extends EstablishmentReportItem {
   estabId: string;
   estabName: string;
   estabProvince: string;
+  estabCity: string;
 }
 
 export interface ReportFilters {
   province?: string;
+  city?: string;
   reportType?: string;
   dateFrom?: string; // YYYY-MM-DD, inclusive
   dateTo?: string;   // YYYY-MM-DD, inclusive
@@ -459,6 +529,7 @@ export function useAllReports(
   const [reports, setReports] = useState<AllReportItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { myUid, myProvince, myRole, ready } = useJurisdiction();
 
   const requestId = useRef(0);
 
@@ -477,7 +548,12 @@ export function useAllReports(
       if (!hasLoadedOnce.current) setLoading(true);
       setError(null);
 
-      const [establishments, inspectionReports, surveyReports] = await Promise.all([
+      if (!ready) {
+        if (id === requestId.current) setReports([]);
+        return;
+      }
+
+      const [establishments, allInspectionReports, allSurveyReports] = await Promise.all([
         database.collections.get<Establishment>('establishments').query().fetch(),
         database.collections.get<InspectionReport>('inspection_reports').query().fetch(),
         database.collections.get<SurveyReport>('survey_reports').query().fetch(),
@@ -485,6 +561,21 @@ export function useAllReports(
 
       const estabNameById = new Map(establishments.map(e => [e.estabId, e.name]));
       const estabProvinceById = new Map(establishments.map(e => [e.estabId, e.province]));
+      const estabCityById = new Map(establishments.map(e => [e.estabId, e.city]));
+
+      // Jurisdiction baseline, mirroring "inspectors can read jurisdiction
+      // inspection reports" RLS: visible if the establishment itself is
+      // (same province or own), OR the report is one this inspector wrote
+      // themselves regardless of where the establishment sits.
+      const visibleEstabIds = new Set(
+        establishments.filter(e => isEstablishmentVisible(e, myProvince, myUid, myRole)).map(e => e.estabId),
+      );
+      const inspectionReports = allInspectionReports.filter(
+        r => visibleEstabIds.has(r.estabId) || r.inspectorUid === myUid,
+      );
+      const surveyReports = allSurveyReports.filter(
+        r => visibleEstabIds.has(r.estabId) || r.inspectorUid === myUid,
+      );
 
       const items: AllReportItem[] = [
         ...inspectionReports.map(r => ({
@@ -494,6 +585,7 @@ export function useAllReports(
           estabId: r.estabId,
           estabName: estabNameById.get(r.estabId) ?? 'Unknown establishment',
           estabProvince: estabProvinceById.get(r.estabId) ?? '',
+          estabCity: estabCityById.get(r.estabId) ?? '',
           reportType: r.reportType,
           title: INSPECTION_TYPE_LABELS[r.reportType] ?? r.reportType,
           date: r.inspectionDate,
@@ -508,6 +600,7 @@ export function useAllReports(
           estabId: r.estabId,
           estabName: estabNameById.get(r.estabId) ?? 'Unknown establishment',
           estabProvince: estabProvinceById.get(r.estabId) ?? '',
+          estabCity: estabCityById.get(r.estabId) ?? '',
           reportType: 'survey',
           title: r.projectName || 'Survey Report',
           date: r.inspectionDate,
@@ -524,6 +617,7 @@ export function useAllReports(
         // term, which read as inaccurate results.
         const matchesSearch = !q || item.estabName.toLowerCase().includes(q);
         const matchesProvince = !f.province || item.estabProvince === f.province;
+        const matchesCity = !f.city || item.estabCity === f.city;
         const matchesReportType = !f.reportType || item.reportType === f.reportType;
         const matchesDateFrom = !f.dateFrom || item.date >= f.dateFrom;
         const matchesDateTo = !f.dateTo || item.date <= f.dateTo;
@@ -531,6 +625,7 @@ export function useAllReports(
           matchesStatus &&
           matchesSearch &&
           matchesProvince &&
+          matchesCity &&
           matchesReportType &&
           matchesDateFrom &&
           matchesDateTo
@@ -555,7 +650,7 @@ export function useAllReports(
         hasLoadedOnce.current = true;
       }
     }
-  }, []);
+  }, [ready, myProvince, myUid, myRole]);
 
   useEffect(() => {
     fetchAllReports(search, statusFilter, filters);

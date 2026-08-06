@@ -40,11 +40,17 @@ begin
 
   insert into public.user_accounts (
     uid, first_name, middle_name, last_name, username, role, region,
-    area_of_assignment, email, is_active, sync_status, device_id
+    province, email, is_active, sync_status, device_id
   ) values (
     v_uid::text, 'Stephanie Kim', 'Asa', 'Pineda', 'sapineda', 'Inspector',
     'Region 4B MIMAROPA', 'Oriental Mindoro', 'stephaniekimpineda@emb.gov.ph',
     true, 'synced', 'seed'
   )
   on conflict (uid) do nothing;
+
+  insert into public.inspector_municipalities (inspector_uid, municipality) values
+    (v_uid::text, 'Calapan City'),
+    (v_uid::text, 'Puerto Galera'),
+    (v_uid::text, 'Pinamalayan')
+  on conflict (inspector_uid, municipality) do nothing;
 end $$;

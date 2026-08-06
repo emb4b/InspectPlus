@@ -13,6 +13,7 @@ import type { PurposeOfInspection } from '../../../db/models';
 interface PurposeOfInspectionViewProps {
   purposeId: string;
   value: PurposeFormState;
+  canEdit: boolean;
   onSaved: () => void;
 }
 
@@ -63,10 +64,12 @@ interface VerifyInfoFields {
 const VerifyInfoSection: React.FC<{
   purposeId: string;
   value: VerifyInfoFields;
+  canEdit: boolean;
   onSaved: () => void;
 }> = ({
   purposeId,
   value,
+  canEdit,
   onSaved,
 }) => {
   const remarksRefs = useRef<Record<number, TextInput | null>>({});
@@ -103,7 +106,7 @@ const VerifyInfoSection: React.FC<{
       icon="bookmark-outline"
       title="Verification of Application"
       headerRight={
-        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} />
+        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
       <ToggleCheck
         checked={section.draft.verifyInfo}
@@ -168,8 +171,9 @@ interface ComplianceInvestigationFields {
 const ComplianceInvestigationSection: React.FC<{
   purposeId: string;
   value: ComplianceInvestigationFields;
+  canEdit: boolean;
   onSaved: () => void;
-}> = ({ purposeId, value, onSaved }) => {
+}> = ({ purposeId, value, canEdit, onSaved }) => {
   const section = useEditableSection<ComplianceInvestigationFields>({
     value,
     onSave: async fields => {
@@ -183,7 +187,7 @@ const ComplianceInvestigationSection: React.FC<{
       icon="search-outline"
       title="Compliance & Investigation"
       headerRight={
-        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} />
+        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
       <ToggleCheck
         checked={section.draft.determineCompliance}
@@ -212,11 +216,13 @@ interface CommitmentFields {
 const CommitmentSection: React.FC<{
   purposeId: string;
   value: CommitmentFields;
+  canEdit: boolean;
   onSaved: () => void;
   othersRef?: React.RefObject<TextInput | null>;
 }> = ({
   purposeId,
   value,
+  canEdit,
   onSaved,
   othersRef,
 }) => {
@@ -260,7 +266,7 @@ const CommitmentSection: React.FC<{
       icon="people-outline"
       title="Voluntary Commitment"
       headerRight={
-        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} />
+        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
       <ToggleCheck
         checked={section.draft.checkCommitments}
@@ -311,9 +317,10 @@ const CommitmentSection: React.FC<{
 
 // ── Others ──────────────────────────────────────────────────────────────────
 
-const OthersSection = React.forwardRef<TextInput, { purposeId: string; value: string; onSaved: () => void }>(({
+const OthersSection = React.forwardRef<TextInput, { purposeId: string; value: string; canEdit: boolean; onSaved: () => void }>(({
   purposeId,
   value,
+  canEdit,
   onSaved,
 }, ref) => {
   const section = useEditableSection<string>({
@@ -329,7 +336,7 @@ const OthersSection = React.forwardRef<TextInput, { purposeId: string; value: st
       icon="create-outline"
       title="Others"
       headerRight={
-        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} />
+        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
       {section.editing ? (
         <TextField
@@ -352,7 +359,7 @@ OthersSection.displayName = 'OthersSection';
 
 // ── Top-level ─────────────────────────────────────────────────────────────
 
-export const PurposeOfInspectionView: React.FC<PurposeOfInspectionViewProps> = ({ purposeId, value, onSaved }) => {
+export const PurposeOfInspectionView: React.FC<PurposeOfInspectionViewProps> = ({ purposeId, value, canEdit, onSaved }) => {
   const othersRef = useRef<TextInput>(null);
 
   return (
@@ -360,20 +367,23 @@ export const PurposeOfInspectionView: React.FC<PurposeOfInspectionViewProps> = (
       <VerifyInfoSection
         purposeId={purposeId}
         value={{ verifyInfo: value.verifyInfo, verifyInfoRows: value.verifyInfoRows }}
+        canEdit={canEdit}
         onSaved={onSaved}
       />
       <ComplianceInvestigationSection
         purposeId={purposeId}
         value={{ determineCompliance: value.determineCompliance, investigateComplaints: value.investigateComplaints }}
+        canEdit={canEdit}
         onSaved={onSaved}
       />
       <CommitmentSection
         purposeId={purposeId}
         value={{ checkCommitments: value.checkCommitments, commitmentRows: value.commitmentRows }}
+        canEdit={canEdit}
         onSaved={onSaved}
         othersRef={othersRef}
       />
-      <OthersSection ref={othersRef} purposeId={purposeId} value={value.others} onSaved={onSaved} />
+      <OthersSection ref={othersRef} purposeId={purposeId} value={value.others} canEdit={canEdit} onSaved={onSaved} />
     </View>
   );
 };

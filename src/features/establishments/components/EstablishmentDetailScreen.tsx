@@ -120,10 +120,13 @@ export const EstablishmentDetailScreen: React.FC<EstablishmentDetailScreenProps>
           establishment={establishment}
           inspectorLabel={inspectorLabel}
           onAddReport={handleAddReport}
-          onEdit={handleEdit}
+          onEdit={isSelf ? handleEdit : undefined}
         />
 
-        <EstablishmentInfoSections establishment={establishment} onUpdatePermits={handleUpdatePermits} />
+        <EstablishmentInfoSections
+          establishment={establishment}
+          onUpdatePermits={isSelf ? handleUpdatePermits : undefined}
+        />
 
         <EstablishmentReportsSection
           reports={reports}

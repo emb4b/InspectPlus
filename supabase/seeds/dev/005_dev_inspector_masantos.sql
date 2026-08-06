@@ -1,12 +1,12 @@
 -- Local dev login account, seeded on every `supabase db reset`.
 -- Not a real account — only ever runs against the local Supabase stack.
 --
--- Email:    jvremonte.emb4b@outlook.com
+-- Email:    miguelantoniosantos@emb.gov.ph
 -- Password: Test@1234
 
 do $$
 declare
-  v_uid uuid := '2be9cd81-60f5-44da-abeb-e02abff9366a';
+  v_uid uuid := '67901ec8-04ef-4f1c-ba71-0b7514585cd3';
 begin
   -- GoTrue scans confirmation_token/recovery_token/email_change* as Go
   -- strings, not nullable strings — NULL here breaks login with a 500
@@ -21,7 +21,7 @@ begin
   ) values (
     '00000000-0000-0000-0000-000000000000',
     v_uid, 'authenticated', 'authenticated',
-    'jvremonte.emb4b@outlook.com', crypt('Test@1234', gen_salt('bf')),
+    'miguelantoniosantos@emb.gov.ph', crypt('Test@1234', gen_salt('bf')),
     now(), now(), now(),
     '{"provider":"email","providers":["email"]}', '{}',
     '', '', '', '', '', '', '', ''
@@ -33,7 +33,7 @@ begin
     last_sign_in_at, created_at, updated_at
   ) values (
     gen_random_uuid(), v_uid,
-    jsonb_build_object('sub', v_uid::text, 'email', 'jvremonte.emb4b@outlook.com'),
+    jsonb_build_object('sub', v_uid::text, 'email', 'miguelantoniosantos@emb.gov.ph'),
     'email', v_uid::text, now(), now(), now()
   )
   on conflict (provider_id, provider) do nothing;
@@ -42,15 +42,15 @@ begin
     uid, first_name, middle_name, last_name, username, role, region,
     province, email, is_active, sync_status, device_id
   ) values (
-    v_uid::text, 'Jonathan Andre', 'Vicente', 'Remonte', 'jvremonte', 'Inspector',
-    'Region 4B MIMAROPA', 'Palawan', 'jvremonte.emb4b@outlook.com',
+    v_uid::text, 'Miguel Antonio', 'Cruz', 'Santos', 'masantos', 'Inspector',
+    'Region 4B MIMAROPA', 'Romblon', 'miguelantoniosantos@emb.gov.ph',
     true, 'synced', 'seed'
   )
   on conflict (uid) do nothing;
 
   insert into public.inspector_municipalities (inspector_uid, municipality) values
-    (v_uid::text, 'Roxas'),
-    (v_uid::text, 'Taytay'),
-    (v_uid::text, 'Puerto Princesa City')
+    (v_uid::text, 'Romblon'),
+    (v_uid::text, 'Odiongan'),
+    (v_uid::text, 'San Fernando')
   on conflict (inspector_uid, municipality) do nothing;
 end $$;

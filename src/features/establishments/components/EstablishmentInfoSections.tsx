@@ -7,7 +7,9 @@ import type { EstablishmentDTO, PermitSnapshotItem } from '../types';
 
 interface EstablishmentInfoSectionsProps {
   establishment: EstablishmentDTO;
-  onUpdatePermits: () => void;
+  // Omitted for an establishment the current inspector doesn't own — see
+  // EstablishmentHeaderCard's onEdit.
+  onUpdatePermits?: () => void;
 }
 
 // denrPermits is a flat array of freeform entries — one card per entry,
@@ -90,10 +92,12 @@ export const EstablishmentInfoSections: React.FC<EstablishmentInfoSectionsProps>
         icon="document-outline"
         title="DENR Permits, Licenses & Clearances"
         headerRight={
-          <TouchableOpacity style={styles.updateBtn} onPress={onUpdatePermits} activeOpacity={0.75}>
-            <Ionicons name="pencil" size={11} color={Colors.textSecondary} />
-            <Text style={styles.updateBtnText}>Update Permits</Text>
-          </TouchableOpacity>
+          onUpdatePermits && (
+            <TouchableOpacity style={styles.updateBtn} onPress={onUpdatePermits} activeOpacity={0.75}>
+              <Ionicons name="pencil" size={11} color={Colors.textSecondary} />
+              <Text style={styles.updateBtnText}>Update Permits</Text>
+            </TouchableOpacity>
+          )
         }>
         {permits.length === 0 ? (
           <Text style={styles.emptyText}>No permits on record.</Text>

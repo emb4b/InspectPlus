@@ -229,9 +229,9 @@ supabase.from('user_accounts').update({...}).eq('uid', uid)
 - `first_name`, `middle_name`, `last_name`
 - `username`
 - `email`
-- `role` (`Inspector` or `Administrator`)
+- `role` (`Inspector`, `Administrator`, or `Developer` — Administrator/Developer bypass province scoping and can read every establishment/report regardless of jurisdiction)
 - `region`
-- `area_of_assignment`
+- `province` — the inspector's one assigned province; matched against `establishments.province` to scope jurisdiction visibility (Inspector role only)
 - `phone_number`
 - `created_at`
 - `last_login`
@@ -244,6 +244,14 @@ handled entirely by Supabase Auth (`auth.users`), not by this column.
 
 ### Deletion behavior
 - not deletable through the client; `establishments.inspector_uid` and other FKs reference `user_accounts(uid)` with `on delete restrict`
+
+### Related table: `inspector_municipalities`
+Holds the specific municipalities/cities within an inspector's `province` that they're responsible for. This narrows the UI (e.g. filtering) but is **not** an access-control boundary — jurisdiction visibility is still province-wide only, per the RLS policies on `establishments` and the report tables.
+
+- Primary key: (`inspector_uid`, `municipality`), `inspector_uid` → `user_accounts.uid` with `on delete cascade`
+- `SELECT` only is granted to `authenticated`; RLS restricts rows to `inspector_uid = auth.uid()`
+- no `INSERT`/`UPDATE`/`DELETE` from the client — rows are managed server-side (e.g. seeded, or set via an admin path outside this contract)
+- not synced through `pull_changes` / `push_changes`, read directly via PostgREST like `user_accounts`
 
 ---
 
