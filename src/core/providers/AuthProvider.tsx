@@ -5,6 +5,7 @@ import React, {
 import { authService } from '../../services/supabase/auth';
 import { supabase } from '../../services/supabase/client';
 import { checkOnline } from '../../utils/network';
+import { runManagedSync } from '../../services/sync/syncOrchestrator';
 
 // If neither the local short-cache nor Supabase's own session check has
 // resolved within this window, stop waiting and show the login screen.
@@ -214,6 +215,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const result = await authService.signIn(emailOrUsername, password);
       if (result?.session) {
         setSession(result.session);
+
+        // Fire-and-forget: a quick sync on every explicit login, but never
+        // block reaching /home on it. ensureSyncScopedToUser (inside
+        // runManagedSync) also detects a different inspector signing into
+        // this device and wipes/re-pulls accordingly — see
+        // syncOrchestrator.ts.
+        const uid = (result.session as { user?: { id?: string } }).user?.id;
+        if (uid) {
+          runManagedSync(uid).catch(err => {
+            console.warn('[AuthProvider] Post-login sync failed:', err);
+          });
+        }
       }
       if (result?.fullName) {
         setFullName(result.fullName);

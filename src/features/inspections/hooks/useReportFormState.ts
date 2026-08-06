@@ -4,6 +4,7 @@ import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { generateId } from '../../../utils/crypto';
 import { getDeviceId } from '../../../utils/device';
 import { createEstablishmentRecord } from '../establishmentPersistence';
+import { notifySyncDataChanged } from '../../../services/sync/syncEvents';
 import {
   GeneralInfoFormState,
   PurposeFormState,
@@ -128,7 +129,7 @@ export function useReportFormState({
               rec.productLines = productLines;
               rec.denrPermits = permitsSnapshot;
               rec.updatedAt = now;
-              rec.syncState = 'pending';
+              rec.syncState = 'pending_update';
             });
           } else {
             // Brand-new establishment that wasn't already persisted by the
@@ -153,7 +154,7 @@ export function useReportFormState({
             rec.deviceId = deviceId;
             rec.createdAt = now;
             rec.updatedAt = now;
-            rec.syncState = 'pending';
+            rec.syncState = 'pending_create';
           });
 
           await collections.inspectionReports.create(rec => {
@@ -172,12 +173,18 @@ export function useReportFormState({
             rec.createdAt = now;
             rec.updatedAt = now;
             rec.deletedAt = null;
-            rec.syncState = 'pending';
+            rec.syncState = 'pending_create';
             rec.reportStatus = status;
           });
 
           await writeCompliance({ reportId });
         });
+
+        // Home's establishment/report lists don't observe WatermelonDB
+        // directly (see useEstablishments et al.) — this is what makes a
+        // newly created/drafted/submitted report show up there once the
+        // caller navigates back, instead of only after a manual pull-to-refresh.
+        notifySyncDataChanged();
 
         return { reportId, estabId: resolvedEstabId };
       } catch (err) {

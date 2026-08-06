@@ -61,7 +61,7 @@ export async function createEstablishmentRecord({
     rec.deviceId = deviceId;
     rec.createdAt = now;
     rec.updatedAt = now;
-    rec.syncState = 'pending';
+    rec.syncState = 'pending_create';
     rec.isArchived = false;
   });
 }
@@ -112,6 +112,6 @@ export async function updateEstablishmentRecord({ estabId, form }: UpdateEstabli
     rec.pcoEffectivity = form.pcoEffectivity || null;
     rec.productLines = productLines;
     rec.updatedAt = now;
-    rec.syncState = 'pending';
+    rec.syncState = 'pending_update';
   });
 }

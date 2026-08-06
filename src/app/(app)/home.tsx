@@ -18,6 +18,7 @@ import {
   ManageReportsTab,
   ManageReportsTabHandle,
 } from '../../features/establishments/components/ManageReportsTab';
+import { subscribeToSyncDataChanged } from '../../services/sync/syncEvents';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -64,6 +65,17 @@ export default function HomeScreen() {
   useEffect(() => {
     const id = setInterval(() => setCurrentTime(getFormattedTime()), 1000);
     return () => clearInterval(id);
+  }, []);
+
+  // A sync can complete while Home is already mounted and focused (the
+  // manual "Sync Now" button, or the post-login sync landing right as this
+  // screen appears) — pull-to-refresh alone wouldn't pick that up, so both
+  // tabs also refetch whenever local data changes for any reason.
+  useEffect(() => {
+    return subscribeToSyncDataChanged(() => {
+      manageEstablishmentsRef.current?.refresh();
+      manageReportsRef.current?.refresh();
+    });
   }, []);
 
   const renderTab = () => {

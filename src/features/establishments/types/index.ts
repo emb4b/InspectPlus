@@ -15,7 +15,17 @@ export type EstablishmentOperatingStatus =
   | 'Non-Operational';
 
 // ── Sync status values (shared across all entities) ───────────────────────────
+// Display-level status only — the local WatermelonDB syncState column tracks
+// finer-grained states ('pending_create' | 'pending_update' | 'pending_delete'
+// | 'synced', see src/services/sync/syncTypes.ts's SyncStatus) so push can
+// tell creates from updates. UI badges don't need that distinction.
 export type SyncStatus = 'pending' | 'synced' | 'conflict';
+
+export function toDisplaySyncStatus(syncState: string | null | undefined): SyncStatus {
+  if (syncState === 'synced' || !syncState) return 'synced';
+  if (syncState === 'conflict') return 'conflict';
+  return 'pending'; // pending_create | pending_update | pending_delete
+}
 
 // ── Compliance tag — derived from report types ────────────────────────────────
 // Used for display badges on EstablishmentCard

@@ -302,6 +302,14 @@ export interface SyncMetadata {
   lastPulledAt: number | null;
   lastSyncAt?: number | null;
   isSyncing?: boolean;
+  // uid of the inspector this device last ran a sync for — see
+  // syncOrchestrator.ts's ensureSyncScopedToUser. lastPulledAt is a single
+  // incremental watermark; if a different user logs in on the same device,
+  // an incremental pull would skip everything outside the previous user's
+  // RLS-visible scope that predates the watermark, even though the new
+  // user is allowed to see it. Comparing against this field is how that
+  // gets detected.
+  lastSyncedUserId?: string | null;
 }
 
 export type CoreSyncEntityName =

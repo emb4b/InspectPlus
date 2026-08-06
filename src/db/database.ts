@@ -1,6 +1,7 @@
 import { Database } from '@nozbe/watermelondb';
 import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
 import { schema } from './schema';
+import { migrations } from './migrations';
 import {
   Establishment,
   InspectionReport,
@@ -15,7 +16,7 @@ import {
 // ── SQLite adapter ────────────────────────────────────────────────────────────
 const adapter = new SQLiteAdapter({
   schema,
-  // migrations: migrations, // add later when schema version increments
+  migrations,
   jsi: true,        // uses JSI for better performance on Hermes
   onSetUpError: error => {
     console.error('[WatermelonDB] Database setup failed:', error);
