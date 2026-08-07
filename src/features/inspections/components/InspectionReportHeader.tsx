@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { useInspectorName } from '../../../core/hooks/useInspectorName';
+import { canManageAllRecords } from '../../establishments/hooks/useEstablishment';
 import { getReportTypeMeta } from '../reportTypeMeta';
 
 export type ReportDetailTabKey = 'geninfo' | 'purpose' | 'compliance';
@@ -31,6 +32,10 @@ interface InspectionReportHeaderProps {
   activeTab: ReportDetailTabKey;
   onTabChange: (tab: ReportDetailTabKey) => void;
   onBack: () => void;
+  // Only the inspector who owns the report (or a Developer account, which
+  // gets unrestricted write access — see canManageAllRecords) can delete
+  // it — omitted entirely (rather than passed disabled) otherwise.
+  onDelete?: () => void;
 }
 
 export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
@@ -44,6 +49,7 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
   activeTab,
   onTabChange,
   onBack,
+  onDelete,
 }) => {
   const typeMeta = getReportTypeMeta(reportType);
   const IconAsset = typeMeta.iconAsset;
@@ -52,9 +58,10 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
   // Same self-vs-other resolution as EstablishmentDetailScreen — fullName is
   // only ever the signed-in user's own name, so it can't be assumed to match
   // this report's assigned inspector.
-  const { fullName, session } = useAuthContext();
+  const { fullName, session, role } = useAuthContext();
   const currentUid = (session as { user?: { id?: string } } | null)?.user?.id ?? '';
   const isSelf = inspectorUid === currentUid;
+  const canManage = isSelf || canManageAllRecords(role ?? '');
   const { name: resolvedInspectorName, loading: inspectorNameLoading } = useInspectorName(
     !isSelf ? inspectorUid : undefined,
   );
@@ -64,10 +71,18 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.backBtn} onPress={onBack} activeOpacity={0.7}>
-        <Ionicons name="chevron-back" size={16} color={Colors.navy} />
-        <Text style={styles.backText}>Back</Text>
-      </TouchableOpacity>
+      <View style={styles.topBar}>
+        <TouchableOpacity style={styles.backBtn} onPress={onBack} activeOpacity={0.7}>
+          <Ionicons name="chevron-back" size={16} color={Colors.navy} />
+          <Text style={styles.backText}>Back</Text>
+        </TouchableOpacity>
+        {canManage && onDelete && (
+          <TouchableOpacity style={styles.deleteBtn} onPress={onDelete} activeOpacity={0.7}>
+            <Ionicons name="trash-outline" size={14} color={Colors.conflict} />
+            <Text style={styles.deleteText}>Delete</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       <View style={styles.card}>
         <View style={styles.topRow}>
@@ -142,19 +157,33 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: Colors.border,
   },
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
   backBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingTop: 12,
-    paddingBottom: 4,
   },
   backText: {
     fontSize: 12.5,
     fontWeight: '600',
     color: Colors.navy,
+  },
+  deleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  deleteText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: Colors.conflict,
   },
   card: {
     marginHorizontal: 12,

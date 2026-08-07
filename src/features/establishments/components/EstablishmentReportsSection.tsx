@@ -8,6 +8,10 @@ import type { EstablishmentReportItem } from '../hooks/useEstablishment';
 interface EstablishmentReportsSectionProps {
   reports: EstablishmentReportItem[];
   loading?: boolean;
+  currentUid: string;
+  // Developer accounts can manage every report, not just their own — see
+  // canManageAllRecords.
+  canManageAll: boolean;
   onAddReport: () => void;
   onOpenReport: (item: EstablishmentReportItem) => void;
   onDeleteReport: (item: EstablishmentReportItem) => void;
@@ -31,7 +35,8 @@ const ReportRow: React.FC<{
   item: EstablishmentReportItem;
   onOpen: () => void;
   onDelete: () => void;
-}> = ({ item, onOpen, onDelete }) => {
+  showDelete: boolean;
+}> = ({ item, onOpen, onDelete, showDelete }) => {
   const urgency = getReportUrgency(item.date, item.status);
 
   return (
@@ -76,9 +81,11 @@ const ReportRow: React.FC<{
       </View>
       <View style={styles.actions}>
         <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
-        <TouchableOpacity style={styles.deleteBtn} onPress={onDelete} activeOpacity={0.75}>
-          <Ionicons name="trash-outline" size={12} color={Colors.textWhite} />
-        </TouchableOpacity>
+        {showDelete && (
+          <TouchableOpacity style={styles.deleteBtn} onPress={onDelete} activeOpacity={0.75}>
+            <Ionicons name="trash-outline" size={12} color={Colors.textWhite} />
+          </TouchableOpacity>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -87,6 +94,8 @@ const ReportRow: React.FC<{
 export const EstablishmentReportsSection: React.FC<EstablishmentReportsSectionProps> = ({
   reports,
   loading,
+  currentUid,
+  canManageAll,
   onAddReport,
   onOpenReport,
   onDeleteReport,
@@ -119,6 +128,11 @@ export const EstablishmentReportsSection: React.FC<EstablishmentReportsSectionPr
           item={item}
           onOpen={() => onOpenReport(item)}
           onDelete={() => onDeleteReport(item)}
+          // Delete is only wired up for inspection reports, and only for
+          // the inspector who owns the record or a Developer account —
+          // matches the "own record" / Developer-full-access delete RLS
+          // policies on the backend.
+          showDelete={item.kind === 'inspection' && (item.inspectorUid === currentUid || canManageAll)}
         />
       ))
     )}

@@ -24,6 +24,19 @@ export function isPrivilegedRole(role: string): boolean {
   return UNRESTRICTED_ROLES.has(role);
 }
 
+// Distinct from isPrivilegedRole above: that's a READ-only expansion shared
+// by Administrator and Developer. Developer alone additionally gets
+// unrestricted WRITE access — add/edit/delete on any establishment or
+// report, not just their own — per
+// supabase/migrations/20260807010000_add_developer_full_write_access.sql.
+// Administrator's write access stays owner-only. Client-side gates using
+// this must stay in sync with that migration's RLS policies: showing an
+// edit/delete control this doesn't cover would let a role tap an action
+// that the backend silently drops.
+export function canManageAllRecords(role: string): boolean {
+  return role === 'Developer';
+}
+
 export function isEstablishmentVisible(
   e: { province: string; inspectorUid: string },
   myProvince: string,
@@ -188,8 +201,10 @@ export function useEstablishments(
 
       // Jurisdiction baseline first — same-province or own establishments
       // only (see isEstablishmentVisible) — then the name search and any
-      // user-chosen filters narrow further within that.
-      const visible = all.filter(e => isEstablishmentVisible(e, myProvince, myUid, myRole));
+      // user-chosen filters narrow further within that. Archived
+      // establishments (the local stand-in for "deleted", see
+      // archiveEstablishmentRecord) are excluded from every list surface.
+      const visible = all.filter(e => isEstablishmentVisible(e, myProvince, myUid, myRole) && !e.isArchived);
 
       // Name-only — matching on address/city/province too used to pull in
       // unrelated establishments that merely shared a location with the
@@ -284,7 +299,7 @@ export function useEstablishmentFilterOptions(): UseEstablishmentFilterOptionsRe
           .query()
           .fetch();
 
-        const visible = all.filter(e => isEstablishmentVisible(e, myProvince, myUid, myRole));
+        const visible = all.filter(e => isEstablishmentVisible(e, myProvince, myUid, myRole) && !e.isArchived);
 
         const provinces = Array.from(new Set(visible.map(e => e.province).filter(Boolean))).sort();
         const inspectorUids = Array.from(new Set(visible.map(e => e.inspectorUid).filter(Boolean)));
@@ -350,9 +365,10 @@ export function useEstablishment(estabId: string | undefined): UseEstablishmentR
           .query(Q.where('estabId', estabId))
           .fetch();
 
-        // Not visible under jurisdiction rules -> treat exactly like "not
-        // found", same as RLS would for a row outside a user's grant.
-        const match = matches.find(e => isEstablishmentVisible(e, myProvince, myUid, myRole));
+        // Not visible under jurisdiction rules, or archived (the local
+        // stand-in for "deleted") -> treat exactly like "not found", same
+        // as RLS would for a row outside a user's grant.
+        const match = matches.find(e => isEstablishmentVisible(e, myProvince, myUid, myRole) && !e.isArchived);
 
         if (!cancelled) {
           setEstablishment(match ? await modelToDTO(match) : null);
@@ -381,6 +397,7 @@ export interface EstablishmentReportItem {
   key: string;
   kind: 'inspection' | 'survey';
   reportId: string;
+  inspectorUid: string;
   reportType: string;
   title: string;
   date: string;
@@ -429,7 +446,7 @@ export function useEstablishmentReports(estabId: string | undefined): UseEstabli
         setLoading(true);
         setError(null);
 
-        const [inspectionReports, surveyReports] = await Promise.all([
+        const [inspectionReportsRaw, surveyReports] = await Promise.all([
           database.collections
             .get<InspectionReport>('inspection_reports')
             .query(Q.where('estabId', estabId))
@@ -440,11 +457,19 @@ export function useEstablishmentReports(estabId: string | undefined): UseEstabli
             .fetch(),
         ]);
 
+        // Exclude reports that have been deleted locally (pending_delete,
+        // not yet pushed) or remotely (deletedAt set by a pulled soft
+        // delete) — see deleteInspectionReportRecord.
+        const inspectionReports = inspectionReportsRaw.filter(
+          r => !r.deletedAt && r.syncState !== 'pending_delete',
+        );
+
         const items: EstablishmentReportItem[] = [
           ...inspectionReports.map(r => ({
             key: `inspection-${r.reportId}`,
             kind: 'inspection' as const,
             reportId: r.reportId,
+            inspectorUid: r.inspectorUid,
             reportType: r.reportType,
             title: INSPECTION_TYPE_LABELS[r.reportType] ?? r.reportType,
             date: r.inspectionDate,
@@ -457,6 +482,7 @@ export function useEstablishmentReports(estabId: string | undefined): UseEstabli
             key: `survey-${r.surveyId}`,
             kind: 'survey' as const,
             reportId: r.surveyId,
+            inspectorUid: r.inspectorUid,
             reportType: 'survey',
             title: r.projectName || 'Survey Report',
             date: r.inspectionDate,
@@ -575,7 +601,10 @@ export function useAllReports(
         establishments.filter(e => isEstablishmentVisible(e, myProvince, myUid, myRole)).map(e => e.estabId),
       );
       const inspectionReports = allInspectionReports.filter(
-        r => visibleEstabIds.has(r.estabId) || r.inspectorUid === myUid,
+        r =>
+          !r.deletedAt &&
+          r.syncState !== 'pending_delete' &&
+          (visibleEstabIds.has(r.estabId) || r.inspectorUid === myUid),
       );
       const surveyReports = allSurveyReports.filter(
         r => visibleEstabIds.has(r.estabId) || r.inspectorUid === myUid,
@@ -586,6 +615,7 @@ export function useAllReports(
           key: `inspection-${r.reportId}`,
           kind: 'inspection' as const,
           reportId: r.reportId,
+          inspectorUid: r.inspectorUid,
           estabId: r.estabId,
           estabName: estabNameById.get(r.estabId) ?? 'Unknown establishment',
           estabProvince: estabProvinceById.get(r.estabId) ?? '',
@@ -602,6 +632,7 @@ export function useAllReports(
           key: `survey-${r.surveyId}`,
           kind: 'survey' as const,
           reportId: r.surveyId,
+          inspectorUid: r.inspectorUid,
           estabId: r.estabId,
           estabName: estabNameById.get(r.estabId) ?? 'Unknown establishment',
           estabProvince: estabProvinceById.get(r.estabId) ?? '',

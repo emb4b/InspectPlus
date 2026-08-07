@@ -1,5 +1,5 @@
 begin;
-select plan(9);
+select plan(8);
 
 -- Inspector A owns everything under test, in Occidental Mindoro. Admin and
 -- Developer accounts are both assigned to a DIFFERENT province (Romblon) —
@@ -115,12 +115,10 @@ select is(
   'developer can read an inspection report outside their own province'
 );
 
-delete from public.establishments where estab_id = 'admin-est-a';
-select is(
-  (select count(*)::int from public.establishments where estab_id = 'admin-est-a'),
-  1,
-  'developer full-read visibility does not grant delete rights on an establishment they don''t own'
-);
+-- Developer write-on-everything is a deliberate, separate grant (see
+-- 20260807010000_add_developer_full_write_access.sql and
+-- developer_full_write_rls.sql) — no longer covered by this file, which is
+-- specifically about visibility, not write access.
 
 select * from finish();
 rollback;

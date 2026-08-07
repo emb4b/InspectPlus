@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { View, Text, ActivityIndicator, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, ActivityIndicator, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
@@ -7,7 +7,14 @@ import { Colors } from '../../../constants/colors';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { useInspectorName } from '../../../core/hooks/useInspectorName';
 import { useGuardedPress } from '../../../utils/useGuardedPress';
-import { useEstablishment, useEstablishmentReports, EstablishmentReportItem } from '../hooks/useEstablishment';
+import {
+  useEstablishment,
+  useEstablishmentReports,
+  EstablishmentReportItem,
+  INSPECTION_TYPE_LABELS,
+  canManageAllRecords,
+} from '../hooks/useEstablishment';
+import { deleteInspectionReportRecord } from '../../inspections/reportPersistence';
 import { EstablishmentHeaderCard } from './EstablishmentHeaderCard';
 import { EstablishmentInfoSections } from './EstablishmentInfoSections';
 import { EstablishmentReportsSection } from './EstablishmentReportsSection';
@@ -18,10 +25,10 @@ interface EstablishmentDetailScreenProps {
 }
 
 export const EstablishmentDetailScreen: React.FC<EstablishmentDetailScreenProps> = ({ estabId }) => {
-  const { fullName, session } = useAuthContext();
+  const { fullName, session, role } = useAuthContext();
   const { onScroll } = useHeaderScroll();
   const { establishment, loading, error, refetch } = useEstablishment(estabId);
-  const { reports, loading: reportsLoading } = useEstablishmentReports(estabId);
+  const { reports, loading: reportsLoading, refetch: refetchReports } = useEstablishmentReports(estabId);
 
   // fullName is only the SIGNED-IN user's own name — an establishment can be
   // assigned to a different inspector, so it can't be used as a blanket
@@ -29,6 +36,11 @@ export const EstablishmentDetailScreen: React.FC<EstablishmentDetailScreenProps>
   // other inspector's name via the shared cache/RPC instead.
   const currentUid = (session as { user?: { id?: string } } | null)?.user?.id ?? '';
   const isSelf = !!establishment && establishment.inspectorUid === currentUid;
+  // Developer accounts get unrestricted write access on top of ownership —
+  // see canManageAllRecords. Kept separate from isSelf, which stays a pure
+  // ownership check used for inspector-name resolution below.
+  const isDeveloper = canManageAllRecords(role ?? '');
+  const canManageEstablishment = isSelf || isDeveloper;
   const { name: resolvedInspectorName, loading: inspectorNameLoading } = useInspectorName(
     !isSelf ? establishment?.inspectorUid : undefined,
   );
@@ -70,10 +82,36 @@ export const EstablishmentDetailScreen: React.FC<EstablishmentDetailScreenProps>
     }
   });
 
+  // Only inspection reports are deletable here (survey reports aren't in
+  // scope for this feature) — EstablishmentReportsSection already hides the
+  // delete button for survey rows and for reports owned by another
+  // inspector, unless the current user is a Developer (see showDelete
+  // there), so reaching this with a disallowed item shouldn't happen, but
+  // the guard keeps it safe if a future caller wires the callback
+  // differently.
   const handleDeleteReport = useCallback((item: EstablishmentReportItem) => {
-    // TODO: show confirmation modal then soft-delete
-    console.log('[EstablishmentDetail] Delete report:', item.key);
-  }, []);
+    if (item.kind !== 'inspection' || !(item.inspectorUid === currentUid || isDeveloper)) return;
+    Alert.alert(
+      'Delete report?',
+      `This ${INSPECTION_TYPE_LABELS[item.reportType] ?? item.reportType} report will be removed.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteInspectionReportRecord(item.reportId);
+              refetchReports();
+            } catch (err) {
+              console.error('[EstablishmentDetail] Failed to delete report:', err);
+              Alert.alert('Delete failed', err instanceof Error ? err.message : 'Something went wrong.');
+            }
+          },
+        },
+      ],
+    );
+  }, [currentUid, isDeveloper, refetchReports]);
 
   if (loading) {
     return (
@@ -125,17 +163,19 @@ export const EstablishmentDetailScreen: React.FC<EstablishmentDetailScreenProps>
           establishment={establishment}
           inspectorLabel={inspectorLabel}
           onAddReport={handleAddReport}
-          onEdit={isSelf ? handleEdit : undefined}
+          onEdit={canManageEstablishment ? handleEdit : undefined}
         />
 
         <EstablishmentInfoSections
           establishment={establishment}
-          onUpdatePermits={isSelf ? handleUpdatePermits : undefined}
+          onUpdatePermits={canManageEstablishment ? handleUpdatePermits : undefined}
         />
 
         <EstablishmentReportsSection
           reports={reports}
           loading={reportsLoading}
+          currentUid={currentUid}
+          canManageAll={isDeveloper}
           onAddReport={handleAddReport}
           onOpenReport={handleOpenReport}
           onDeleteReport={handleDeleteReport}

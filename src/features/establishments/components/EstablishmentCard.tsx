@@ -32,8 +32,7 @@ const MAX_VISIBLE_TAGS = 3;
 // Full-size action buttons revealed by swiping the card left — sized for a
 // comfortable tap target (unlike the old cramped inline pill buttons).
 const ACTION_WIDTH = 72;
-const REVEAL_WIDTH = ACTION_WIDTH * 3;
-const OPEN_THRESHOLD = REVEAL_WIDTH * 0.4;
+const OPEN_THRESHOLD_RATIO = 0.4;
 
 export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
   item,
@@ -44,6 +43,15 @@ export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
 }) => {
   const visibleTags = item.complianceTags.slice(0, MAX_VISIBLE_TAGS);
   const overflowCount = item.complianceTags.length - MAX_VISIBLE_TAGS;
+
+  // Edit/Delete are owner-only actions (see ManageEstablishmentsTab) — the
+  // caller passes undefined for a jurisdiction-visible establishment that
+  // isn't the current user's own, so those buttons (and the swipe distance
+  // needed to reveal them) simply don't exist rather than rendering as
+  // dead taps.
+  const visibleActionCount = 1 + (onEdit ? 1 : 0) + (onDelete ? 1 : 0);
+  const revealWidth = ACTION_WIDTH * visibleActionCount;
+  const openThreshold = revealWidth * OPEN_THRESHOLD_RATIO;
 
   const translateX = useSharedValue(0);
   const startX = useSharedValue(0);
@@ -59,11 +67,11 @@ export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
       startX.value = translateX.value;
     })
     .onUpdate(e => {
-      translateX.value = Math.min(0, Math.max(-REVEAL_WIDTH, startX.value + e.translationX));
+      translateX.value = Math.min(0, Math.max(-revealWidth, startX.value + e.translationX));
     })
     .onEnd(() => {
       translateX.value = withTiming(
-        translateX.value < -OPEN_THRESHOLD ? -REVEAL_WIDTH : 0,
+        translateX.value < -openThreshold ? -revealWidth : 0,
         { duration: 200 },
       );
     });
@@ -98,20 +106,24 @@ export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
           <Ionicons name="add-circle-outline" size={22} color={Colors.textSecondary} />
           <Text style={styles.actionAddText}>Add</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.actionEdit]}
-          onPress={() => handleAction(onEdit)}
-          activeOpacity={0.8}>
-          <Ionicons name="pencil" size={20} color={Colors.textWhite} />
-          <Text style={styles.actionEditText}>Edit</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionBtn, styles.actionDelete]}
-          onPress={() => handleAction(onDelete)}
-          activeOpacity={0.8}>
-          <Ionicons name="trash-outline" size={20} color={Colors.textWhite} />
-          <Text style={styles.actionDeleteText}>Delete</Text>
-        </TouchableOpacity>
+        {onEdit && (
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionEdit]}
+            onPress={() => handleAction(onEdit)}
+            activeOpacity={0.8}>
+            <Ionicons name="pencil" size={20} color={Colors.textWhite} />
+            <Text style={styles.actionEditText}>Edit</Text>
+          </TouchableOpacity>
+        )}
+        {onDelete && (
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionDelete]}
+            onPress={() => handleAction(onDelete)}
+            activeOpacity={0.8}>
+            <Ionicons name="trash-outline" size={20} color={Colors.textWhite} />
+            <Text style={styles.actionDeleteText}>Delete</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Foreground card — slides left via gesture to reveal the actions */}

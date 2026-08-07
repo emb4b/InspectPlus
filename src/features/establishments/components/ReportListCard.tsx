@@ -7,7 +7,12 @@ import type { AllReportItem } from '../hooks/useEstablishment';
 
 interface ReportListCardProps {
   item: AllReportItem;
+  currentUid: string;
+  // Developer accounts can manage every report, not just their own — see
+  // canManageAllRecords.
+  canManageAll: boolean;
   onPress: (item: AllReportItem) => void;
+  onDelete: (item: AllReportItem) => void;
 }
 
 const REPORT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
@@ -24,9 +29,20 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-export const ReportListCard: React.FC<ReportListCardProps> = ({ item, onPress }) => {
+export const ReportListCard: React.FC<ReportListCardProps> = ({
+  item,
+  currentUid,
+  canManageAll,
+  onPress,
+  onDelete,
+}) => {
   const isSubmitted = item.status === 'submitted';
   const urgency = getReportUrgency(item.date, item.status);
+  // Delete is only wired up for inspection reports, and only for the
+  // inspector who owns the record or a Developer account — matches the
+  // "own record" / Developer-full-access delete RLS policies on the
+  // backend (see EstablishmentReportsSection's showDelete).
+  const showDelete = item.kind === 'inspection' && (item.inspectorUid === currentUid || canManageAll);
 
   return (
     <TouchableOpacity
@@ -104,7 +120,14 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({ item, onPress })
         </View>
         <Text style={styles.controlNo}>{item.controlNo || 'No control number yet'}</Text>
       </View>
-      <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
+      <View style={styles.actions}>
+        <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
+        {showDelete && (
+          <TouchableOpacity style={styles.deleteBtn} onPress={() => onDelete(item)} activeOpacity={0.75}>
+            <Ionicons name="trash-outline" size={12} color={Colors.textWhite} />
+          </TouchableOpacity>
+        )}
+      </View>
     </TouchableOpacity>
   );
 };
@@ -215,5 +238,19 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
     marginTop: 2,
     fontFamily: 'monospace',
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 0,
+  },
+  deleteBtn: {
+    width: 26,
+    height: 26,
+    borderRadius: 6,
+    backgroundColor: '#e74c3c',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

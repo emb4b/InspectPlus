@@ -1,4 +1,4 @@
-import { collections } from '../../db/database';
+import { database, collections } from '../../db/database';
 import { GeneralInfoFormState } from './types';
 import type { EditEstablishmentFormState } from '../establishments/editEstablishmentForm';
 
@@ -113,5 +113,26 @@ export async function updateEstablishmentRecord({ estabId, form }: UpdateEstabli
     rec.productLines = productLines;
     rec.updatedAt = now;
     rec.syncState = 'pending_update';
+  });
+}
+
+// "Delete" for establishments means archive, not a hard delete: the remote
+// establishments table has no soft-delete column and inspection_reports/
+// survey_reports/purpose_of_inspection all reference it with `on delete
+// restrict`, so a real delete would fail server-side for any establishment
+// with report history. Archiving reuses the existing (till now unused)
+// isArchived flag, which is already wired through the sync field map for
+// both push and pull — see syncSchema.ts. Opens its own database.write,
+// unlike create/update above, since it's always called standalone from a
+// delete action rather than composed into a larger save transaction.
+export async function archiveEstablishmentRecord(estabId: string): Promise<void> {
+  const now = new Date().toISOString();
+  await database.write(async () => {
+    const estabRecord = await collections.establishments.find(estabId);
+    await estabRecord.update(rec => {
+      rec.isArchived = true;
+      rec.updatedAt = now;
+      rec.syncState = 'pending_update';
+    });
   });
 }

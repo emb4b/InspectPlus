@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Keyboard,
   Modal,
+  Alert,
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,10 +17,12 @@ import { useGuardedPress } from '../../../utils/useGuardedPress';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { SelectField } from '../../../components/form';
 import { EstablishmentCard } from './EstablishmentCard';
+import { archiveEstablishmentRecord } from '../../inspections/establishmentPersistence';
 import {
   useEstablishments,
   useEstablishmentFilterOptions,
   EstablishmentFilters,
+  canManageAllRecords,
 } from '../hooks/useEstablishment';
 import type { EstablishmentDTO, ComplianceTag } from '../types';
 
@@ -49,7 +52,9 @@ export const ManageEstablishmentsTab = forwardRef<ManageEstablishmentsTabHandle>
   const { provinceOptions, inspectorOptions } = useEstablishmentFilterOptions();
   // The inspector's own assigned municipalities — narrows the (already
   // province-wide-visible) list further, it's not an access boundary.
-  const { municipalities } = useAuthContext();
+  const { municipalities, session, role } = useAuthContext();
+  const currentUid = (session as { user?: { id?: string } } | null)?.user?.id ?? '';
+  const isDeveloper = canManageAllRecords(role ?? '');
 
   // Stable reference so the filter object only changes when a filter
   // value actually changes — a fresh object literal on every render would
@@ -105,10 +110,34 @@ export const ManageEstablishmentsTab = forwardRef<ManageEstablishmentsTabHandle>
     console.log('[ManageReports] Edit establishment:', item.estabId);
   }, []);
 
+  // Establishment "delete" archives the record (see archiveEstablishmentRecord)
+  // rather than hard-deleting it — the remote table has no soft-delete column
+  // and would reject a hard delete once the establishment has any report
+  // history. RLS only grants delete/update rights to the record's own
+  // inspector, so this is only ever reachable via a self-owned card — see
+  // the isSelf gate applied where EstablishmentCard is rendered below.
   const handleDelete = useCallback((item: EstablishmentDTO) => {
-    // TODO: show confirmation modal then soft-delete
-    console.log('[ManageReports] Delete establishment:', item.estabId);
-  }, []);
+    Alert.alert(
+      'Delete establishment?',
+      `"${item.name}" will be removed from your establishment list. This can be undone by contacting an administrator.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await archiveEstablishmentRecord(item.estabId);
+              refetch();
+            } catch (err) {
+              console.error('[ManageEstablishmentsTab] Failed to delete establishment:', err);
+              Alert.alert('Delete failed', err instanceof Error ? err.message : 'Something went wrong.');
+            }
+          },
+        },
+      ],
+    );
+  }, [refetch]);
 
   // ── Render states ────────────────────────────────────────────────────────────
   if (loading) {
@@ -189,16 +218,26 @@ export const ManageEstablishmentsTab = forwardRef<ManageEstablishmentsTabHandle>
           </Text>
         </View>
       ) : (
-        paginated.map(item => (
-          <EstablishmentCard
-            key={item.estabId}
-            item={item}
-            onPress={handleOpen}
-            onAdd={handleAdd}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-          />
-        ))
+        paginated.map(item => {
+          // Edit/Delete are owner-only actions — matches the "own record"
+          // RLS policies on the backend (see useEstablishment.ts's jurisdiction
+          // comments) — except for Developer accounts, which the backend
+          // additionally grants unrestricted write access (see
+          // canManageAllRecords). Anyone else viewing a jurisdiction-visible
+          // establishment belonging to another inspector only gets the
+          // Add-report swipe action.
+          const canManage = item.inspectorUid === currentUid || isDeveloper;
+          return (
+            <EstablishmentCard
+              key={item.estabId}
+              item={item}
+              onPress={handleOpen}
+              onAdd={handleAdd}
+              onEdit={canManage ? handleEdit : undefined}
+              onDelete={canManage ? handleDelete : undefined}
+            />
+          );
+        })
       )}
 
       {/* Pagination */}

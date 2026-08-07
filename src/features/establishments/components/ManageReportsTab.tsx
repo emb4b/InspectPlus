@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Keyboard,
   Modal,
+  Alert,
   StyleSheet,
 } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
@@ -18,6 +19,7 @@ import { useGuardedPress } from '../../../utils/useGuardedPress';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { SelectField, DateField } from '../../../components/form';
 import { ReportListCard } from './ReportListCard';
+import { deleteInspectionReportRecord } from '../../inspections/reportPersistence';
 import {
   useAllReports,
   useEstablishmentFilterOptions,
@@ -26,6 +28,7 @@ import {
   ReportFilters,
   ReportSortOrder,
   INSPECTION_TYPE_LABELS,
+  canManageAllRecords,
 } from '../hooks/useEstablishment';
 
 const PAGE_SIZE = 5;
@@ -73,7 +76,9 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
   const { provinceOptions } = useEstablishmentFilterOptions();
   // The inspector's own assigned municipalities — narrows the (already
   // province-wide-visible) list further, it's not an access boundary.
-  const { municipalities } = useAuthContext();
+  const { municipalities, session, role } = useAuthContext();
+  const currentUid = (session as { user?: { id?: string } } | null)?.user?.id ?? '';
+  const isDeveloper = canManageAllRecords(role ?? '');
 
   const { height: keyboardHeight } = useReanimatedKeyboardAnimation();
   const overlayAnimatedStyle = useAnimatedStyle(() => ({
@@ -130,6 +135,33 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
       router.push({ pathname: '/survey/[id]', params: { id: item.reportId } });
     }
   });
+
+  // Only inspection reports are deletable here (survey reports aren't in
+  // scope for this feature) — ReportListCard already hides the delete
+  // button for survey rows and for reports owned by another inspector.
+  const handleDelete = useCallback((item: AllReportItem) => {
+    if (item.kind !== 'inspection' || !(item.inspectorUid === currentUid || isDeveloper)) return;
+    Alert.alert(
+      'Delete report?',
+      `This ${INSPECTION_TYPE_LABELS[item.reportType] ?? item.reportType} report for "${item.estabName}" will be removed.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteInspectionReportRecord(item.reportId);
+              refetch();
+            } catch (err) {
+              console.error('[ManageReportsTab] Failed to delete report:', err);
+              Alert.alert('Delete failed', err instanceof Error ? err.message : 'Something went wrong.');
+            }
+          },
+        },
+      ],
+    );
+  }, [currentUid, isDeveloper, refetch]);
 
   if (loading) {
     return (
@@ -228,7 +260,14 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
         </View>
       ) : (
         paginated.map(item => (
-          <ReportListCard key={item.key} item={item} onPress={handleOpen} />
+          <ReportListCard
+            key={item.key}
+            item={item}
+            currentUid={currentUid}
+            canManageAll={isDeveloper}
+            onPress={handleOpen}
+            onDelete={handleDelete}
+          />
         ))
       )}
 

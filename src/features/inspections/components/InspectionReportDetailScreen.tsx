@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useCallback, useRef, useState } from 'react';
+import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import type { KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,8 @@ import { router } from 'expo-router';
 import { Colors } from '../../../constants/colors';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { useInspectionReport } from '../hooks/useInspectionReport';
+import { deleteInspectionReportRecord } from '../reportPersistence';
+import { INSPECTION_TYPE_LABELS, canManageAllRecords } from '../../establishments/hooks/useEstablishment';
 import { InspectionReportHeader, ReportDetailTabKey } from './InspectionReportHeader';
 import { GeneralInformationView } from './GeneralInformationView';
 import { PurposeOfInspectionView } from './PurposeOfInspectionView';
@@ -22,14 +24,44 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
   const { report, purpose, compliance, loading, error, refetch } = useInspectionReport(reportId);
   const scrollRef = useRef<ScrollView>(null);
   const { onScroll } = useHeaderScroll();
-  const { session } = useAuthContext();
+  const { session, role } = useAuthContext();
   const currentUid = (session as { user?: { id?: string } } | null)?.user?.id ?? '';
+  // Developer accounts get unrestricted write access — including editing
+  // submitted reports and reports they don't own — see canManageAllRecords.
+  const isDeveloper = canManageAllRecords(role ?? '');
 
   // Only the inspector who created the report can edit it, and only while
   // it's still a draft — jurisdiction-visible reports from other inspectors
-  // (or a report that's already been submitted) render read-only. See
-  // SectionEditActions.
-  const canEdit = !!report && report.inspectorUid === currentUid && report.reportStatus === 'draft';
+  // (or a report that's already been submitted) render read-only, unless
+  // the current user is a Developer. See SectionEditActions.
+  const canEdit =
+    !!report && (isDeveloper || (report.inspectorUid === currentUid && report.reportStatus === 'draft'));
+
+  // Delete, unlike edit, isn't restricted to drafts — matches the "own
+  // record" delete RLS policy on the backend, which only checks ownership.
+  const handleDelete = useCallback(() => {
+    if (!report) return;
+    Alert.alert(
+      'Delete report?',
+      `This ${INSPECTION_TYPE_LABELS[report.reportType] ?? report.reportType} report will be removed.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteInspectionReportRecord(report.reportId);
+              router.back();
+            } catch (err) {
+              console.error('[InspectionReportDetailScreen] Failed to delete report:', err);
+              Alert.alert('Delete failed', err instanceof Error ? err.message : 'Something went wrong.');
+            }
+          },
+        },
+      ],
+    );
+  }, [report]);
 
   if (loading) {
     return (
@@ -85,6 +117,7 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onBack={() => router.back()}
+        onDelete={handleDelete}
       />
 
       <View style={styles.noteBar}>
