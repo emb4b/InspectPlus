@@ -25,7 +25,7 @@ import { appSchema, tableSchema } from '@nozbe/watermelondb';
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const schema = appSchema({
-  version: 7,
+  version: 8,
   tables: [
 
     // ── ESTABLISHMENTS ───────────────────────────────────────────────────────
