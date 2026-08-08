@@ -21,6 +21,17 @@ import { schemaMigrations, addColumns, unsafeExecuteSql } from '@nozbe/watermelo
 // so they're picked up on the next sync. compliance_* and survey_reports
 // never used the old 'pending' literal (their syncState support was added
 // together with the new convention), so they don't need backfilling.
+//
+// This also catches establishments stuck in a *false* 'synced' state: an
+// early build of markLocalChangesAsSynced (before it started stamping
+// lastSyncedSnapshot — see the v6->v7 migration above) flipped a row to
+// 'synced' the moment push_changes returned {"status":"ok"}, without
+// confirming that specific row actually landed server-side (e.g. it was
+// silently dropped by `on conflict (estab_id) do nothing` or an RLS
+// mismatch). Since every genuine successful sync now always sets
+// lastSyncedSnapshot alongside 'synced', a 'synced' establishment with no
+// snapshot is unreachable via current code and is a reliable signature of
+// that earlier bug — reset it to 'pending_create' too.
 export const migrations = schemaMigrations({
   migrations: [
     {
@@ -57,7 +68,7 @@ export const migrations = schemaMigrations({
       toVersion: 8,
       steps: [
         unsafeExecuteSql(
-          `UPDATE establishments SET syncState = 'pending_create' WHERE syncState = 'pending';`
+          `UPDATE establishments SET syncState = 'pending_create' WHERE syncState = 'pending' OR (syncState = 'synced' AND lastSyncedSnapshot IS NULL);`
         ),
         unsafeExecuteSql(
           `UPDATE purpose_of_inspection SET syncState = 'pending_create' WHERE syncState = 'pending';`
