@@ -19,6 +19,7 @@ import { database } from '../../../db/database';
 import { useEstablishment } from '../hooks/useEstablishment';
 import { FormSection, TextField, SelectField, DateField, DynamicRowTable, focusInput } from '../../../components/form';
 import { updateEstablishmentRecord } from '../../inspections/establishmentPersistence';
+import { notifySyncDataChanged } from '../../../services/sync/syncEvents';
 import { buildEditFormFromEstablishment, EditEstablishmentFormState } from '../editEstablishmentForm';
 import type { EstablishmentOperatingStatus } from '../types';
 import { useHeaderScroll } from '../../home/context/HeaderScrollContext';
@@ -84,6 +85,11 @@ export const EditEstablishmentScreen: React.FC<EditEstablishmentScreenProps> = (
       await database.write(async () => {
         await updateEstablishmentRecord({ estabId, form });
       });
+      // Home's Manage Establishments/Reports tabs don't observe WatermelonDB
+      // directly — without this, an edit only reaches them after a manual
+      // pull-to-refresh, since going back from here only returns as far as
+      // the establishment detail screen, not all the way to Home.
+      notifySyncDataChanged();
       Alert.alert('Establishment updated', 'The establishment record has been updated.', [
         { text: 'OK', onPress: () => router.back() },
       ]);

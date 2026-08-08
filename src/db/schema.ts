@@ -25,7 +25,7 @@ import { appSchema, tableSchema } from '@nozbe/watermelondb';
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const schema = appSchema({
-  version: 6,
+  version: 7,
   tables: [
 
     // ── ESTABLISHMENTS ───────────────────────────────────────────────────────
@@ -67,6 +67,14 @@ export const schema = appSchema({
         { name: 'updated_at',                  type: 'number' }, // reserved — see note above, not used by app code
         { name: 'syncState',                   type: 'string' }, // ← not syncStatus
         { name: 'isArchived',                  type: 'boolean' },
+        // JSON snapshot of the content fields as of the last successful sync
+        // (push or pull) — see establishmentPersistence.ts's
+        // resolveEstablishmentContentEdit. Lets a later edit be compared
+        // against the true last-synced baseline instead of just the
+        // immediately-prior local value, so reverting a field back to what's
+        // already on the server clears the pending-sync flag instead of
+        // leaving it stuck dirty.
+        { name: 'lastSyncedSnapshot',          type: 'string', isOptional: true },
       ],
     }),
 

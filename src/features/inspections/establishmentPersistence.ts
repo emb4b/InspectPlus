@@ -1,6 +1,108 @@
 import { database, collections } from '../../db/database';
 import { GeneralInfoFormState } from './types';
 import type { EditEstablishmentFormState } from '../establishments/editEstablishmentForm';
+import { notifySyncDataChanged } from '../../services/sync/syncEvents';
+
+// Preserves a still-unsynced establishment's 'pending_create' status across
+// local edits. push_changes' "updated establishments" handler only ever runs
+// an UPDATE (never an INSERT) — so if a local edit downgrades a row to
+// 'pending_update' before its original create has ever reached the server,
+// that UPDATE matches nothing, silently drops the row from every future
+// push, and permanently orphans anything that references it (purpose_of_
+// inspection, inspection_reports, ...) behind a foreign key violation.
+export function nextEstablishmentSyncState(current: string): 'pending_create' | 'pending_update' {
+  return current === 'pending_create' ? 'pending_create' : 'pending_update';
+}
+
+// Array/object fields (productLines, denrPermits) can't be compared with
+// === — a freshly mapped array is never reference-equal to the one already
+// stored even when its contents match, so this falls back to a structural
+// comparison for anything non-primitive.
+function valuesEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a === 'object' || typeof b === 'object') {
+    return JSON.stringify(a) === JSON.stringify(b);
+  }
+  return false;
+}
+
+// Every establishment "content" field either write path (quick-create/report
+// save, or the Edit Establishment screen) can touch — the union of
+// createEstablishmentRecord's and updateEstablishmentRecord's field sets.
+// Used both to build the last-synced snapshot (see watermelonAdapter.ts) and
+// to diff a proposed edit against it below.
+export const ESTABLISHMENT_CONTENT_FIELDS = [
+  'name', 'formerName', 'addressLine', 'barangay', 'city', 'province',
+  'geoLat', 'geoLng', 'natureOfBusiness', 'psicCode', 'product', 'yearEstablished',
+  'operatingStatus', 'operatingHoursDay', 'operatingDaysWeek', 'operatingDaysYear',
+  'productLines', 'ownerName', 'managingHeadName', 'pcoName', 'pcoAccreditationNo',
+  'pcoEffectivity', 'phoneFax', 'email', 'contactPersonName', 'contactPersonPosition',
+  'denrPermits',
+] as const;
+
+export type EstablishmentContentField = typeof ESTABLISHMENT_CONTENT_FIELDS[number];
+type EstablishmentContentSnapshot = Partial<Record<EstablishmentContentField, unknown>>;
+
+// Captures the establishment's content fields right after a successful sync
+// (push or pull) — see watermelonAdapter.ts's markLocalChangesAsSynced and
+// upsertMany, the only two call sites for this.
+export function buildEstablishmentSnapshotJson(record: Record<string, unknown>): string {
+  const snapshot: EstablishmentContentSnapshot = {};
+  for (const field of ESTABLISHMENT_CONTENT_FIELDS) {
+    snapshot[field] = record[field];
+  }
+  return JSON.stringify(snapshot);
+}
+
+interface ResolvedEstablishmentEdit {
+  syncState: 'pending_create' | 'pending_update' | 'synced';
+  // Whether the record actually needs writing — false means the proposed
+  // values already match what's live, so the caller should skip the write
+  // entirely rather than bump updatedAt/syncState for no reason.
+  isDirty: boolean;
+}
+
+// Diffs a proposed partial edit (only the fields the caller manages — the
+// Edit screen and the report-save path each touch a different subset) to
+// decide what syncState it should leave behind:
+//  - Still-unsynced (pending_create): stays pending_create regardless of the
+//    diff — see nextEstablishmentSyncState's reasoning.
+//  - Has a last-synced snapshot: the resulting record (live fields with this
+//    edit's overrides applied) is compared against that snapshot, not just
+//    whatever was live a moment ago — so saving a change and later saving it
+//    back to the original value resolves to 'synced' again instead of
+//    staying stuck 'pending_update' forever.
+//  - No snapshot yet (row synced before this column existed): falls back to
+//    comparing the edit against the live record, matching the old behavior.
+export function resolveEstablishmentContentEdit(
+  record: Record<string, unknown> & { syncState: string; lastSyncedSnapshot?: string | null },
+  nextPartialFields: Partial<Record<EstablishmentContentField, unknown>>,
+): ResolvedEstablishmentEdit {
+  const editedKeys = Object.keys(nextPartialFields) as EstablishmentContentField[];
+  const isDirtyVsLive = editedKeys.some(key => !valuesEqual(record[key], nextPartialFields[key]));
+
+  if (!isDirtyVsLive) {
+    // Nothing proposed actually differs from what's live right now — no
+    // write needed, regardless of sync state or snapshot.
+    return { syncState: record.syncState as 'pending_create' | 'pending_update' | 'synced', isDirty: false };
+  }
+
+  if (record.syncState === 'pending_create') {
+    return { syncState: 'pending_create', isDirty: true };
+  }
+
+  if (!record.lastSyncedSnapshot) {
+    return { syncState: 'pending_update', isDirty: true };
+  }
+
+  const snapshot = JSON.parse(record.lastSyncedSnapshot) as EstablishmentContentSnapshot;
+  const matchesSnapshot = ESTABLISHMENT_CONTENT_FIELDS.every(key => {
+    const nextValue = key in nextPartialFields ? nextPartialFields[key] : record[key];
+    return valuesEqual(snapshot[key], nextValue);
+  });
+
+  return { syncState: matchesSnapshot ? 'synced' : 'pending_update', isDirty: true };
+}
 
 interface CreateEstablishmentArgs {
   estabId: string;
@@ -75,6 +177,9 @@ interface UpdateEstablishmentArgs {
 // createEstablishmentRecord — must be called inside a database.write, it
 // doesn't open its own. Only sets the fields the edit form manages; geoLat/
 // geoLng/denrPermits/isArchived/deviceId/inspectorUid/createdAt are left as-is.
+// Only actually writes (and flags the record for sync) if the submitted
+// form differs from what's already stored — saving an edit screen with no
+// real changes shouldn't mark an otherwise-untouched establishment pending.
 export async function updateEstablishmentRecord({ estabId, form }: UpdateEstablishmentArgs): Promise<void> {
   const now = new Date().toISOString();
   const productLines = form.productLines
@@ -86,33 +191,43 @@ export async function updateEstablishmentRecord({ estabId, form }: UpdateEstabli
     }));
 
   const estabRecord = await collections.establishments.find(estabId);
+  const nextFields = {
+    name: form.name,
+    formerName: form.includeFormerName ? form.formerName || null : null,
+    addressLine: form.addressLine,
+    barangay: form.barangay,
+    city: form.city,
+    province: form.province,
+    natureOfBusiness: form.natureOfBusiness,
+    psicCode: form.psicCode || null,
+    product: form.product || null,
+    yearEstablished: form.yearEstablished ? Number(form.yearEstablished) : null,
+    operatingStatus: form.operatingStatus,
+    operatingHoursDay: form.operatingHoursDay ? Number(form.operatingHoursDay) : null,
+    operatingDaysWeek: form.operatingDaysWeek ? Number(form.operatingDaysWeek) : null,
+    operatingDaysYear: form.operatingDaysYear ? Number(form.operatingDaysYear) : null,
+    ownerName: form.ownerName,
+    managingHeadName: form.managingHeadName,
+    contactPersonName: form.contactPersonName,
+    contactPersonPosition: form.contactPersonPosition,
+    phoneFax: form.phoneFax,
+    email: form.email,
+    pcoName: form.pcoName || null,
+    pcoAccreditationNo: form.pcoAccreditationNo || null,
+    pcoEffectivity: form.pcoEffectivity || null,
+    productLines,
+  } as const;
+
+  const resolved = resolveEstablishmentContentEdit(
+    estabRecord as unknown as Record<string, unknown> & { syncState: string; lastSyncedSnapshot?: string | null },
+    nextFields,
+  );
+  if (!resolved.isDirty) return;
+
   await estabRecord.update(rec => {
-    rec.name = form.name;
-    rec.formerName = form.includeFormerName ? form.formerName || null : null;
-    rec.addressLine = form.addressLine;
-    rec.barangay = form.barangay;
-    rec.city = form.city;
-    rec.province = form.province;
-    rec.natureOfBusiness = form.natureOfBusiness;
-    rec.psicCode = form.psicCode || null;
-    rec.product = form.product || null;
-    rec.yearEstablished = form.yearEstablished ? Number(form.yearEstablished) : null;
-    rec.operatingStatus = form.operatingStatus;
-    rec.operatingHoursDay = form.operatingHoursDay ? Number(form.operatingHoursDay) : null;
-    rec.operatingDaysWeek = form.operatingDaysWeek ? Number(form.operatingDaysWeek) : null;
-    rec.operatingDaysYear = form.operatingDaysYear ? Number(form.operatingDaysYear) : null;
-    rec.ownerName = form.ownerName;
-    rec.managingHeadName = form.managingHeadName;
-    rec.contactPersonName = form.contactPersonName;
-    rec.contactPersonPosition = form.contactPersonPosition;
-    rec.phoneFax = form.phoneFax;
-    rec.email = form.email;
-    rec.pcoName = form.pcoName || null;
-    rec.pcoAccreditationNo = form.pcoAccreditationNo || null;
-    rec.pcoEffectivity = form.pcoEffectivity || null;
-    rec.productLines = productLines;
+    Object.assign(rec, nextFields);
     rec.updatedAt = now;
-    rec.syncState = 'pending_update';
+    rec.syncState = resolved.syncState;
   });
 }
 
@@ -132,7 +247,13 @@ export async function archiveEstablishmentRecord(estabId: string): Promise<void>
     await estabRecord.update(rec => {
       rec.isArchived = true;
       rec.updatedAt = now;
-      rec.syncState = 'pending_update';
+      rec.syncState = nextEstablishmentSyncState(rec.syncState);
     });
   });
+
+  // The archiving screen already refetches its own list, but another
+  // screen showing this establishment (e.g. its detail screen) wouldn't
+  // otherwise know to refresh — see reportPersistence.ts's matching call
+  // for report deletion.
+  notifySyncDataChanged();
 }

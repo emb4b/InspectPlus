@@ -43,4 +43,8 @@ export class Establishment extends Model {
   //   WatermelonDB's internal Model.syncStatus property
   @field('syncState')             syncState!: string;
   @field('isArchived')            isArchived!: boolean;
+  // JSON snapshot of the content fields as of the last successful sync — see
+  // schema.ts's column comment and establishmentPersistence.ts's
+  // resolveEstablishmentContentEdit. Null until the row has synced once.
+  @field('lastSyncedSnapshot')    lastSyncedSnapshot!: string | null;
 }

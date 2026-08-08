@@ -1,4 +1,13 @@
+import { Q } from '@nozbe/watermelondb';
 import { database, collections } from '../../db/database';
+import { notifySyncDataChanged } from '../../services/sync/syncEvents';
+
+const REPORT_TYPE_TO_COMPLIANCE_COLLECTION: Partial<Record<string, keyof typeof collections>> = {
+  air_monitoring: 'complianceAir',
+  water_monitoring: 'complianceWater',
+  hazardous_waste: 'complianceHazwaste',
+  eia: 'complianceEia',
+};
 
 // Marks a local inspection report as pending_delete. The sync pipeline
 // already treats inspection_reports as a soft-delete entity end-to-end
@@ -9,13 +18,48 @@ import { database, collections } from '../../db/database';
 // later pull reconciles it via applyPulledChanges' softDeleteMany; callers
 // must filter out pending_delete/deletedAt rows from any list/detail query
 // in the meantime (see useEstablishment.ts).
+//
+// A report that was never pushed (still 'pending_create') has no remote
+// counterpart to soft-delete — marking it 'pending_delete' would just send
+// its bare id in the push payload's `deleted` array (a no-op remote
+// update), while its still-pending purpose_of_inspection and compliance_*
+// rows kept trying to INSERT against a report_id that will never exist
+// server-side, permanently failing every future push with a foreign key
+// violation. For that case, hard-delete the report and everything it owns
+// instead — there's nothing to reconcile with the server.
 export async function deleteInspectionReportRecord(reportId: string): Promise<void> {
   const now = new Date().toISOString();
   await database.write(async () => {
     const reportRecord = await collections.inspectionReports.find(reportId);
-    await reportRecord.update(rec => {
-      rec.syncState = 'pending_delete';
-      rec.updatedAt = now;
-    });
+
+    if (reportRecord.syncState === 'pending_create') {
+      const complianceCollectionKey = REPORT_TYPE_TO_COMPLIANCE_COLLECTION[reportRecord.reportType];
+      if (complianceCollectionKey) {
+        const complianceRows = await collections[complianceCollectionKey]
+          .query(Q.where('reportId', reportId))
+          .fetch();
+        await Promise.all(complianceRows.map(row => row.destroyPermanently()));
+      }
+
+      if (reportRecord.purposeId) {
+        const purposeRows = await collections.purposeOfInspection
+          .query(Q.where('purposeId', reportRecord.purposeId))
+          .fetch();
+        await Promise.all(purposeRows.map(row => row.destroyPermanently()));
+      }
+
+      await reportRecord.destroyPermanently();
+    } else {
+      await reportRecord.update(rec => {
+        rec.syncState = 'pending_delete';
+        rec.updatedAt = now;
+      });
+    }
   });
+
+  // The deleting screen already refetches its own view, but a deleted
+  // report also changes derived establishment data elsewhere — e.g. the
+  // compliance-tag thumbnails on Manage Establishments — that no other
+  // screen would otherwise know to refresh.
+  notifySyncDataChanged();
 }

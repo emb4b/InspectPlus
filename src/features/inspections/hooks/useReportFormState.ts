@@ -3,7 +3,7 @@ import { database, collections } from '../../../db/database';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { generateId } from '../../../utils/crypto';
 import { getDeviceId } from '../../../utils/device';
-import { createEstablishmentRecord } from '../establishmentPersistence';
+import { createEstablishmentRecord, resolveEstablishmentContentEdit } from '../establishmentPersistence';
 import { notifySyncDataChanged } from '../../../services/sync/syncEvents';
 import {
   GeneralInfoFormState,
@@ -100,37 +100,52 @@ export function useReportFormState({
         await database.write(async () => {
           if (estabId) {
             // Keep the live establishment record current with any edits
-            // made on the General Information tab.
+            // made on the General Information tab — but only if something
+            // actually changed. Every report save used to touch and re-flag
+            // the establishment unconditionally, which meant adding a report
+            // always marked an otherwise-untouched establishment as pending
+            // sync too.
             const estabRecord = await collections.establishments.find(estabId);
-            await estabRecord.update(rec => {
-              rec.name = generalInfo.name;
-              rec.formerName = generalInfo.includeFormerName ? generalInfo.formerName || null : null;
-              rec.addressLine = generalInfo.addressLine;
-              rec.barangay = generalInfo.barangay;
-              rec.city = generalInfo.city;
-              rec.province = generalInfo.province;
-              rec.geoLat = generalInfo.geoLat ? Number(generalInfo.geoLat) : null;
-              rec.geoLng = generalInfo.geoLng ? Number(generalInfo.geoLng) : null;
-              rec.natureOfBusiness = generalInfo.natureOfBusiness;
-              rec.psicCode = generalInfo.psicCode || null;
-              rec.operatingStatus = generalInfo.operatingStatus;
-              rec.operatingHoursDay = generalInfo.operatingHoursDay ? Number(generalInfo.operatingHoursDay) : null;
-              rec.operatingDaysWeek = generalInfo.operatingDaysWeek ? Number(generalInfo.operatingDaysWeek) : null;
-              rec.operatingDaysYear = generalInfo.operatingDaysYear ? Number(generalInfo.operatingDaysYear) : null;
-              rec.ownerName = generalInfo.ownerName;
-              rec.managingHeadName = generalInfo.managingHeadName;
-              rec.contactPersonName = generalInfo.contactPersonName;
-              rec.contactPersonPosition = generalInfo.contactPersonPosition;
-              rec.phoneFax = generalInfo.phoneFax;
-              rec.email = generalInfo.email;
-              rec.pcoName = generalInfo.pcoName || null;
-              rec.pcoAccreditationNo = generalInfo.pcoAccreditationNo || null;
-              rec.pcoEffectivity = generalInfo.pcoEffectivity || null;
-              rec.productLines = productLines;
-              rec.denrPermits = permitsSnapshot;
-              rec.updatedAt = now;
-              rec.syncState = 'pending_update';
-            });
+            const nextEstabFields = {
+              name: generalInfo.name,
+              formerName: generalInfo.includeFormerName ? generalInfo.formerName || null : null,
+              addressLine: generalInfo.addressLine,
+              barangay: generalInfo.barangay,
+              city: generalInfo.city,
+              province: generalInfo.province,
+              geoLat: generalInfo.geoLat ? Number(generalInfo.geoLat) : null,
+              geoLng: generalInfo.geoLng ? Number(generalInfo.geoLng) : null,
+              natureOfBusiness: generalInfo.natureOfBusiness,
+              psicCode: generalInfo.psicCode || null,
+              operatingStatus: generalInfo.operatingStatus,
+              operatingHoursDay: generalInfo.operatingHoursDay ? Number(generalInfo.operatingHoursDay) : null,
+              operatingDaysWeek: generalInfo.operatingDaysWeek ? Number(generalInfo.operatingDaysWeek) : null,
+              operatingDaysYear: generalInfo.operatingDaysYear ? Number(generalInfo.operatingDaysYear) : null,
+              ownerName: generalInfo.ownerName,
+              managingHeadName: generalInfo.managingHeadName,
+              contactPersonName: generalInfo.contactPersonName,
+              contactPersonPosition: generalInfo.contactPersonPosition,
+              phoneFax: generalInfo.phoneFax,
+              email: generalInfo.email,
+              pcoName: generalInfo.pcoName || null,
+              pcoAccreditationNo: generalInfo.pcoAccreditationNo || null,
+              pcoEffectivity: generalInfo.pcoEffectivity || null,
+              productLines,
+              denrPermits: permitsSnapshot,
+            } as const;
+
+            const resolved = resolveEstablishmentContentEdit(
+              estabRecord as unknown as Record<string, unknown> & { syncState: string; lastSyncedSnapshot?: string | null },
+              nextEstabFields,
+            );
+
+            if (resolved.isDirty) {
+              await estabRecord.update(rec => {
+                Object.assign(rec, nextEstabFields);
+                rec.updatedAt = now;
+                rec.syncState = resolved.syncState;
+              });
+            }
           } else {
             // Brand-new establishment that wasn't already persisted by the
             // quick-create modal (e.g. an older draft) — insert it now so

@@ -66,10 +66,36 @@ const REPORT_TYPE_TO_TAG: Record<string, ComplianceTag> = {
   eia:              'EIA',
 };
 
+// Local-only sync states (never sent to the backend as-is — see
+// collectPushChanges.ts's withBackendSyncStatus) that mean "this row still
+// needs to be pushed."
+const PENDING_LOCAL_STATES = new Set(['pending_create', 'pending_update', 'pending_delete']);
+
+// The establishment's own "Pending sync" badge should reflect its full state
+// as an inspector thinks of it — general info AND its inspection/survey
+// reports — not just the establishments row in isolation. Adding a report
+// keeps it pending on purpose (a reminder there's something unsynced), but
+// reverting a change (e.g. adding then deleting a never-synced report, or
+// editing a field back to its last-synced value) must actually clear it —
+// see resolveEstablishmentContentEdit and reportPersistence.ts's
+// hard-delete-if-never-synced path for the other half of that contract.
+function computeEstablishmentSyncStatus(
+  estabSyncState: string,
+  reportsRaw: { syncState: string }[],
+  surveyReports: { syncState: string }[],
+): SyncStatus {
+  if (estabSyncState === 'conflict') return 'conflict';
+  const hasPendingReports =
+    reportsRaw.some(r => PENDING_LOCAL_STATES.has(r.syncState)) ||
+    surveyReports.some(r => PENDING_LOCAL_STATES.has(r.syncState));
+  if (hasPendingReports) return 'pending';
+  return toDisplaySyncStatus(estabSyncState);
+}
+
 // ── Map WatermelonDB model → EstablishmentDTO ──────────────────────────────────
 async function modelToDTO(model: Establishment): Promise<EstablishmentDTO> {
   // Derive compliance tags from linked inspection reports
-  const reports = await database.collections
+  const reportsRaw = await database.collections
     .get('inspection_reports')
     .query(Q.where('estabId', model.estabId))
     .fetch();
@@ -78,6 +104,14 @@ async function modelToDTO(model: Establishment): Promise<EstablishmentDTO> {
     .get('survey_reports')
     .query(Q.where('estabId', model.estabId))
     .fetch();
+
+  // Same rule as useEstablishmentReports: a soft-deleted report (pending_delete
+  // locally, or deletedAt set by a pulled remote delete) must not count toward
+  // the establishment's tags — otherwise a deleted report's tag/badge lingers
+  // on the establishment card even though its own report list shows nothing.
+  const reports = reportsRaw.filter(
+    (r: any) => !r.deletedAt && r.syncState !== 'pending_delete',
+  );
 
   const tagSet = new Set<ComplianceTag>();
   reports.forEach((r: any) => {
@@ -119,7 +153,7 @@ async function modelToDTO(model: Establishment): Promise<EstablishmentDTO> {
     denrPermits:            model.denrPermits ?? [],
     createdAt:              model.createdAt,
     updatedAt:              model.updatedAt,
-    syncStatus:             toDisplaySyncStatus(model.syncState),
+    syncStatus:             computeEstablishmentSyncStatus(model.syncState, reportsRaw as any, surveyReports as any),
     deviceId:               model.deviceId,
     isArchived:             model.isArchived,
     complianceTags:         Array.from(tagSet),

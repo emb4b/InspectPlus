@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { View, Text, ActivityIndicator, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +19,7 @@ import { EstablishmentHeaderCard } from './EstablishmentHeaderCard';
 import { EstablishmentInfoSections } from './EstablishmentInfoSections';
 import { EstablishmentReportsSection } from './EstablishmentReportsSection';
 import { useHeaderScroll } from '../../home/context/HeaderScrollContext';
+import { subscribeToSyncDataChanged } from '../../../services/sync/syncEvents';
 
 interface EstablishmentDetailScreenProps {
   estabId: string;
@@ -61,13 +62,26 @@ export const EstablishmentDetailScreen: React.FC<EstablishmentDetailScreenProps>
   );
 
   // The native Stack doesn't remount this screen when navigating back to
-  // it, so without this the card/info sections would keep showing pre-edit
-  // data after Save → back from the edit screen.
+  // it, so without this the card/info sections — and the reports list below
+  // them — would keep showing stale data after saving/submitting a report
+  // (or editing the establishment) from a screen stacked on top of this one.
   useFocusEffect(
     useCallback(() => {
       refetch();
-    }, [refetch]),
+      refetchReports();
+    }, [refetch, refetchReports]),
   );
+
+  // Mirrors Home's dual-trigger approach (see home.tsx): the notifier fires
+  // the moment a report is saved, before the user navigates back, so data
+  // is already fresh by the time useFocusEffect above re-runs. This also
+  // covers a background sync landing while this screen is already open.
+  useEffect(() => {
+    return subscribeToSyncDataChanged(() => {
+      refetch();
+      refetchReports();
+    });
+  }, [refetch, refetchReports]);
 
   const handleUpdatePermits = useCallback(() => {
     // TODO: navigate to permits edit flow

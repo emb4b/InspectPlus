@@ -5,6 +5,7 @@ import { LocalSyncRecord } from '../../services/sync/syncMappers';
 import { PushChangesPayload } from '../../services/sync/syncTypes';
 import { LocalPendingRecords, LocalPushSourceAdapter } from './collectPushChanges';
 import { LocalEntitySyncAdapter } from './applyPulledChanges';
+import { buildEstablishmentSnapshotJson } from '../../features/inspections/establishmentPersistence';
 
 const PENDING_SYNC_STATES = ['pending_create', 'pending_update', 'pending_delete'];
 
@@ -106,6 +107,13 @@ async function upsertMany(entity: SyncEntityName, records: LocalSyncRecord[]): P
           // Data pulled from the server is synced by definition, regardless
           // of what sync_status it happened to carry.
           target.syncState = 'synced';
+          // Re-baseline the last-synced snapshot to what the server just
+          // sent — see establishmentPersistence.ts's
+          // resolveEstablishmentContentEdit, which diffs future local edits
+          // against this instead of just the immediately-prior local value.
+          if (entity === 'establishments') {
+            target.lastSyncedSnapshot = buildEstablishmentSnapshotJson(target);
+          }
         });
       } else {
         await collection.create((r: unknown) => {
@@ -115,6 +123,9 @@ async function upsertMany(entity: SyncEntityName, records: LocalSyncRecord[]): P
             target[key] = value;
           }
           target.syncState = 'synced';
+          if (entity === 'establishments') {
+            target.lastSyncedSnapshot = buildEstablishmentSnapshotJson(target);
+          }
         });
       }
     }
@@ -189,7 +200,13 @@ export async function markLocalChangesAsSynced(payload: PushChangesPayload): Pro
         if (!existing) continue;
 
         await existing.update((r: unknown) => {
-          (r as Record<string, unknown>).syncState = 'synced';
+          const target = r as Record<string, unknown>;
+          target.syncState = 'synced';
+          // Re-baseline the last-synced snapshot to what was just pushed —
+          // see resolveEstablishmentContentEdit.
+          if (entity === 'establishments') {
+            target.lastSyncedSnapshot = buildEstablishmentSnapshotJson(target);
+          }
         });
       }
     }
