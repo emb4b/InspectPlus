@@ -23,6 +23,7 @@ import { notifySyncDataChanged } from '../../../services/sync/syncEvents';
 import { buildEditFormFromEstablishment, EditEstablishmentFormState } from '../editEstablishmentForm';
 import type { EstablishmentOperatingStatus } from '../types';
 import { useHeaderScroll } from '../../home/context/HeaderScrollContext';
+import { useScreenFooter } from '../../home/context/ScreenFooterContext';
 
 const OPERATING_STATUS_OPTIONS = ['Operational', 'Temporarily Close', 'Non-Operational'];
 
@@ -100,6 +101,33 @@ export const EditEstablishmentScreen: React.FC<EditEstablishmentScreenProps> = (
       setSaving(false);
     }
   }, [estabId, form]);
+
+  // Rendered by AppChrome as a sibling of the collapsing header, not nested
+  // inline here — see useScreenFooter for why. `null` while there's nothing
+  // to save yet (loading/error states below still return before any of this
+  // reaches the screen).
+  useScreenFooter(
+    () =>
+      form ? (
+        <View style={styles.footer}>
+          <TouchableOpacity style={styles.cancelBtn} onPress={handleBack} disabled={saving} activeOpacity={0.8}>
+            <Text style={styles.cancelBtnText}>Cancel</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+            onPress={handleSave}
+            disabled={saving}
+            activeOpacity={0.8}>
+            {saving ? (
+              <ActivityIndicator size="small" color={Colors.textWhite} />
+            ) : (
+              <Text style={styles.saveBtnText}>Save Changes</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      ) : null,
+    [form, saving, handleBack, handleSave]
+  );
 
   // `form` is seeded from `establishment` by the effect above, one render
   // after `establishment` itself arrives — treat that single-tick gap as
@@ -441,23 +469,6 @@ export const EditEstablishmentScreen: React.FC<EditEstablishmentScreenProps> = (
           </Text>
         </View>
       </KeyboardAwareScrollView>
-
-      <View style={styles.footer}>
-        <TouchableOpacity style={styles.cancelBtn} onPress={handleBack} disabled={saving} activeOpacity={0.8}>
-          <Text style={styles.cancelBtnText}>Cancel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
-          onPress={handleSave}
-          disabled={saving}
-          activeOpacity={0.8}>
-          {saving ? (
-            <ActivityIndicator size="small" color={Colors.textWhite} />
-          ) : (
-            <Text style={styles.saveBtnText}>Save Changes</Text>
-          )}
-        </TouchableOpacity>
-      </View>
     </View>
   );
 };

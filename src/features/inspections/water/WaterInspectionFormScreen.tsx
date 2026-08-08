@@ -21,6 +21,7 @@ import { WaterComplianceTab } from './WaterComplianceTab';
 import { emptyWaterComplianceForm, WaterComplianceFormState } from './waterTypes';
 import type { EstablishmentDTO } from '../../establishments/types';
 import { useHeaderScroll } from '../../home/context/HeaderScrollContext';
+import { useScreenFooter } from '../../home/context/ScreenFooterContext';
 
 const REPORT_TYPE = 'water_monitoring';
 
@@ -105,6 +106,23 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
     [save, waterCompliance],
   );
 
+  // Rendered by AppChrome as a sibling of the collapsing header rather than
+  // inline here — see useScreenFooter for why nesting it below the header
+  // caused it to visibly lag the collapse/expand animation.
+  useScreenFooter(
+    () => (
+      <SaveBar
+        establishmentName={generalInfo.name || 'New Establishment'}
+        typeLabel="Water Monitoring"
+        saving={saving}
+        onDiscard={() => router.back()}
+        onSaveDraft={() => handleSave('draft')}
+        onSubmit={() => handleSave('submitted')}
+      />
+    ),
+    [generalInfo.name, saving, handleSave]
+  );
+
   return (
     <View style={styles.flex}>
       <ReportFormHeader
@@ -135,15 +153,6 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
           <WaterComplianceTab value={waterCompliance} onChange={setWaterCompliance} />
         )}
       </KeyboardAwareScrollView>
-
-      <SaveBar
-        establishmentName={generalInfo.name || 'New Establishment'}
-        typeLabel="Water Monitoring"
-        saving={saving}
-        onDiscard={() => router.back()}
-        onSaveDraft={() => handleSave('draft')}
-        onSubmit={() => handleSave('submitted')}
-      />
     </View>
   );
 }

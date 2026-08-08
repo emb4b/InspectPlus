@@ -35,10 +35,31 @@ const ANIM_DURATION = 220;
 export const HeaderScrollProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const collapsed = useSharedValue(0);
   const anchor = useSharedValue(0);
+  // True only while the user's finger is actually on the list (through any
+  // resulting momentum). Libraries like KeyboardAwareScrollView call
+  // `scrollTo()` programmatically to keep a focused field above the
+  // keyboard — on a long form with many fields, each focus change fires one
+  // of these synthetic jumps, which look exactly like a big user scroll to
+  // a plain `onScroll` handler and were flipping `collapsed` back and forth
+  // on every field tap, well outside of any real scrolling. Gating on this
+  // flag means only a real drag (or its momentum) can ever move `collapsed`.
+  const dragging = useSharedValue(false);
 
   const onScroll = useAnimatedScrollHandler({
+    onBeginDrag: () => {
+      'worklet';
+      dragging.value = true;
+    },
+    onMomentumEnd: () => {
+      'worklet';
+      dragging.value = false;
+    },
     onScroll: event => {
       'worklet';
+      if (!dragging.value) {
+        return;
+      }
+
       const offsetY = event.contentOffset.y;
 
       if (offsetY <= TOP_OFFSET) {

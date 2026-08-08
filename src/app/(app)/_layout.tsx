@@ -6,6 +6,7 @@ import { Colors } from '../../constants/colors';
 import { HomeHeader } from '../../features/home/components/HomeHeader';
 import { HomeFooter } from '../../features/home/components/HomeFooter';
 import { HeaderScrollProvider, useHeaderScroll } from '../../features/home/context/HeaderScrollContext';
+import { ScreenFooterProvider, useActiveScreenFooter } from '../../features/home/context/ScreenFooterContext';
 
 // Header/footer chrome that reacts to the active route — split out so it can
 // read scroll-collapse state from the provider below.
@@ -13,6 +14,7 @@ function AppChrome() {
   const pathname = usePathname();
   const isHome = pathname === '/home';
   const { collapsed, expand } = useHeaderScroll();
+  const screenFooter = useActiveScreenFooter();
 
   // Each screen mounts its own scroll container, so the collapsed state from
   // whatever page the user just left shouldn't carry over to the next one.
@@ -26,6 +28,7 @@ function AppChrome() {
       <View style={styles.content}>
         <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }} />
       </View>
+      {screenFooter}
       <HomeFooter />
     </>
   );
@@ -38,7 +41,9 @@ export default function AppLayout() {
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <StatusBar barStyle="light-content" backgroundColor={Colors.navy} />
       <HeaderScrollProvider>
-        <AppChrome />
+        <ScreenFooterProvider>
+          <AppChrome />
+        </ScreenFooterProvider>
       </HeaderScrollProvider>
     </SafeAreaView>
   );
