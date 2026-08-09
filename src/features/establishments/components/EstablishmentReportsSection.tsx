@@ -1,5 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { getReportUrgency } from '../../../utils/reportUrgency';
@@ -31,6 +33,12 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// Swipe-to-reveal Delete, matching ReportListCard's (Manage Reports tab)
+// gesture treatment — this section only ever shows a single action, unlike
+// ReportListCard's Edit+Delete, so revealWidth is just one ACTION_WIDTH or 0.
+const ACTION_WIDTH = 72;
+const OPEN_THRESHOLD_RATIO = 0.4;
+
 const ReportRow: React.FC<{
   item: EstablishmentReportItem;
   onOpen: () => void;
@@ -39,55 +47,109 @@ const ReportRow: React.FC<{
 }> = ({ item, onOpen, onDelete, showDelete }) => {
   const urgency = getReportUrgency(item.date, item.status);
 
+  const revealWidth = showDelete ? ACTION_WIDTH : 0;
+  const openThreshold = revealWidth * OPEN_THRESHOLD_RATIO;
+
+  const translateX = useSharedValue(0);
+  const startX = useSharedValue(0);
+
+  const close = () => {
+    translateX.value = withTiming(0, { duration: 200 });
+  };
+
+  const panGesture = Gesture.Pan()
+    .enabled(revealWidth > 0)
+    .activeOffsetX([-10, 10])
+    .failOffsetY([-8, 8])
+    .onStart(() => {
+      startX.value = translateX.value;
+    })
+    .onUpdate(e => {
+      translateX.value = Math.min(0, Math.max(-revealWidth, startX.value + e.translationX));
+    })
+    .onEnd(() => {
+      translateX.value = withTiming(
+        translateX.value < -openThreshold ? -revealWidth : 0,
+        { duration: 200 },
+      );
+    });
+
+  const rowAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  // A tap while the row is swiped open snaps it shut instead of opening the
+  // report — same convention as ReportListCard.
+  const handlePress = () => {
+    if (translateX.value < -1) {
+      close();
+      return;
+    }
+    onOpen();
+  };
+
+  const handleDelete = () => {
+    close();
+    onDelete();
+  };
+
   return (
-    <TouchableOpacity
-      style={[
-        styles.row,
-        urgency === 'overdue' && styles.rowOverdue,
-        urgency === 'due-soon' && styles.rowDueSoon,
-      ]}
-      onPress={onOpen}
-      activeOpacity={0.75}>
-      <View style={styles.iconWrap}>
-        <Ionicons name={REPORT_ICONS[item.reportType] ?? 'document-outline'} size={17} color={Colors.water.text} />
-      </View>
-      <View style={styles.content}>
-        <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-        <View style={styles.dateRow}>
-          <Ionicons name="calendar-outline" size={10} color={Colors.textMuted} />
-          <Text style={styles.date}>{formatDate(item.date)}</Text>
-          {urgency !== 'none' && (
-            <View
-              style={[
-                styles.urgencyBadge,
-                { backgroundColor: urgency === 'overdue' ? Colors.hazwaste.badgeBg : Colors.warning.badgeBg },
-              ]}>
-              <Ionicons
-                name="alert-circle"
-                size={9}
-                color={urgency === 'overdue' ? Colors.hazwaste.badgeText : Colors.warning.text}
-              />
-              <Text
-                style={[
-                  styles.urgencyBadgeText,
-                  { color: urgency === 'overdue' ? Colors.hazwaste.badgeText : Colors.warning.text },
-                ]}>
-                {urgency === 'overdue' ? 'Overdue' : 'Due soon'}
-              </Text>
-            </View>
-          )}
-        </View>
-        <Text style={styles.controlNo}>{item.controlNo || 'No control number yet'}</Text>
-      </View>
-      <View style={styles.actions}>
-        <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
-        {showDelete && (
-          <TouchableOpacity style={styles.deleteBtn} onPress={onDelete} activeOpacity={0.75}>
-            <Ionicons name="trash-outline" size={12} color={Colors.textWhite} />
+    <View style={styles.rowWrap}>
+      {showDelete && (
+        <View style={styles.swipeActions}>
+          <TouchableOpacity style={styles.deleteAction} onPress={handleDelete} activeOpacity={0.8}>
+            <Ionicons name="trash-outline" size={20} color={Colors.textWhite} />
+            <Text style={styles.deleteActionText}>Delete</Text>
           </TouchableOpacity>
-        )}
-      </View>
-    </TouchableOpacity>
+        </View>
+      )}
+
+      <GestureDetector gesture={panGesture}>
+        <Animated.View style={rowAnimatedStyle}>
+          <TouchableOpacity
+            style={[
+              styles.row,
+              urgency === 'overdue' && styles.rowOverdue,
+              urgency === 'due-soon' && styles.rowDueSoon,
+            ]}
+            onPress={handlePress}
+            activeOpacity={0.75}>
+            <View style={styles.iconWrap}>
+              <Ionicons name={REPORT_ICONS[item.reportType] ?? 'document-outline'} size={17} color={Colors.water.text} />
+            </View>
+            <View style={styles.content}>
+              <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+              <View style={styles.dateRow}>
+                <Ionicons name="calendar-outline" size={10} color={Colors.textMuted} />
+                <Text style={styles.date}>{formatDate(item.date)}</Text>
+                {urgency !== 'none' && (
+                  <View
+                    style={[
+                      styles.urgencyBadge,
+                      { backgroundColor: urgency === 'overdue' ? Colors.hazwaste.badgeBg : Colors.warning.badgeBg },
+                    ]}>
+                    <Ionicons
+                      name="alert-circle"
+                      size={9}
+                      color={urgency === 'overdue' ? Colors.hazwaste.badgeText : Colors.warning.text}
+                    />
+                    <Text
+                      style={[
+                        styles.urgencyBadgeText,
+                        { color: urgency === 'overdue' ? Colors.hazwaste.badgeText : Colors.warning.text },
+                      ]}>
+                      {urgency === 'overdue' ? 'Overdue' : 'Due soon'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.controlNo}>{item.controlNo || 'No control number yet'}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
+          </TouchableOpacity>
+        </Animated.View>
+      </GestureDetector>
+    </View>
   );
 };
 
@@ -186,6 +248,30 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     textAlign: 'center',
   },
+  rowWrap: {
+    marginBottom: 10,
+  },
+  swipeActions: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  deleteAction: {
+    width: ACTION_WIDTH,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    backgroundColor: '#e74c3c',
+  },
+  deleteActionText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.textWhite,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -195,7 +281,6 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: 10,
     padding: 12,
-    marginBottom: 10,
   },
   rowDueSoon: {
     borderColor: Colors.warning.border,
@@ -251,19 +336,5 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
     marginTop: 2,
     fontFamily: 'monospace',
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flexShrink: 0,
-  },
-  deleteBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 6,
-    backgroundColor: '#e74c3c',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });
