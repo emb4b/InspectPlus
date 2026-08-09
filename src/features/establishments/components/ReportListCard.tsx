@@ -1,5 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { getReportUrgency } from '../../../utils/reportUrgency';
@@ -12,6 +14,7 @@ interface ReportListCardProps {
   // canManageAllRecords.
   canManageAll: boolean;
   onPress: (item: AllReportItem) => void;
+  onEdit: (item: AllReportItem) => void;
   onDelete: (item: AllReportItem) => void;
 }
 
@@ -29,11 +32,17 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// Full-size action buttons revealed by swiping the card left — matches
+// EstablishmentCard's swipe-actions treatment.
+const ACTION_WIDTH = 72;
+const OPEN_THRESHOLD_RATIO = 0.4;
+
 export const ReportListCard: React.FC<ReportListCardProps> = ({
   item,
   currentUid,
   canManageAll,
   onPress,
+  onEdit,
   onDelete,
 }) => {
   const isSubmitted = item.status === 'submitted';
@@ -42,97 +51,207 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
   // inspector who owns the record or a Developer account — matches the
   // "own record" / Developer-full-access delete RLS policies on the
   // backend (see EstablishmentReportsSection's showDelete).
-  const showDelete = item.kind === 'inspection' && (item.inspectorUid === currentUid || canManageAll);
+  const isOwnerOrManager = item.inspectorUid === currentUid || canManageAll;
+  const showDelete = item.kind === 'inspection' && isOwnerOrManager;
+  // Editing only exists for inspection reports (section-level edit on the
+  // report detail screen — see InspectionReportDetailScreen's canEdit), and
+  // only while still a draft owned by this inspector, or a Developer account.
+  const showEdit = item.kind === 'inspection' && !isSubmitted && isOwnerOrManager;
+
+  const visibleActionCount = (showEdit ? 1 : 0) + (showDelete ? 1 : 0);
+  const revealWidth = ACTION_WIDTH * visibleActionCount;
+  const openThreshold = revealWidth * OPEN_THRESHOLD_RATIO;
+
+  const translateX = useSharedValue(0);
+  const startX = useSharedValue(0);
+
+  const close = () => {
+    translateX.value = withTiming(0, { duration: 200 });
+  };
+
+  const panGesture = Gesture.Pan()
+    .enabled(revealWidth > 0)
+    .activeOffsetX([-10, 10])
+    .failOffsetY([-8, 8])
+    .onStart(() => {
+      startX.value = translateX.value;
+    })
+    .onUpdate(e => {
+      translateX.value = Math.min(0, Math.max(-revealWidth, startX.value + e.translationX));
+    })
+    .onEnd(() => {
+      translateX.value = withTiming(
+        translateX.value < -openThreshold ? -revealWidth : 0,
+        { duration: 200 },
+      );
+    });
+
+  const cardAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  // A tap while the row is swiped open snaps it shut instead of navigating —
+  // the standard swipe-actions convention.
+  const handleCardPress = () => {
+    if (translateX.value < -1) {
+      close();
+      return;
+    }
+    onPress(item);
+  };
+
+  const handleAction = (handler: (item: AllReportItem) => void) => {
+    close();
+    handler(item);
+  };
 
   return (
-    <TouchableOpacity
-      style={[
-        styles.card,
-        urgency === 'overdue' && styles.cardOverdue,
-        urgency === 'due-soon' && styles.cardDueSoon,
-      ]}
-      onPress={() => onPress(item)}
-      activeOpacity={0.75}>
-      <View style={styles.iconWrap}>
-        <Ionicons name={REPORT_ICONS[item.reportType] ?? 'document-outline'} size={17} color={Colors.water.text} />
-      </View>
-      <View style={styles.content}>
-        <View style={styles.titleRow}>
-          <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-          {item.status && (
-            <View
-              style={[
-                styles.statusBadge,
-                { backgroundColor: isSubmitted ? Colors.greenMuted : Colors.warning.badgeBg },
-              ]}>
-              <Text
-                style={[
-                  styles.statusBadgeText,
-                  { color: isSubmitted ? Colors.green : Colors.warning.text },
-                ]}>
-                {isSubmitted ? 'Submitted' : 'Draft'}
-              </Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.metaRow}>
-          <Ionicons name="business-outline" size={10} color={Colors.textMuted} />
-          <Text style={styles.estabName} numberOfLines={1}>{item.estabName}</Text>
-        </View>
-
-        {/* Sync status indicator */}
-        {item.syncStatus === 'pending' && (
-          <View style={styles.syncRow}>
-            <Ionicons name="cloud-upload-outline" size={10} color={Colors.pending} />
-            <Text style={styles.syncText}>Pending sync</Text>
-          </View>
+    <View style={styles.rowWrap}>
+      {/* Actions revealed behind the card when swiped left */}
+      <View style={styles.swipeActions}>
+        {showEdit && (
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionEdit]}
+            onPress={() => handleAction(onEdit)}
+            activeOpacity={0.8}>
+            <Ionicons name="pencil" size={20} color={Colors.textWhite} />
+            <Text style={styles.actionEditText}>Edit</Text>
+          </TouchableOpacity>
         )}
-        {item.syncStatus === 'conflict' && (
-          <View style={styles.syncRow}>
-            <Ionicons name="alert-circle-outline" size={10} color={Colors.conflict} />
-            <Text style={[styles.syncText, { color: Colors.conflict }]}>Sync conflict</Text>
-          </View>
-        )}
-
-        <View style={styles.dateRow}>
-          <Ionicons name="calendar-outline" size={10} color={Colors.textMuted} />
-          <Text style={styles.date}>{formatDate(item.date)}</Text>
-          {urgency !== 'none' && (
-            <View
-              style={[
-                styles.urgencyBadge,
-                { backgroundColor: urgency === 'overdue' ? Colors.hazwaste.badgeBg : Colors.warning.badgeBg },
-              ]}>
-              <Ionicons
-                name="alert-circle"
-                size={9}
-                color={urgency === 'overdue' ? Colors.hazwaste.badgeText : Colors.warning.text}
-              />
-              <Text
-                style={[
-                  styles.urgencyBadgeText,
-                  { color: urgency === 'overdue' ? Colors.hazwaste.badgeText : Colors.warning.text },
-                ]}>
-                {urgency === 'overdue' ? 'Overdue' : 'Due soon'}
-              </Text>
-            </View>
-          )}
-        </View>
-        <Text style={styles.controlNo}>{item.controlNo || 'No control number yet'}</Text>
-      </View>
-      <View style={styles.actions}>
-        <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
         {showDelete && (
-          <TouchableOpacity style={styles.deleteBtn} onPress={() => onDelete(item)} activeOpacity={0.75}>
-            <Ionicons name="trash-outline" size={12} color={Colors.textWhite} />
+          <TouchableOpacity
+            style={[styles.actionBtn, styles.actionDelete]}
+            onPress={() => handleAction(onDelete)}
+            activeOpacity={0.8}>
+            <Ionicons name="trash-outline" size={20} color={Colors.textWhite} />
+            <Text style={styles.actionDeleteText}>Delete</Text>
           </TouchableOpacity>
         )}
       </View>
-    </TouchableOpacity>
+
+      {/* Foreground card — slides left via gesture to reveal the actions */}
+      <GestureDetector gesture={panGesture}>
+        <Animated.View style={cardAnimatedStyle}>
+          <TouchableOpacity
+            style={[
+              styles.card,
+              urgency === 'overdue' && styles.cardOverdue,
+              urgency === 'due-soon' && styles.cardDueSoon,
+            ]}
+            onPress={handleCardPress}
+            activeOpacity={0.75}>
+            <View style={styles.iconWrap}>
+              <Ionicons name={REPORT_ICONS[item.reportType] ?? 'document-outline'} size={17} color={Colors.water.text} />
+            </View>
+            <View style={styles.content}>
+              <View style={styles.titleRow}>
+                <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+                {item.status && (
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      { backgroundColor: isSubmitted ? Colors.greenMuted : Colors.warning.badgeBg },
+                    ]}>
+                    <Text
+                      style={[
+                        styles.statusBadgeText,
+                        { color: isSubmitted ? Colors.green : Colors.warning.text },
+                      ]}>
+                      {isSubmitted ? 'Submitted' : 'Draft'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.metaRow}>
+                <Ionicons name="business-outline" size={10} color={Colors.textMuted} />
+                <Text style={styles.estabName} numberOfLines={1}>{item.estabName}</Text>
+              </View>
+
+              {/* Sync status indicator */}
+              {item.syncStatus === 'pending' && (
+                <View style={styles.syncRow}>
+                  <Ionicons name="cloud-upload-outline" size={10} color={Colors.pending} />
+                  <Text style={styles.syncText}>Pending sync</Text>
+                </View>
+              )}
+              {item.syncStatus === 'conflict' && (
+                <View style={styles.syncRow}>
+                  <Ionicons name="alert-circle-outline" size={10} color={Colors.conflict} />
+                  <Text style={[styles.syncText, { color: Colors.conflict }]}>Sync conflict</Text>
+                </View>
+              )}
+
+              <View style={styles.dateRow}>
+                <Ionicons name="calendar-outline" size={10} color={Colors.textMuted} />
+                <Text style={styles.date}>{formatDate(item.date)}</Text>
+                {urgency !== 'none' && (
+                  <View
+                    style={[
+                      styles.urgencyBadge,
+                      { backgroundColor: urgency === 'overdue' ? Colors.hazwaste.badgeBg : Colors.warning.badgeBg },
+                    ]}>
+                    <Ionicons
+                      name="alert-circle"
+                      size={9}
+                      color={urgency === 'overdue' ? Colors.hazwaste.badgeText : Colors.warning.text}
+                    />
+                    <Text
+                      style={[
+                        styles.urgencyBadgeText,
+                        { color: urgency === 'overdue' ? Colors.hazwaste.badgeText : Colors.warning.text },
+                      ]}>
+                      {urgency === 'overdue' ? 'Overdue' : 'Due soon'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={styles.controlNo}>{item.controlNo || 'No control number yet'}</Text>
+            </View>
+
+            {/* Chevron */}
+            <Ionicons name="chevron-forward" size={14} color={Colors.textLight} />
+          </TouchableOpacity>
+        </Animated.View>
+      </GestureDetector>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  rowWrap: {
+    marginBottom: 10,
+  },
+  swipeActions: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  actionBtn: {
+    width: ACTION_WIDTH,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  actionEdit: {
+    backgroundColor: Colors.navy,
+  },
+  actionEditText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.textWhite,
+  },
+  actionDelete: {
+    backgroundColor: '#e74c3c',
+  },
+  actionDeleteText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.textWhite,
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -142,7 +261,11 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     borderRadius: 10,
     padding: 12,
-    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 1,
   },
   cardDueSoon: {
     borderColor: Colors.warning.border,
@@ -238,19 +361,5 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
     marginTop: 2,
     fontFamily: 'monospace',
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flexShrink: 0,
-  },
-  deleteBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 6,
-    backgroundColor: '#e74c3c',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
 });

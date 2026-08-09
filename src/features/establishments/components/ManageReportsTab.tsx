@@ -266,6 +266,7 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
             currentUid={currentUid}
             canManageAll={isDeveloper}
             onPress={handleOpen}
+            onEdit={handleOpen}
             onDelete={handleDelete}
           />
         ))

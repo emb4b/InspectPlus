@@ -1,5 +1,12 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, LayoutChangeEvent } from 'react-native';
+import Reanimated, {
+  Extrapolation,
+  interpolate,
+  SharedValue,
+  useAnimatedStyle,
+  useDerivedValue,
+} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
@@ -36,6 +43,11 @@ interface InspectionReportHeaderProps {
   // gets unrestricted write access — see canManageAllRecords) can delete
   // it — omitted entirely (rather than passed disabled) otherwise.
   onDelete?: () => void;
+  // Scroll-driven collapse progress (0 = expanded, 1 = collapsed), shared
+  // with the screen's scroll view — see HeaderScrollContext. Only the
+  // establishment card collapses; the tab row below always stays put so
+  // the tabs never move around under the user's thumb.
+  collapsed?: SharedValue<number>;
 }
 
 export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
@@ -50,10 +62,70 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
   onTabChange,
   onBack,
   onDelete,
+  collapsed,
 }) => {
   const typeMeta = getReportTypeMeta(reportType);
   const IconAsset = typeMeta.iconAsset;
   const isSubmitted = reportStatus === 'submitted';
+
+  // collapsed is now mapped directly and continuously from scroll position
+  // (see InspectionReportDetailScreen's handleScroll) rather than from
+  // HeaderScrollContext's threshold-triggered, separately-timed animation —
+  // so, like HomeHeader, this can just read it straight through. There's no
+  // discrete state to jump between and nothing to smooth: collapsed always
+  // exactly matches the current scroll offset.
+  const progress = useDerivedValue(() => (collapsed ? collapsed.value : 0), [collapsed]);
+
+  // The collapsing blocks below need their own natural (expanded) height as
+  // the interpolation's starting bound. A guessed placeholder that's larger
+  // than the real content means maxHeight has no visible effect until
+  // progress is most of the way to 1 — everything then collapses in one
+  // sudden jump instead of shrinking smoothly with the scroll, which reads
+  // as a jiggle rather than a collapse. The screen always mounts expanded
+  // (see _layout.tsx's expand() on every route change), so the first
+  // onLayout pass is guaranteed to report the true, uncapped height —
+  // captured once and reused as the animation's real starting bound.
+  //
+  // null (not a numeric placeholder) means "not measured yet": the very
+  // first render already applies whatever this height resolves to as a
+  // maxHeight/overflow:hidden constraint, before onLayout has ever fired —
+  // so a numeric placeholder shorter than the true content (e.g. a 1-line
+  // guess for text that actually wraps to 2) clips the content on that
+  // first render, which is exactly what onLayout then measures and locks
+  // in forever. Rendering unconstrained until the real measurement lands
+  // avoids the constraint corrupting its own calibration.
+  const [locationHeight, setLocationHeight] = useState<number | null>(null);
+  const locationMeasured = useRef(false);
+  const handleLocationLayout = (e: LayoutChangeEvent) => {
+    if (locationMeasured.current) return;
+    locationMeasured.current = true;
+    setLocationHeight(e.nativeEvent.layout.height);
+  };
+  const [metaBlockHeight, setMetaBlockHeight] = useState<number | null>(null);
+  const metaBlockMeasured = useRef(false);
+  const handleMetaBlockLayout = (e: LayoutChangeEvent) => {
+    if (metaBlockMeasured.current) return;
+    metaBlockMeasured.current = true;
+    setMetaBlockHeight(e.nativeEvent.layout.height);
+  };
+
+  const iconAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(progress.value, [0, 1], [1, 0.7], Extrapolation.CLAMP) }],
+  }));
+  const locationAnimatedStyle = useAnimatedStyle(() => {
+    if (locationHeight === null) return {};
+    return {
+      maxHeight: interpolate(progress.value, [0, 1], [locationHeight, 0], Extrapolation.CLAMP),
+      opacity: interpolate(progress.value, [0, 0.6, 1], [1, 0, 0], Extrapolation.CLAMP),
+    };
+  }, [locationHeight]);
+  const metaAnimatedStyle = useAnimatedStyle(() => {
+    if (metaBlockHeight === null) return {};
+    return {
+      maxHeight: interpolate(progress.value, [0, 1], [metaBlockHeight, 0], Extrapolation.CLAMP),
+      opacity: interpolate(progress.value, [0, 0.6, 1], [1, 0, 0], Extrapolation.CLAMP),
+    };
+  }, [metaBlockHeight]);
 
   // Same self-vs-other resolution as EstablishmentDetailScreen — fullName is
   // only ever the signed-in user's own name, so it can't be assumed to match
@@ -86,52 +158,71 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
 
       <View style={styles.card}>
         <View style={styles.topRow}>
-          <View style={styles.iconWrap}>
+          <Reanimated.View style={[styles.iconWrap, iconAnimatedStyle]}>
             <Ionicons name="business" size={22} color={Colors.green} />
-          </View>
+          </Reanimated.View>
           <View style={styles.titleInfo}>
-            <Text style={styles.name}>{establishmentName}</Text>
-            <View style={styles.pillRow}>
-              <View style={[styles.pill, { backgroundColor: typeMeta.bgColor }]}>
-                {IconAsset && <IconAsset width={11} height={11} />}
-                <Text style={[styles.pillText, { color: typeMeta.textColor }]}>{typeMeta.label}</Text>
-              </View>
+            <Text style={styles.name} numberOfLines={2}>{establishmentName}</Text>
+            <Reanimated.View
+              style={[styles.locationWrap, locationAnimatedStyle]}
+              onLayout={handleLocationLayout}>
+              <Text style={styles.location} numberOfLines={2}>{establishmentLocation}</Text>
+            </Reanimated.View>
+          </View>
+          <View style={styles.badgeGroup}>
+            {/* The law citation (e.g. "R.A. 9275") stands in for the full report
+                type name here — short enough to sit beside the status badge
+                without the two competing for width the way the full label did. */}
+            <View style={[styles.pill, { backgroundColor: typeMeta.bgColor }]}>
+              {IconAsset && <IconAsset width={11} height={11} />}
+              <Text style={[styles.pillText, { color: typeMeta.textColor }]} numberOfLines={1}>
+                {typeMeta.law || typeMeta.label}
+              </Text>
             </View>
-            <Text style={styles.location}>{establishmentLocation}</Text>
-          </View>
-          <View
-            style={[
-              styles.statusBadge,
-              { backgroundColor: isSubmitted ? Colors.greenMuted : Colors.warning.badgeBg },
-            ]}>
-            <Text
+            <View
               style={[
-                styles.statusBadgeText,
-                { color: isSubmitted ? Colors.green : Colors.warning.text },
+                styles.statusBadge,
+                { backgroundColor: isSubmitted ? Colors.greenMuted : Colors.warning.badgeBg },
               ]}>
-              {isSubmitted ? 'Submitted' : 'Draft'}
-            </Text>
+              <Text
+                style={[
+                  styles.statusBadgeText,
+                  { color: isSubmitted ? Colors.green : Colors.warning.text },
+                ]}>
+                {isSubmitted ? 'Submitted' : 'Draft'}
+              </Text>
+            </View>
           </View>
         </View>
 
-        <View style={styles.divider} />
+        <Reanimated.View style={[styles.metaWrap, metaAnimatedStyle]} onLayout={handleMetaBlockLayout}>
+          <View style={styles.divider} />
 
-        <View style={styles.metaRow}>
-          <View style={styles.metaChip}>
-            <Ionicons name="calendar-outline" size={11} color={Colors.textLight} />
-            <Text style={styles.metaText}>{formatDate(inspectionDate)}</Text>
+          <View style={styles.metaRow}>
+            <View style={[styles.metaChip, styles.metaChipNarrow]}>
+              <Ionicons name="calendar-outline" size={11} color={Colors.textLight} />
+              <Text style={styles.metaText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.92}>
+                {formatDate(inspectionDate)}
+              </Text>
+            </View>
+            {/* Control numbers routinely run longer than the date/inspector
+                chips' content ("Control No. 2026-08-09-000123") — giving this
+                one more of the row's width means it doesn't need to shrink
+                its text nearly as much to fit, unlike the other two. */}
+            <View style={[styles.metaChip, styles.metaChipWide]}>
+              <Ionicons name="pricetag-outline" size={11} color={Colors.textLight} />
+              <Text style={styles.metaText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.92}>
+                {reportControlNo ? `Control No. ${reportControlNo}` : 'No control number yet'}
+              </Text>
+            </View>
+            <View style={[styles.metaChip, styles.metaChipNarrow]}>
+              <Ionicons name="person-circle-outline" size={12} color={Colors.textLight} />
+              <Text style={styles.metaText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.92}>
+                {inspectorLabel}
+              </Text>
+            </View>
           </View>
-          <View style={styles.metaChip}>
-            <Ionicons name="pricetag-outline" size={11} color={Colors.textLight} />
-            <Text style={styles.metaText}>
-              {reportControlNo ? `Control No. ${reportControlNo}` : 'No control number yet'}
-            </Text>
-          </View>
-          <View style={styles.metaChip}>
-            <Ionicons name="person-circle-outline" size={12} color={Colors.textLight} />
-            <Text style={styles.metaText}>{inspectorLabel}</Text>
-          </View>
-        </View>
+        </Reanimated.View>
       </View>
 
       <View style={styles.tabRow}>
@@ -201,15 +292,24 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   topRow: {
+    // center, not flex-start: iconWrap is a fixed 44x44 box (not stretched
+    // to the title column's height), so when the card is collapsed and
+    // titleInfo shrinks down to just the single-line name, it's shorter
+    // than the icon — flex-start would leave the name/badge pinned to the
+    // top of the row while the icon sits centered in its own taller box,
+    // visibly misaligned. Center keeps the icon, name, and badge group on
+    // the same visual midline whether expanded or collapsed. This no longer
+    // reintroduces the old wobble concern: the row's height now changes
+    // smoothly with the scroll-linked collapse rather than snapping between
+    // states, so the recentering happens gradually, in step with everything
+    // else, instead of as a sudden jump.
     flexDirection: 'row',
-    alignItems: 'stretch',
+    alignItems: 'center',
     gap: 10,
   },
   iconWrap: {
-    // No fixed size — stretches to the title block's height (topRow's
-    // tallest child) and aspectRatio keeps it square, so it scales up
-    // with the block instead of looking small next to a 3-line title.
-    aspectRatio: 1,
+    width: 44,
+    height: 44,
     borderRadius: 12,
     backgroundColor: Colors.greenMuted,
     alignItems: 'center',
@@ -225,11 +325,28 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Colors.navy,
   },
-  pillRow: {
+  // Not part of the collapsing block below — the address collapses away,
+  // but the name above it never does.
+  locationWrap: {
+    overflow: 'hidden',
+  },
+  metaWrap: {
+    overflow: 'hidden',
+  },
+  // Report-type flag + status badge, stacked beside each other on the
+  // right. wrap (rather than a fixed row) is a safety net for narrow
+  // screens or an unusually long law citation — never lets the pair push
+  // into the name's column.
+  badgeGroup: {
     flexDirection: 'row',
-    marginTop: 4,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 0,
   },
   pill: {
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -247,7 +364,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   statusBadge: {
-    alignSelf: 'center',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 20,
@@ -268,7 +384,6 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   metaChip: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -279,10 +394,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 5,
   },
+  metaChipNarrow: {
+    flex: 0.85,
+  },
+  metaChipWide: {
+    flex: 1.3,
+  },
   metaText: {
     flex: 1,
     flexShrink: 1,
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontWeight: '600',
     color: Colors.textMuted,
   },
