@@ -2,20 +2,13 @@ import React, { useCallback, useRef, useState } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import type { KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller';
-import {
-  Extrapolation,
-  interpolate,
-  useAnimatedScrollHandler,
-  useFrameCallback,
-  useSharedValue,
-} from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Colors } from '../../../constants/colors';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { useInspectionReport } from '../hooks/useInspectionReport';
 import { deleteInspectionReportRecord } from '../reportPersistence';
-import { INSPECTION_TYPE_LABELS, canManageAllRecords } from '../../establishments/hooks/useEstablishment';
+import { INSPECTION_TYPE_LABELS, canManageAllRecords, useEstablishment } from '../../establishments/hooks/useEstablishment';
 import { InspectionReportHeader, ReportDetailTabKey } from './InspectionReportHeader';
 import { GeneralInformationView } from './GeneralInformationView';
 import { PurposeOfInspectionView } from './PurposeOfInspectionView';
@@ -26,75 +19,25 @@ interface InspectionReportDetailScreenProps {
   reportId: string;
 }
 
-// Pixels of scroll over which the establishment card fully collapses —
-// small enough that an initial swipe reads as "collapse the card" before
-// the form content underneath has scrolled far, but wide enough that the
-// motion reads as an actual shrink rather than a snap.
-const COLLAPSE_RANGE = 110;
-// How much of the remaining gap to close per frame — lower is smoother
-// (more of a gentle catch-up) but laggier; higher tracks the raw scroll
-// target more tightly but transmits more of its noise. 0.14 keeps a real,
-// sustained swipe feeling essentially immediate (it closes the gap within
-// a couple of frames of visual perception either way) while noticeably
-// softening the motion compared to snapping straight to the target.
-const SMOOTHING = 0.14;
-
 export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreenProps> = ({ reportId }) => {
   const [activeTab, setActiveTab] = useState<ReportDetailTabKey>('geninfo');
+  const [noteBarDismissed, setNoteBarDismissed] = useState(false);
   const { report, purpose, compliance, loading, error, refetch } = useInspectionReport(reportId);
+  // Loaded independently of `report.establishmentSnapshot` — that's a
+  // point-in-time copy, while this reflects the establishments row as it
+  // stands right now, so GeneralInformationView can flag where they've
+  // drifted apart instead of the two silently going out of sync.
+  const { establishment: liveEstablishment, loading: liveEstablishmentLoading } = useEstablishment(report?.estabId);
   const scrollRef = useRef<ScrollView>(null);
-  const { collapsed } = useHeaderScroll();
-
-  // The card's collapse is tied directly to scroll position instead of
-  // HeaderScrollContext's threshold-triggered onScroll (used elsewhere in
-  // the app) — that system reacts to a scroll *gesture* crossing a distance
-  // threshold, animated afterward on its own timer, which is disconnected
-  // from where the content actually is. That's fine for the top app bar's
-  // small collapse, but for this card it meant the swipe that starts a
-  // collapse also kept scrolling the form underneath, instead of the swipe
-  // going toward collapsing the card first. Mapping collapsed directly from
-  // contentOffset.y means the first COLLAPSE_RANGE px of swipe visibly and
-  // proportionally collapses the card (and symmetrically expands it back on
-  // the way up), with no separate timed animation or state to fall out of
-  // sync — collapsed always exactly matches the current scroll position.
-  //
-  // Reaching offset 0 after scrolling back up can overshoot/settle with a
-  // few quick rubber-band-style corrections rather than landing exactly at
-  // rest in one step — with COLLAPSE_RANGE as small as 80px, that's enough
-  // swing to snap collapsed all the way between 0 and 1 several times in
-  // under a second. Nudging toward the target instead of assigning it
-  // outright absorbs that kind of fast back-and-forth into a much smaller
-  // wobble while still tracking a real, sustained swipe (which moves the
-  // offset over hundreds of ms, far slower than this filter's response)
-  // essentially immediately. This is applied here, at the source, rather
-  // than inside InspectionReportHeader — HomeHeader reads the same shared
-  // collapsed value directly, so smoothing it only on the card's side would
-  // leave the two headers visibly out of step with each other.
-  //
-  // targetProgress holds the raw, unsmoothed value; collapsed is nudged
-  // toward it by a separate per-frame tick (useFrameCallback) rather than
-  // inside onScroll itself. onScroll only fires while a scroll event is
-  // actually arriving — if the scroll settles (or a bounce sequence stops)
-  // before collapsed had fully caught up to 0, there would be no further
-  // event to close that last bit of gap, leaving the header permanently
-  // stuck slightly short of fully expanded. Ticking every rendered frame
-  // instead guarantees collapsed keeps converging on whatever targetProgress
-  // currently is even after scrolling has completely stopped.
-  const targetProgress = useSharedValue(0);
-  const handleScroll = useAnimatedScrollHandler({
-    onScroll: event => {
-      targetProgress.value = interpolate(
-        event.contentOffset.y,
-        [0, COLLAPSE_RANGE],
-        [0, 1],
-        Extrapolation.CLAMP,
-      );
-    },
-  });
-  useFrameCallback(() => {
-    const diff = targetProgress.value - collapsed.value;
-    collapsed.value = Math.abs(diff) < 0.001 ? targetProgress.value : collapsed.value + diff * SMOOTHING;
-  });
+  // Same threshold-triggered snap onScroll every other screen uses (see
+  // HeaderScrollContext) — the card fully collapses or expands once a scroll
+  // gesture crosses its distance threshold, rather than tracking scroll
+  // position continuously. Trade-off: unlike the previous continuous version,
+  // the swipe that crosses the threshold also keeps scrolling the form
+  // content underneath at the same time, since content offset moves with the
+  // finger immediately while the header's snap animation runs on its own
+  // fixed timer.
+  const { collapsed, onScroll } = useHeaderScroll();
   const { session, role } = useAuthContext();
   const currentUid = (session as { user?: { id?: string } } | null)?.user?.id ?? '';
   // Developer accounts get unrestricted write access — including editing
@@ -192,22 +135,30 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
         collapsed={collapsed}
       />
 
-      <View style={styles.noteBar}>
-        <Ionicons name="information-circle-outline" size={13} color={Colors.navy} />
-        <Text style={styles.noteText}>
-          {canEdit ? (
-            <>
-              Use <Text style={styles.noteTextStrong}>Edit</Text> on any section below to make changes, then{' '}
-              <Text style={styles.noteTextStrong}>Save</Text> to update just that section.
-            </>
-          ) : (
-            <>
-              This report is <Text style={styles.noteTextStrong}>view only</Text> — only the inspector who
-              created it can make changes{report.reportStatus === 'submitted' ? ', and it has already been submitted' : ''}.
-            </>
-          )}
-        </Text>
-      </View>
+      {!noteBarDismissed && (
+        <View style={styles.noteBar}>
+          <Ionicons name="information-circle-outline" size={13} color={Colors.navy} />
+          <Text style={styles.noteText}>
+            {canEdit ? (
+              <>
+                Use <Text style={styles.noteTextStrong}>Edit</Text> on any section below to make changes, then{' '}
+                <Text style={styles.noteTextStrong}>Save</Text> to update just that section.
+              </>
+            ) : (
+              <>
+                This report is <Text style={styles.noteTextStrong}>view only</Text> — only the inspector who
+                created it can make changes{report.reportStatus === 'submitted' ? ', and it has already been submitted' : ''}.
+              </>
+            )}
+          </Text>
+          <TouchableOpacity
+            onPress={() => setNoteBarDismissed(true)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}>
+            <Ionicons name="close" size={14} color={Colors.navy} />
+          </TouchableOpacity>
+        </View>
+      )}
 
       <KeyboardAwareScrollView
         ref={scrollRef as unknown as React.Ref<KeyboardAwareScrollViewRef>}
@@ -216,7 +167,7 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
         showsVerticalScrollIndicator={false}
         bottomOffset={150}
         keyboardShouldPersistTaps="handled"
-        onScroll={handleScroll}
+        onScroll={onScroll}
         scrollEventThrottle={16}>
         {activeTab === 'geninfo' && (
           <GeneralInformationView
@@ -225,6 +176,8 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
             permits={report.permitsSnapshot}
             canEdit={canEdit}
             onSaved={refetch}
+            liveEstablishment={liveEstablishment}
+            liveEstablishmentLoading={liveEstablishmentLoading}
           />
         )}
         {activeTab === 'purpose' &&

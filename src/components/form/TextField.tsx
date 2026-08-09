@@ -7,6 +7,7 @@ import {
   StyleSheet,
   KeyboardTypeOptions,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
 
 interface TextFieldProps {
@@ -16,6 +17,10 @@ interface TextFieldProps {
   placeholder?: string;
   required?: boolean;
   hint?: string;
+  // Distinct from `hint` (static instructional text) — flags that this
+  // field's value has drifted from another source of truth (e.g. the live
+  // establishment record), so it's styled to stand out rather than blend in.
+  changeNote?: string;
   readOnly?: boolean;
   multiline?: boolean;
   numberOfLines?: number;
@@ -37,6 +42,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(({
   placeholder,
   required,
   hint,
+  changeNote,
   readOnly,
   multiline,
   numberOfLines,
@@ -73,6 +79,12 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(({
       onFocus={onFocus}
     />
     {hint && <Text style={styles.hint}>{hint}</Text>}
+    {changeNote && (
+      <View style={styles.changeNoteRow}>
+        <Ionicons name="information-circle" size={12} color={Colors.warning.text} />
+        <Text style={styles.changeNote}>{changeNote}</Text>
+      </View>
+    )}
   </View>
 ));
 TextField.displayName = 'TextField';
@@ -111,5 +123,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textMuted,
     marginTop: 4,
+  },
+  changeNoteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  changeNote: {
+    fontSize: 11,
+    color: Colors.warning.text,
+    fontWeight: '600',
+    flexShrink: 1,
   },
 });

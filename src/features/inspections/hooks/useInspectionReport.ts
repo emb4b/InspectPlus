@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Q } from '@nozbe/watermelondb';
 import { collections } from '../../../db/database';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
@@ -148,7 +148,11 @@ export function useInspectionReport(reportId: string | undefined): UseInspection
   const myRole = role ?? '';
   const ready = !!myUid && !!myProvince;
 
-  const refetch = () => setTick(t => t + 1);
+  // Stable across renders — GeneralInformationView's section components pass
+  // this down as `onSaved` and are React.memo'd, so a new reference here on
+  // every InspectionReportDetailScreen render (e.g. a tab switch) would
+  // otherwise force all of them to re-render regardless of memoization.
+  const refetch = useCallback(() => setTick(t => t + 1), []);
 
   useEffect(() => {
     let cancelled = false;

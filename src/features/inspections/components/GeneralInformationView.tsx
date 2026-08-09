@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
@@ -9,6 +9,7 @@ import { SectionEditActions } from './SectionEditActions';
 import { useEditableSection } from '../hooks/useEditableSection';
 import { SimpleTable } from './ComplianceReadPrimitives';
 import type { EstablishmentSnapshot, PermitSnapshotItem, ProductLineItem } from '../../../services/sync/syncTypes';
+import type { EstablishmentDTO } from '../../establishments/types';
 
 interface GeneralInformationViewProps {
   reportId: string;
@@ -16,6 +17,32 @@ interface GeneralInformationViewProps {
   permits: PermitSnapshotItem[];
   canEdit: boolean;
   onSaved: () => void;
+  // The live establishments row this report points to (via estabId), kept
+  // separate from `snapshot` on purpose — see liveRecordNote below.
+  liveEstablishment: EstablishmentDTO | null;
+  // True while useEstablishment's fetch is still in flight — distinguishes
+  // "haven't resolved it yet" from "resolved to nothing" below, so the
+  // unavailable banner doesn't flash on every screen load.
+  liveEstablishmentLoading: boolean;
+}
+
+// The report's own establishmentSnapshot fields can drift from the live
+// establishments row two ways: someone edits the master record later (from
+// EditEstablishmentScreen), or someone edits this report's copy directly via
+// patchEstablishmentSnapshot below. Neither write path touches the other, so
+// nothing keeps them in sync — this just surfaces the drift rather than
+// resolving or hiding it, per the report acting as a point-in-time record.
+function valuesDiffer(a: string, b: string): boolean {
+  if (a === b) return false;
+  const na = Number(a);
+  const nb = Number(b);
+  if (a !== '' && b !== '' && !Number.isNaN(na) && !Number.isNaN(nb)) return na !== nb;
+  return true;
+}
+
+function liveRecordNote(current: string, live: string | undefined): string | undefined {
+  if (live === undefined || live === '' || !valuesDiffer(current, live)) return undefined;
+  return `Establishment record currently shows: "${live}"`;
 }
 
 const OPERATING_STATUS_OPTIONS = ['Operational', 'Temporarily Close', 'Non-Operational'];
@@ -80,6 +107,25 @@ function toDetailsFields(s: EstablishmentSnapshot): DetailsFields {
   };
 }
 
+function toLiveDetailsFields(e: EstablishmentDTO): DetailsFields {
+  return {
+    name: e.name,
+    formerName: e.formerName ?? '',
+    addressLine: e.addressLine,
+    barangay: e.barangay,
+    city: e.city,
+    province: e.province,
+    geoLat: e.geoLat != null ? String(e.geoLat) : '',
+    geoLng: e.geoLng != null ? String(e.geoLng) : '',
+    natureOfBusiness: e.natureOfBusiness,
+    psicCode: e.psicCode ?? '',
+    operatingStatus: e.operatingStatus,
+    operatingHoursDay: e.operatingHoursDay != null ? String(e.operatingHoursDay) : '',
+    operatingDaysWeek: e.operatingDaysWeek != null ? String(e.operatingDaysWeek) : '',
+    operatingDaysYear: e.operatingDaysYear != null ? String(e.operatingDaysYear) : '',
+  };
+}
+
 function fromDetailsFields(f: DetailsFields): Partial<EstablishmentSnapshot> {
   return {
     name: f.name,
@@ -121,6 +167,17 @@ function toPersonnelFields(s: EstablishmentSnapshot): PersonnelFields {
   };
 }
 
+function toLivePersonnelFields(e: EstablishmentDTO): PersonnelFields {
+  return {
+    ownerName: e.ownerName,
+    managingHeadName: e.managingHeadName,
+    contactPersonName: e.contactPersonName,
+    contactPersonPosition: e.contactPersonPosition,
+    phoneFax: e.phoneFax,
+    email: e.email,
+  };
+}
+
 function fromPersonnelFields(f: PersonnelFields): Partial<EstablishmentSnapshot> {
   return {
     owner_name: f.ownerName,
@@ -145,6 +202,14 @@ function toPcoFields(s: EstablishmentSnapshot): PcoFields {
     pcoName: s.pco_name ?? '',
     pcoAccreditationNo: s.pco_accreditation_no ?? '',
     pcoEffectivity: s.pco_effectivity ?? '',
+  };
+}
+
+function toLivePcoFields(e: EstablishmentDTO): PcoFields {
+  return {
+    pcoName: e.pcoName ?? '',
+    pcoAccreditationNo: e.pcoAccreditationNo ?? '',
+    pcoEffectivity: e.pcoEffectivity ?? '',
   };
 }
 
@@ -184,36 +249,46 @@ const emptyPermit = (): PermitSnapshotItem => ({
   expiry_date: '',
 });
 
-const ReadOnlyPermitCard: React.FC<{ permit: PermitSnapshotItem }> = ({ permit }) => (
-  <View style={styles.permitCard}>
-    <View style={styles.permitCardHeader}>
-      <Ionicons name="document-text-outline" size={13} color={Colors.green} />
-      <Text style={styles.permitCardTitle} numberOfLines={1}>
-        {[permit.envi_law, permit.permit_type].filter(Boolean).join(' — ') || 'Permit'}
-      </Text>
+const ReadOnlyPermitCard = React.memo(function ReadOnlyPermitCard({ permit }: { permit: PermitSnapshotItem }) {
+  return (
+    <View style={styles.permitCard}>
+      <View style={styles.permitCardHeader}>
+        <Ionicons name="document-text-outline" size={13} color={Colors.green} />
+        <Text style={styles.permitCardTitle} numberOfLines={1}>
+          {[permit.envi_law, permit.permit_type].filter(Boolean).join(' — ') || 'Permit'}
+        </Text>
+      </View>
+      <View style={styles.permitRow}>
+        <Text style={styles.permitLabel}>Permit / Serial No.</Text>
+        <Text style={styles.permitValue} numberOfLines={1}>{permit.permit_serial || '—'}</Text>
+      </View>
+      <View style={styles.permitRow}>
+        <Text style={styles.permitLabel}>Date Issued</Text>
+        <Text style={styles.permitValue} numberOfLines={1}>{permit.issued_date || '—'}</Text>
+      </View>
+      <View style={styles.permitRow}>
+        <Text style={styles.permitLabel}>Expiry Date</Text>
+        <Text style={styles.permitValue} numberOfLines={1}>{permit.expiry_date || '—'}</Text>
+      </View>
     </View>
-    <View style={styles.permitRow}>
-      <Text style={styles.permitLabel}>Permit / Serial No.</Text>
-      <Text style={styles.permitValue} numberOfLines={1}>{permit.permit_serial || '—'}</Text>
-    </View>
-    <View style={styles.permitRow}>
-      <Text style={styles.permitLabel}>Date Issued</Text>
-      <Text style={styles.permitValue} numberOfLines={1}>{permit.issued_date || '—'}</Text>
-    </View>
-    <View style={styles.permitRow}>
-      <Text style={styles.permitLabel}>Expiry Date</Text>
-      <Text style={styles.permitValue} numberOfLines={1}>{permit.expiry_date || '—'}</Text>
-    </View>
-  </View>
-);
+  );
+});
 
-const EditablePermitCard: React.FC<{
+interface EditablePermitCardProps {
   index: number;
   permit: PermitSnapshotItem;
   onChange: (next: PermitSnapshotItem) => void;
   onRemove: () => void;
   onFocusField?: (ref: React.RefObject<TextInput | null>) => void;
-}> = ({ index, permit, onChange, onRemove, onFocusField }) => {
+}
+
+const EditablePermitCard = React.memo(function EditablePermitCard({
+  index,
+  permit,
+  onChange,
+  onRemove,
+  onFocusField,
+}: EditablePermitCardProps) {
   const enviLawRef = useRef<TextInput>(null);
   const permitTypeRef = useRef<TextInput>(null);
   const serialRef = useRef<TextInput>(null);
@@ -287,15 +362,31 @@ const EditablePermitCard: React.FC<{
       </View>
     </View>
   );
-};
+});
 
-export const GeneralInformationView: React.FC<GeneralInformationViewProps> = ({
+// ── Section components ───────────────────────────────────────────────────
+// Each section owns its own useEditableSection call and refs, and is wrapped
+// in React.memo — so editing a field in one section (a setDraft call) only
+// re-renders that section, not the other four plus every changeNote diff
+// across the whole form on every keystroke. `snapshot`/`liveDetails` etc.
+// must stay referentially stable across unrelated parent re-renders for the
+// memo to actually pay off — see the useMemo calls in GeneralInformationView.
+
+interface DetailsSectionProps {
+  reportId: string;
+  snapshot: EstablishmentSnapshot;
+  liveDetails: DetailsFields | null;
+  canEdit: boolean;
+  onSaved: () => void;
+}
+
+const DetailsSection = React.memo(function DetailsSection({
   reportId,
   snapshot,
-  permits,
+  liveDetails,
   canEdit,
   onSaved,
-}) => {
+}: DetailsSectionProps) {
   const formerNameRef = useRef<TextInput>(null);
   const addressRef = useRef<TextInput>(null);
   const barangayRef = useRef<TextInput>(null);
@@ -308,13 +399,6 @@ export const GeneralInformationView: React.FC<GeneralInformationViewProps> = ({
   const hoursRef = useRef<TextInput>(null);
   const daysWeekRef = useRef<TextInput>(null);
   const daysYearRef = useRef<TextInput>(null);
-  const ownerRef = useRef<TextInput>(null);
-  const headRef = useRef<TextInput>(null);
-  const contactRef = useRef<TextInput>(null);
-  const contactPositionRef = useRef<TextInput>(null);
-  const phoneRef = useRef<TextInput>(null);
-  const emailRef = useRef<TextInput>(null);
-  const pcoAccredRef = useRef<TextInput>(null);
 
   const details = useEditableSection<DetailsFields>({
     value: toDetailsFields(snapshot),
@@ -324,6 +408,86 @@ export const GeneralInformationView: React.FC<GeneralInformationViewProps> = ({
     },
   });
 
+  return (
+    <FormSection
+      icon="business-outline"
+      title="Establishment Details"
+      headerRight={
+        <SectionEditActions
+          editing={details.editing}
+          saving={details.saving}
+          onStartEdit={details.startEdit}
+          onCancel={details.cancel}
+          onSave={details.save}
+          canEdit={canEdit}
+        />
+      }>
+      <View style={styles.row}>
+        <TextField label="Establishment Name" value={details.draft.name} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, name: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(formerNameRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.name, liveDetails.name) : undefined} />
+      </View>
+      <View style={styles.row}>
+        <TextField ref={formerNameRef} label="Former Establishment Name" value={details.draft.formerName} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, formerName: v }))} placeholder="—" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(addressRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.formerName, liveDetails.formerName) : undefined} />
+      </View>
+      <View style={styles.row}>
+        <TextField ref={addressRef} label="Address" value={details.draft.addressLine} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, addressLine: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(barangayRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.addressLine, liveDetails.addressLine) : undefined} />
+        <TextField ref={barangayRef} label="Barangay" value={details.draft.barangay} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, barangay: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(cityRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.barangay, liveDetails.barangay) : undefined} />
+      </View>
+      <View style={styles.row}>
+        <TextField ref={cityRef} label="City / Municipality" value={details.draft.city} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, city: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(provinceRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.city, liveDetails.city) : undefined} />
+        <TextField ref={provinceRef} label="Province" value={details.draft.province} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, province: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(natureRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.province, liveDetails.province) : undefined} />
+      </View>
+      <View style={styles.row}>
+        <TextField ref={natureRef} label="Nature of Business" value={details.draft.natureOfBusiness} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, natureOfBusiness: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(psicRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.natureOfBusiness, liveDetails.natureOfBusiness) : undefined} />
+        <TextField ref={psicRef} label="PSIC Code" value={details.draft.psicCode} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, psicCode: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(latRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.psicCode, liveDetails.psicCode) : undefined} />
+      </View>
+      <View style={styles.row}>
+        <TextField ref={latRef} label="Latitude" value={details.draft.geoLat} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, geoLat: v }))} keyboardType="numeric" placeholder="e.g. 11.144" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(lngRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.geoLat, liveDetails.geoLat) : undefined} />
+        <TextField ref={lngRef} label="Longitude" value={details.draft.geoLng} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, geoLng: v }))} keyboardType="numeric" placeholder="e.g. 119.395" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(hoursRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.geoLng, liveDetails.geoLng) : undefined} />
+      </View>
+      <View style={styles.row}>
+        {details.editing ? (
+          <SelectField
+            label="Status of Operation"
+            value={details.draft.operatingStatus}
+            options={OPERATING_STATUS_OPTIONS}
+            onSelect={v => details.setDraft(d => ({ ...d, operatingStatus: v }))}
+          />
+        ) : (
+          <TextField label="Status of Operation" value={details.draft.operatingStatus} readOnly changeNote={liveDetails ? liveRecordNote(details.draft.operatingStatus, liveDetails.operatingStatus) : undefined} />
+        )}
+      </View>
+      <View style={styles.row3}>
+        <TextField ref={hoursRef} label="Operating Hours/Day" value={details.draft.operatingHoursDay} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, operatingHoursDay: v }))} keyboardType="numeric" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(daysWeekRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.operatingHoursDay, liveDetails.operatingHoursDay) : undefined} />
+        <TextField ref={daysWeekRef} label="Operating Days/Week" value={details.draft.operatingDaysWeek} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, operatingDaysWeek: v }))} keyboardType="numeric" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(daysYearRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.operatingDaysWeek, liveDetails.operatingDaysWeek) : undefined} />
+        <TextField ref={daysYearRef} label="Operating Days/Year" value={details.draft.operatingDaysYear} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, operatingDaysYear: v }))} keyboardType="numeric" returnKeyType="done" changeNote={liveDetails ? liveRecordNote(details.draft.operatingDaysYear, liveDetails.operatingDaysYear) : undefined} />
+      </View>
+      {details.error && <Text style={styles.errorText}>{details.error}</Text>}
+    </FormSection>
+  );
+});
+
+interface PersonnelSectionProps {
+  reportId: string;
+  snapshot: EstablishmentSnapshot;
+  livePersonnel: PersonnelFields | null;
+  canEdit: boolean;
+  onSaved: () => void;
+}
+
+const PersonnelSection = React.memo(function PersonnelSection({
+  reportId,
+  snapshot,
+  livePersonnel,
+  canEdit,
+  onSaved,
+}: PersonnelSectionProps) {
+  const ownerRef = useRef<TextInput>(null);
+  const headRef = useRef<TextInput>(null);
+  const contactRef = useRef<TextInput>(null);
+  const contactPositionRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+
   const personnel = useEditableSection<PersonnelFields>({
     value: toPersonnelFields(snapshot),
     onSave: async fields => {
@@ -331,6 +495,48 @@ export const GeneralInformationView: React.FC<GeneralInformationViewProps> = ({
       onSaved();
     },
   });
+
+  return (
+    <FormSection
+      icon="person-outline"
+      title="Key Personnel"
+      headerRight={
+        <SectionEditActions
+          editing={personnel.editing}
+          saving={personnel.saving}
+          onStartEdit={personnel.startEdit}
+          onCancel={personnel.cancel}
+          onSave={personnel.save}
+          canEdit={canEdit}
+        />
+      }>
+      <View style={styles.row}>
+        <TextField ref={ownerRef} label="Owner" value={personnel.draft.ownerName} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, ownerName: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(headRef.current)} changeNote={livePersonnel ? liveRecordNote(personnel.draft.ownerName, livePersonnel.ownerName) : undefined} />
+        <TextField ref={headRef} label="Managing Head / Plant Manager" value={personnel.draft.managingHeadName} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, managingHeadName: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(contactRef.current)} changeNote={livePersonnel ? liveRecordNote(personnel.draft.managingHeadName, livePersonnel.managingHeadName) : undefined} />
+      </View>
+      <View style={styles.row}>
+        <TextField ref={contactRef} label="Contact Person" value={personnel.draft.contactPersonName} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, contactPersonName: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(contactPositionRef.current)} changeNote={livePersonnel ? liveRecordNote(personnel.draft.contactPersonName, livePersonnel.contactPersonName) : undefined} />
+        <TextField ref={contactPositionRef} label="Contact Person Position" value={personnel.draft.contactPersonPosition} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, contactPersonPosition: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(phoneRef.current)} changeNote={livePersonnel ? liveRecordNote(personnel.draft.contactPersonPosition, livePersonnel.contactPersonPosition) : undefined} />
+      </View>
+      <View style={styles.row}>
+        <TextField ref={phoneRef} label="Phone / Fax" value={personnel.draft.phoneFax} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, phoneFax: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(emailRef.current)} changeNote={livePersonnel ? liveRecordNote(personnel.draft.phoneFax, livePersonnel.phoneFax) : undefined} />
+        <TextField ref={emailRef} label="Email Address" value={personnel.draft.email} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, email: v }))} keyboardType="email-address" returnKeyType="done" changeNote={livePersonnel ? liveRecordNote(personnel.draft.email, livePersonnel.email) : undefined} />
+      </View>
+      {personnel.error && <Text style={styles.errorText}>{personnel.error}</Text>}
+    </FormSection>
+  );
+});
+
+interface PcoSectionProps {
+  reportId: string;
+  snapshot: EstablishmentSnapshot;
+  livePco: PcoFields | null;
+  canEdit: boolean;
+  onSaved: () => void;
+}
+
+const PcoSection = React.memo(function PcoSection({ reportId, snapshot, livePco, canEdit, onSaved }: PcoSectionProps) {
+  const pcoAccredRef = useRef<TextInput>(null);
 
   const pco = useEditableSection<PcoFields>({
     value: toPcoFields(snapshot),
@@ -340,6 +546,53 @@ export const GeneralInformationView: React.FC<GeneralInformationViewProps> = ({
     },
   });
 
+  return (
+    <FormSection
+      icon="leaf-outline"
+      title="Pollution Control Officer"
+      headerRight={
+        <SectionEditActions
+          editing={pco.editing}
+          saving={pco.saving}
+          onStartEdit={pco.startEdit}
+          onCancel={pco.cancel}
+          onSave={pco.save}
+          canEdit={canEdit}
+        />
+      }>
+      <View style={styles.row}>
+        <TextField label="PCO Full Name" value={pco.draft.pcoName} readOnly={!pco.editing} onChangeText={v => pco.setDraft(d => ({ ...d, pcoName: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(pcoAccredRef.current)} changeNote={livePco ? liveRecordNote(pco.draft.pcoName, livePco.pcoName) : undefined} />
+        <TextField ref={pcoAccredRef} label="PCO Accreditation No." value={pco.draft.pcoAccreditationNo} readOnly={!pco.editing} onChangeText={v => pco.setDraft(d => ({ ...d, pcoAccreditationNo: v }))} returnKeyType="done" changeNote={livePco ? liveRecordNote(pco.draft.pcoAccreditationNo, livePco.pcoAccreditationNo) : undefined} />
+      </View>
+      <View style={styles.row}>
+        {pco.editing ? (
+          <DateField
+            label="PCO Accreditation Effectivity"
+            value={pco.draft.pcoEffectivity}
+            onChange={v => pco.setDraft(d => ({ ...d, pcoEffectivity: v }))}
+          />
+        ) : (
+          <TextField label="PCO Accreditation Effectivity" value={pco.draft.pcoEffectivity || '—'} readOnly changeNote={livePco ? liveRecordNote(pco.draft.pcoEffectivity, livePco.pcoEffectivity) : undefined} />
+        )}
+      </View>
+      {pco.error && <Text style={styles.errorText}>{pco.error}</Text>}
+    </FormSection>
+  );
+});
+
+interface ProductLinesSectionProps {
+  reportId: string;
+  snapshot: EstablishmentSnapshot;
+  canEdit: boolean;
+  onSaved: () => void;
+}
+
+const ProductLinesSection = React.memo(function ProductLinesSection({
+  reportId,
+  snapshot,
+  canEdit,
+  onSaved,
+}: ProductLinesSectionProps) {
   const productLines = useEditableSection<DynamicRow[]>({
     value: toProductLinesFields(snapshot),
     onSave: async rows => {
@@ -348,6 +601,54 @@ export const GeneralInformationView: React.FC<GeneralInformationViewProps> = ({
     },
   });
 
+  return (
+    <FormSection
+      icon="cube-outline"
+      title="Product Lines"
+      headerRight={
+        <SectionEditActions
+          editing={productLines.editing}
+          saving={productLines.saving}
+          onStartEdit={productLines.startEdit}
+          onCancel={productLines.cancel}
+          onSave={productLines.save}
+          canEdit={canEdit}
+        />
+      }>
+      {productLines.editing ? (
+        <DynamicRowTable
+          columns={[
+            { key: 'product_line', label: 'Product Line', width: 160, placeholder: 'e.g. Beer Production' },
+            { key: 'ecc_production_rate', label: 'Declared Rate', width: 100, type: 'number', placeholder: '0' },
+            { key: 'actual_production_rate', label: 'Actual Rate', width: 100, type: 'number', placeholder: '0' },
+          ]}
+          rows={productLines.draft}
+          onChange={rows => productLines.setDraft(rows)}
+          addLabel="+ Add Product Line"
+        />
+      ) : (
+        <SimpleTable
+          columns={[
+            { key: 'product_line', label: 'Product Line' },
+            { key: 'ecc_production_rate', label: 'Declared Rate' },
+            { key: 'actual_production_rate', label: 'Actual Rate' },
+          ]}
+          rows={productLines.draft}
+        />
+      )}
+      {productLines.error && <Text style={styles.errorText}>{productLines.error}</Text>}
+    </FormSection>
+  );
+});
+
+interface PermitsSectionProps {
+  reportId: string;
+  permits: PermitSnapshotItem[];
+  canEdit: boolean;
+  onSaved: () => void;
+}
+
+const PermitsSection = React.memo(function PermitsSection({ reportId, permits, canEdit, onSaved }: PermitsSectionProps) {
   const permitsSection = useEditableSection<PermitSnapshotItem[]>({
     value: permits,
     onSave: async next => {
@@ -367,202 +668,116 @@ export const GeneralInformationView: React.FC<GeneralInformationViewProps> = ({
   const addPermit = () => permitsSection.setDraft([...permitsSection.draft, emptyPermit()]);
 
   return (
+    <FormSection
+      icon="document-outline"
+      title="DENR Permits, Licenses & Clearances"
+      headerRight={
+        <SectionEditActions
+          editing={permitsSection.editing}
+          saving={permitsSection.saving}
+          onStartEdit={permitsSection.startEdit}
+          onCancel={permitsSection.cancel}
+          onSave={permitsSection.save}
+          canEdit={canEdit}
+        />
+      }>
+      {permitsSection.draft.length === 0 && (
+        <Text style={styles.emptyText}>No permits on record for this report.</Text>
+      )}
+      <View style={permitsSection.editing ? undefined : styles.permitList}>
+        {permitsSection.draft.map((permit, i) =>
+          permitsSection.editing ? (
+            <EditablePermitCard
+              key={i}
+              index={i}
+              permit={permit}
+              onChange={next => updatePermitAt(i, next)}
+              onRemove={() => removePermitAt(i)}
+            />
+          ) : (
+            <ReadOnlyPermitCard key={i} permit={permit} />
+          ),
+        )}
+      </View>
+      {permitsSection.editing && (
+        <TouchableOpacity style={styles.addBtn} activeOpacity={0.7} onPress={addPermit}>
+          <Ionicons name="add" size={13} color={Colors.green} />
+          <Text style={styles.addBtnText}>+ Add Permit</Text>
+        </TouchableOpacity>
+      )}
+      {permitsSection.error && <Text style={styles.errorText}>{permitsSection.error}</Text>}
+    </FormSection>
+  );
+});
+
+export const GeneralInformationView: React.FC<GeneralInformationViewProps> = ({
+  reportId,
+  snapshot,
+  permits,
+  canEdit,
+  onSaved,
+  liveEstablishment,
+  liveEstablishmentLoading,
+}) => {
+  // Memoized on `liveEstablishment` alone so these stay referentially stable
+  // across re-renders that don't actually change the live record — otherwise
+  // every section below would re-render on every GeneralInformationView
+  // render regardless of the React.memo wrapping.
+  const liveDetails = useMemo(() => (liveEstablishment ? toLiveDetailsFields(liveEstablishment) : null), [liveEstablishment]);
+  const livePersonnel = useMemo(() => (liveEstablishment ? toLivePersonnelFields(liveEstablishment) : null), [liveEstablishment]);
+  const livePco = useMemo(() => (liveEstablishment ? toLivePcoFields(liveEstablishment) : null), [liveEstablishment]);
+  // Resolved (not loading) but nothing came back — the establishment was
+  // archived, deleted, or fell outside jurisdiction visibility (see
+  // useEstablishment). Distinct from "still loading": that case shows
+  // nothing rather than falsely claiming the record is gone.
+  const liveEstablishmentUnavailable = !liveEstablishmentLoading && !liveEstablishment;
+  const [unavailableBannerDismissed, setUnavailableBannerDismissed] = useState(false);
+
+  return (
     <View>
-      <FormSection
-        icon="business-outline"
-        title="Establishment Details"
-        headerRight={
-          <SectionEditActions
-            editing={details.editing}
-            saving={details.saving}
-            onStartEdit={details.startEdit}
-            onCancel={details.cancel}
-            onSave={details.save}
-            canEdit={canEdit}
-          />
-        }>
-        <View style={styles.row}>
-          <TextField label="Establishment Name" value={details.draft.name} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, name: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(formerNameRef.current)} />
-        </View>
-        <View style={styles.row}>
-          <TextField ref={formerNameRef} label="Former Establishment Name" value={details.draft.formerName} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, formerName: v }))} placeholder="—" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(addressRef.current)} />
-        </View>
-        <View style={styles.row}>
-          <TextField ref={addressRef} label="Address" value={details.draft.addressLine} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, addressLine: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(barangayRef.current)} />
-          <TextField ref={barangayRef} label="Barangay" value={details.draft.barangay} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, barangay: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(cityRef.current)} />
-        </View>
-        <View style={styles.row}>
-          <TextField ref={cityRef} label="City / Municipality" value={details.draft.city} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, city: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(provinceRef.current)} />
-          <TextField ref={provinceRef} label="Province" value={details.draft.province} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, province: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(natureRef.current)} />
-        </View>
-        <View style={styles.row}>
-          <TextField ref={natureRef} label="Nature of Business" value={details.draft.natureOfBusiness} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, natureOfBusiness: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(psicRef.current)} />
-          <TextField ref={psicRef} label="PSIC Code" value={details.draft.psicCode} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, psicCode: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(latRef.current)} />
-        </View>
-        <View style={styles.row}>
-          <TextField ref={latRef} label="Latitude" value={details.draft.geoLat} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, geoLat: v }))} keyboardType="numeric" placeholder="e.g. 11.144" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(lngRef.current)} />
-          <TextField ref={lngRef} label="Longitude" value={details.draft.geoLng} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, geoLng: v }))} keyboardType="numeric" placeholder="e.g. 119.395" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(hoursRef.current)} />
-        </View>
-        <View style={styles.row}>
-          {details.editing ? (
-            <SelectField
-              label="Status of Operation"
-              value={details.draft.operatingStatus}
-              options={OPERATING_STATUS_OPTIONS}
-              onSelect={v => details.setDraft(d => ({ ...d, operatingStatus: v }))}
-            />
-          ) : (
-            <TextField label="Status of Operation" value={details.draft.operatingStatus} readOnly />
-          )}
-        </View>
-        <View style={styles.row3}>
-          <TextField ref={hoursRef} label="Operating Hours/Day" value={details.draft.operatingHoursDay} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, operatingHoursDay: v }))} keyboardType="numeric" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(daysWeekRef.current)} />
-          <TextField ref={daysWeekRef} label="Operating Days/Week" value={details.draft.operatingDaysWeek} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, operatingDaysWeek: v }))} keyboardType="numeric" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(daysYearRef.current)} />
-          <TextField ref={daysYearRef} label="Operating Days/Year" value={details.draft.operatingDaysYear} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, operatingDaysYear: v }))} keyboardType="numeric" returnKeyType="done" />
-        </View>
-        {details.error && <Text style={styles.errorText}>{details.error}</Text>}
-      </FormSection>
-
-      <FormSection
-        icon="person-outline"
-        title="Key Personnel"
-        headerRight={
-          <SectionEditActions
-            editing={personnel.editing}
-            saving={personnel.saving}
-            onStartEdit={personnel.startEdit}
-            onCancel={personnel.cancel}
-            onSave={personnel.save}
-            canEdit={canEdit}
-          />
-        }>
-        <View style={styles.row}>
-          <TextField ref={ownerRef} label="Owner" value={personnel.draft.ownerName} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, ownerName: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(headRef.current)} />
-          <TextField ref={headRef} label="Managing Head / Plant Manager" value={personnel.draft.managingHeadName} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, managingHeadName: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(contactRef.current)} />
-        </View>
-        <View style={styles.row}>
-          <TextField ref={contactRef} label="Contact Person" value={personnel.draft.contactPersonName} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, contactPersonName: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(contactPositionRef.current)} />
-          <TextField ref={contactPositionRef} label="Contact Person Position" value={personnel.draft.contactPersonPosition} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, contactPersonPosition: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(phoneRef.current)} />
-        </View>
-        <View style={styles.row}>
-          <TextField ref={phoneRef} label="Phone / Fax" value={personnel.draft.phoneFax} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, phoneFax: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(emailRef.current)} />
-          <TextField ref={emailRef} label="Email Address" value={personnel.draft.email} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, email: v }))} keyboardType="email-address" returnKeyType="done" />
-        </View>
-        {personnel.error && <Text style={styles.errorText}>{personnel.error}</Text>}
-      </FormSection>
-
-      <FormSection
-        icon="leaf-outline"
-        title="Pollution Control Officer"
-        headerRight={
-          <SectionEditActions
-            editing={pco.editing}
-            saving={pco.saving}
-            onStartEdit={pco.startEdit}
-            onCancel={pco.cancel}
-            onSave={pco.save}
-            canEdit={canEdit}
-          />
-        }>
-        <View style={styles.row}>
-          <TextField label="PCO Full Name" value={pco.draft.pcoName} readOnly={!pco.editing} onChangeText={v => pco.setDraft(d => ({ ...d, pcoName: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(pcoAccredRef.current)} />
-          <TextField ref={pcoAccredRef} label="PCO Accreditation No." value={pco.draft.pcoAccreditationNo} readOnly={!pco.editing} onChangeText={v => pco.setDraft(d => ({ ...d, pcoAccreditationNo: v }))} returnKeyType="done" />
-        </View>
-        <View style={styles.row}>
-          {pco.editing ? (
-            <DateField
-              label="PCO Accreditation Effectivity"
-              value={pco.draft.pcoEffectivity}
-              onChange={v => pco.setDraft(d => ({ ...d, pcoEffectivity: v }))}
-            />
-          ) : (
-            <TextField label="PCO Accreditation Effectivity" value={pco.draft.pcoEffectivity || '—'} readOnly />
-          )}
-        </View>
-        {pco.error && <Text style={styles.errorText}>{pco.error}</Text>}
-      </FormSection>
-
-      <FormSection
-        icon="cube-outline"
-        title="Product Lines"
-        headerRight={
-          <SectionEditActions
-            editing={productLines.editing}
-            saving={productLines.saving}
-            onStartEdit={productLines.startEdit}
-            onCancel={productLines.cancel}
-            onSave={productLines.save}
-            canEdit={canEdit}
-          />
-        }>
-        {productLines.editing ? (
-          <DynamicRowTable
-            columns={[
-              { key: 'product_line', label: 'Product Line', width: 160, placeholder: 'e.g. Beer Production' },
-              { key: 'ecc_production_rate', label: 'Declared Rate', width: 100, type: 'number', placeholder: '0' },
-              { key: 'actual_production_rate', label: 'Actual Rate', width: 100, type: 'number', placeholder: '0' },
-            ]}
-            rows={productLines.draft}
-            onChange={rows => productLines.setDraft(rows)}
-            addLabel="+ Add Product Line"
-          />
-        ) : (
-          <SimpleTable
-            columns={[
-              { key: 'product_line', label: 'Product Line' },
-              { key: 'ecc_production_rate', label: 'Declared Rate' },
-              { key: 'actual_production_rate', label: 'Actual Rate' },
-            ]}
-            rows={productLines.draft}
-          />
-        )}
-        {productLines.error && <Text style={styles.errorText}>{productLines.error}</Text>}
-      </FormSection>
-
-      <FormSection
-        icon="document-outline"
-        title="DENR Permits, Licenses & Clearances"
-        headerRight={
-          <SectionEditActions
-            editing={permitsSection.editing}
-            saving={permitsSection.saving}
-            onStartEdit={permitsSection.startEdit}
-            onCancel={permitsSection.cancel}
-            onSave={permitsSection.save}
-            canEdit={canEdit}
-          />
-        }>
-        {permitsSection.draft.length === 0 && (
-          <Text style={styles.emptyText}>No permits on record for this report.</Text>
-        )}
-        <View style={permitsSection.editing ? undefined : styles.permitList}>
-          {permitsSection.draft.map((permit, i) =>
-            permitsSection.editing ? (
-              <EditablePermitCard
-                key={i}
-                index={i}
-                permit={permit}
-                onChange={next => updatePermitAt(i, next)}
-                onRemove={() => removePermitAt(i)}
-              />
-            ) : (
-              <ReadOnlyPermitCard key={i} permit={permit} />
-            ),
-          )}
-        </View>
-        {permitsSection.editing && (
-          <TouchableOpacity style={styles.addBtn} activeOpacity={0.7} onPress={addPermit}>
-            <Ionicons name="add" size={13} color={Colors.green} />
-            <Text style={styles.addBtnText}>+ Add Permit</Text>
+      {liveEstablishmentUnavailable && !unavailableBannerDismissed && (
+        <View style={styles.unavailableBanner}>
+          <Ionicons name="alert-circle-outline" size={15} color={Colors.warning.text} />
+          <Text style={styles.unavailableBannerText}>
+            Live establishment record unavailable — it may have been archived, deleted, or is outside your
+            jurisdiction. Changes below can't be checked against it right now.
+          </Text>
+          <TouchableOpacity
+            onPress={() => setUnavailableBannerDismissed(true)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}>
+            <Ionicons name="close" size={15} color={Colors.warning.text} />
           </TouchableOpacity>
-        )}
-        {permitsSection.error && <Text style={styles.errorText}>{permitsSection.error}</Text>}
-      </FormSection>
+        </View>
+      )}
+
+      <DetailsSection reportId={reportId} snapshot={snapshot} liveDetails={liveDetails} canEdit={canEdit} onSaved={onSaved} />
+      <PersonnelSection reportId={reportId} snapshot={snapshot} livePersonnel={livePersonnel} canEdit={canEdit} onSaved={onSaved} />
+      <PcoSection reportId={reportId} snapshot={snapshot} livePco={livePco} canEdit={canEdit} onSaved={onSaved} />
+      <ProductLinesSection reportId={reportId} snapshot={snapshot} canEdit={canEdit} onSaved={onSaved} />
+      <PermitsSection reportId={reportId} permits={permits} canEdit={canEdit} onSaved={onSaved} />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  unavailableBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: Colors.warning.bg,
+    borderWidth: 1,
+    borderColor: Colors.warning.border,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 16,
+  },
+  unavailableBannerText: {
+    flex: 1,
+    fontSize: 11.5,
+    color: Colors.warning.text,
+    lineHeight: 16,
+  },
   row: {
     flexDirection: 'row',
     gap: 14,
