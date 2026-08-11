@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
+import { applyTextCase, stripTrailingSpaces, TextCaseMode } from '../../utils/textCase';
 
 interface TextFieldProps {
   label: string;
@@ -26,6 +27,11 @@ interface TextFieldProps {
   numberOfLines?: number;
   keyboardType?: KeyboardTypeOptions;
   style?: object;
+  // Default text-case behavior applied as the user types: 'sentence'
+  // (default) capitalizes the start of each sentence, 'upper' forces
+  // uppercase (establishment name, permit/serial numbers), 'none' leaves
+  // input untouched (emails, and other case-sensitive values).
+  textCase?: TextCaseMode;
   // Keyboard navigation — wired up by callers via refs/useScrollToInput so
   // "next" on the on-screen keyboard advances focus and the focused field
   // scrolls above the keyboard instead of being hidden behind it.
@@ -48,11 +54,22 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(({
   numberOfLines,
   keyboardType,
   style,
+  textCase = 'sentence',
   returnKeyType,
   blurOnSubmit,
   onSubmitEditing,
   onFocus,
-}, ref) => (
+}, ref) => {
+  const handleChangeText = (text: string) => {
+    onChangeText?.(applyTextCase(text, textCase));
+  };
+
+  const handleBlur = () => {
+    const trimmed = stripTrailingSpaces(value);
+    if (trimmed !== value) onChangeText?.(trimmed);
+  };
+
+  return (
   <View style={[styles.group, style]}>
     <Text style={styles.label}>
       {label}
@@ -66,13 +83,15 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(({
         readOnly && styles.inputReadOnly,
       ]}
       value={value}
-      onChangeText={onChangeText}
+      onChangeText={handleChangeText}
+      onBlur={handleBlur}
       placeholder={placeholder}
       placeholderTextColor={Colors.textLight}
       editable={!readOnly}
       multiline={multiline}
       numberOfLines={numberOfLines}
       keyboardType={keyboardType}
+      autoCapitalize={textCase === 'upper' ? 'characters' : textCase === 'none' ? 'none' : 'sentences'}
       returnKeyType={returnKeyType}
       blurOnSubmit={blurOnSubmit}
       onSubmitEditing={onSubmitEditing}
@@ -86,7 +105,8 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(({
       </View>
     )}
   </View>
-));
+  );
+});
 TextField.displayName = 'TextField';
 
 const styles = StyleSheet.create({
@@ -116,7 +136,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.bgMuted,
   },
   inputReadOnly: {
-    backgroundColor: Colors.bgLight,
+    backgroundColor: Colors.bgDisabled,
     color: Colors.textMuted,
   },
   hint: {

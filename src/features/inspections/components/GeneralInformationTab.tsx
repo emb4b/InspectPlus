@@ -10,6 +10,7 @@ import {
   DynamicRowTable,
   focusInput,
 } from '../../../components/form';
+import { PROVINCE_OPTIONS, getCityOptions, getBarangayOptions } from '../../../constants/provinces';
 import type { GeneralInfoFormState } from '../types';
 import type { PermitSnapshotItem } from '../../../services/sync/syncTypes';
 
@@ -77,6 +78,7 @@ const PermitCard: React.FC<{
           label="Permit / Serial No."
           value={permit.permit_serial}
           onChangeText={permit_serial => onChange({ ...permit, permit_serial })}
+          textCase="upper"
           placeholder="Enter permit number"
           returnKeyType="done"
           onFocus={() => onFocusField?.(serialRef)}
@@ -109,9 +111,6 @@ export const GeneralInformationTab: React.FC<GeneralInformationTabProps> = ({
   // before it hands off straight to the field after.
   const formerNameRef = useRef<TextInput>(null);
   const addressRef = useRef<TextInput>(null);
-  const barangayRef = useRef<TextInput>(null);
-  const cityRef = useRef<TextInput>(null);
-  const provinceRef = useRef<TextInput>(null);
   const natureRef = useRef<TextInput>(null);
   const psicRef = useRef<TextInput>(null);
   const latRef = useRef<TextInput>(null);
@@ -150,6 +149,7 @@ export const GeneralInformationTab: React.FC<GeneralInformationTabProps> = ({
             label="Establishment Name"
             value={value.name}
             onChangeText={name => onChange({ ...value, name })}
+            textCase="upper"
             required
             readOnly
             hint="Pre-filled from the establishment master record"
@@ -171,6 +171,7 @@ export const GeneralInformationTab: React.FC<GeneralInformationTabProps> = ({
               label="Former Establishment Name"
               value={value.formerName}
               onChangeText={formerName => onChange({ ...value, formerName })}
+              textCase="upper"
               returnKeyType="next"
               blurOnSubmit={false}
               onSubmitEditing={() => focusInput(addressRef.current)}
@@ -184,46 +185,40 @@ export const GeneralInformationTab: React.FC<GeneralInformationTabProps> = ({
             label="Address"
             value={value.addressLine}
             onChangeText={addressLine => onChange({ ...value, addressLine })}
-            required
-            returnKeyType="next"
-            blurOnSubmit={false}
-            onSubmitEditing={() => focusInput(barangayRef.current)}
-
-          />
-          <TextField
-            ref={barangayRef}
-            label="Barangay"
-            value={value.barangay}
-            onChangeText={barangay => onChange({ ...value, barangay })}
-            required
-            returnKeyType="next"
-            blurOnSubmit={false}
-            onSubmitEditing={() => focusInput(cityRef.current)}
-
-          />
-        </View>
-        <View style={styles.row}>
-          <TextField
-            ref={cityRef}
-            label="City / Municipality"
-            value={value.city}
-            onChangeText={city => onChange({ ...value, city })}
-            required
-            returnKeyType="next"
-            blurOnSubmit={false}
-            onSubmitEditing={() => focusInput(provinceRef.current)}
-
-          />
-          <TextField
-            ref={provinceRef}
-            label="Province"
-            value={value.province}
-            onChangeText={province => onChange({ ...value, province })}
-            required
+            placeholder="Street / building / lot no. (if known)"
             returnKeyType="next"
             blurOnSubmit={false}
             onSubmitEditing={() => focusInput(natureRef.current)}
 
+          />
+        </View>
+        <View style={styles.row}>
+          <SelectField
+            label="Province"
+            value={value.province}
+            options={PROVINCE_OPTIONS}
+            onSelect={province => onChange({ ...value, province, city: '', barangay: '' })}
+            required
+          />
+          <SelectField
+            label="City / Municipality"
+            value={value.city}
+            options={getCityOptions(value.province)}
+            onSelect={city => onChange({ ...value, city, barangay: '' })}
+            placeholder={value.province ? 'Select…' : 'Select province first'}
+            disabled={!value.province}
+            required
+          />
+        </View>
+        <View style={styles.row}>
+          <SelectField
+            label="Barangay"
+            value={value.barangay}
+            options={getBarangayOptions(value.province, value.city)}
+            onSelect={barangay => onChange({ ...value, barangay })}
+            placeholder={value.city ? 'Select…' : 'Select city/municipality first'}
+            disabled={!value.city}
+            required
           />
         </View>
         <View style={styles.row}>
@@ -390,6 +385,7 @@ export const GeneralInformationTab: React.FC<GeneralInformationTabProps> = ({
             label="Email Address"
             value={value.email}
             onChangeText={email => onChange({ ...value, email })}
+            textCase="none"
             keyboardType="email-address"
             required
             returnKeyType="next"

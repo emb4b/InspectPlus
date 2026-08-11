@@ -19,6 +19,9 @@ interface SelectFieldProps {
   onSelect: (value: string) => void;
   placeholder?: string;
   required?: boolean;
+  // Locks the picker closed — for cascading selects (e.g. City depends on
+  // Province) where there's nothing valid to choose yet.
+  disabled?: boolean;
   style?: object;
 }
 
@@ -29,6 +32,7 @@ export const SelectField: React.FC<SelectFieldProps> = ({
   onSelect,
   placeholder = 'Select…',
   required,
+  disabled,
   style,
 }) => {
   const [open, setOpen] = useState(false);
@@ -46,8 +50,9 @@ export const SelectField: React.FC<SelectFieldProps> = ({
         {required && <Text style={styles.req}> *</Text>}
       </Text>
       <TouchableOpacity
-        style={styles.input}
-        activeOpacity={0.7}
+        style={[styles.input, disabled && styles.inputDisabled]}
+        activeOpacity={disabled ? 1 : 0.7}
+        disabled={disabled}
         onPress={() => {
           // Dismiss first so this Modal's window doesn't open while the
           // keyboard is still transitioning — on Android, two native
@@ -151,6 +156,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textLight,
     flex: 1,
+  },
+  inputDisabled: {
+    backgroundColor: Colors.bgDisabled,
   },
   overlay: {
     flex: 1,

@@ -18,6 +18,7 @@ import { Colors } from '../../../constants/colors';
 import { database } from '../../../db/database';
 import { useEstablishment } from '../hooks/useEstablishment';
 import { FormSection, TextField, SelectField, DateField, DynamicRowTable, focusInput } from '../../../components/form';
+import { PROVINCE_OPTIONS, getCityOptions, getBarangayOptions } from '../../../constants/provinces';
 import { updateEstablishmentRecord } from '../../inspections/establishmentPersistence';
 import { notifySyncDataChanged } from '../../../services/sync/syncEvents';
 import { buildEditFormFromEstablishment, EditEstablishmentFormState } from '../editEstablishmentForm';
@@ -47,9 +48,6 @@ export const EditEstablishmentScreen: React.FC<EditEstablishmentScreenProps> = (
   const scrollRef = useRef<ScrollView>(null);
   const formerNameRef = useRef<TextInput>(null);
   const addressRef = useRef<TextInput>(null);
-  const barangayRef = useRef<TextInput>(null);
-  const cityRef = useRef<TextInput>(null);
-  const provinceRef = useRef<TextInput>(null);
   const natureRef = useRef<TextInput>(null);
   const psicRef = useRef<TextInput>(null);
   const productRef = useRef<TextInput>(null);
@@ -72,12 +70,11 @@ export const EditEstablishmentScreen: React.FC<EditEstablishmentScreenProps> = (
     if (!form) return;
     if (
       !form.name.trim() ||
-      !form.addressLine.trim() ||
       !form.barangay.trim() ||
       !form.city.trim() ||
       !form.province.trim()
     ) {
-      Alert.alert('Missing information', 'Establishment Name, Address, Barangay, City, and Province are required.');
+      Alert.alert('Missing information', 'Establishment Name, Barangay, City, and Province are required.');
       return;
     }
 
@@ -200,6 +197,7 @@ export const EditEstablishmentScreen: React.FC<EditEstablishmentScreenProps> = (
               label="Establishment Name"
               value={form.name}
               onChangeText={name => setForm({ ...form, name })}
+              textCase="upper"
               required
               returnKeyType="next"
               blurOnSubmit={false}
@@ -224,6 +222,7 @@ export const EditEstablishmentScreen: React.FC<EditEstablishmentScreenProps> = (
                 label="Former Establishment Name"
                 value={form.formerName}
                 onChangeText={formerName => setForm({ ...form, formerName })}
+                textCase="upper"
                 returnKeyType="next"
                 blurOnSubmit={false}
                 onSubmitEditing={() => focusInput(addressRef.current)}
@@ -236,42 +235,39 @@ export const EditEstablishmentScreen: React.FC<EditEstablishmentScreenProps> = (
               label="Address"
               value={form.addressLine}
               onChangeText={addressLine => setForm({ ...form, addressLine })}
-              required
-              returnKeyType="next"
-              blurOnSubmit={false}
-              onSubmitEditing={() => focusInput(barangayRef.current)}
-            />
-            <TextField
-              ref={barangayRef}
-              label="Barangay"
-              value={form.barangay}
-              onChangeText={barangay => setForm({ ...form, barangay })}
-              required
-              returnKeyType="next"
-              blurOnSubmit={false}
-              onSubmitEditing={() => focusInput(cityRef.current)}
-            />
-          </View>
-          <View style={styles.row}>
-            <TextField
-              ref={cityRef}
-              label="City / Municipality"
-              value={form.city}
-              onChangeText={city => setForm({ ...form, city })}
-              required
-              returnKeyType="next"
-              blurOnSubmit={false}
-              onSubmitEditing={() => focusInput(provinceRef.current)}
-            />
-            <TextField
-              ref={provinceRef}
-              label="Province"
-              value={form.province}
-              onChangeText={province => setForm({ ...form, province })}
-              required
+              placeholder="Street / building / lot no. (if known)"
               returnKeyType="next"
               blurOnSubmit={false}
               onSubmitEditing={() => focusInput(natureRef.current)}
+            />
+          </View>
+          <View style={styles.row}>
+            <SelectField
+              label="Province"
+              value={form.province}
+              options={PROVINCE_OPTIONS}
+              onSelect={province => setForm({ ...form, province, city: '', barangay: '' })}
+              required
+            />
+            <SelectField
+              label="City / Municipality"
+              value={form.city}
+              options={getCityOptions(form.province)}
+              onSelect={city => setForm({ ...form, city, barangay: '' })}
+              placeholder={form.province ? 'Select…' : 'Select province first'}
+              disabled={!form.province}
+              required
+            />
+          </View>
+          <View style={styles.row}>
+            <SelectField
+              label="Barangay"
+              value={form.barangay}
+              options={getBarangayOptions(form.province, form.city)}
+              onSelect={barangay => setForm({ ...form, barangay })}
+              placeholder={form.city ? 'Select…' : 'Select city/municipality first'}
+              disabled={!form.city}
+              required
             />
           </View>
           <View style={styles.row}>
@@ -442,6 +438,7 @@ export const EditEstablishmentScreen: React.FC<EditEstablishmentScreenProps> = (
               label="Email"
               value={form.email}
               onChangeText={email => setForm({ ...form, email })}
+              textCase="none"
               keyboardType="email-address"
               returnKeyType="done"
             />

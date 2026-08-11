@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { database, collections } from '../../../db/database';
 import { FormSection, TextField, focusInput } from '../../../components/form';
+import { toSentenceCaseText, stripTrailingSpaces } from '../../../utils/textCase';
 import { SectionEditActions } from './SectionEditActions';
 import { useEditableSection } from '../hooks/useEditableSection';
 import type { PurposeFormState, VerifyInfoRowState, CommitmentRowState } from '../types';
@@ -137,7 +138,8 @@ const VerifyInfoSection: React.FC<{
               ref={el => { remarksRefs.current[i] = el; }}
               style={styles.remarksInput}
               value={row.remarks}
-              onChangeText={remarks => setRow(i, { remarks })}
+              onChangeText={remarks => setRow(i, { remarks: toSentenceCaseText(remarks) })}
+              onBlur={() => setRow(i, { remarks: stripTrailingSpaces(row.remarks) })}
               placeholder="Remarks"
               placeholderTextColor={Colors.textLight}
               returnKeyType="next"
@@ -295,7 +297,8 @@ const CommitmentSection: React.FC<{
                   ref={el => { remarksRefs.current[i] = el; }}
                   style={styles.remarksInput}
                   value={row.remarks}
-                  onChangeText={remarks => setRow(i, { remarks })}
+                  onChangeText={remarks => setRow(i, { remarks: toSentenceCaseText(remarks) })}
+                  onBlur={() => setRow(i, { remarks: stripTrailingSpaces(row.remarks) })}
                   placeholder="Remarks"
                   placeholderTextColor={Colors.textLight}
                   returnKeyType="next"

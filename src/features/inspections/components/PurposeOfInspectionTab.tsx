@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import { View, Text, TextInput, Keyboard, StyleSheet } from 'react-native';
 import { Colors } from '../../../constants/colors';
 import { FormSection, TextField, CheckboxRow, focusInput } from '../../../components/form';
+import { toSentenceCaseText, stripTrailingSpaces } from '../../../utils/textCase';
 import type { PurposeFormState } from '../types';
 
 interface PurposeOfInspectionTabProps {
@@ -83,7 +84,8 @@ export const PurposeOfInspectionTab: React.FC<PurposeOfInspectionTabProps> = ({
                 ref={el => { verifyRefs.current[i] = el; }}
                 style={styles.remarksInput}
                 value={row.remarks}
-                onChangeText={remarks => setVerifyRow(i, { remarks })}
+                onChangeText={remarks => setVerifyRow(i, { remarks: toSentenceCaseText(remarks) })}
+                onBlur={() => setVerifyRow(i, { remarks: stripTrailingSpaces(row.remarks) })}
                 placeholder="Remarks"
                 placeholderTextColor={Colors.textLight}
                 returnKeyType="next"
@@ -127,7 +129,8 @@ export const PurposeOfInspectionTab: React.FC<PurposeOfInspectionTabProps> = ({
                 ref={el => { commitmentRefs.current[i] = el; }}
                 style={styles.remarksInput}
                 value={row.remarks}
-                onChangeText={remarks => setCommitmentRow(i, { remarks })}
+                onChangeText={remarks => setCommitmentRow(i, { remarks: toSentenceCaseText(remarks) })}
+                onBlur={() => setCommitmentRow(i, { remarks: stripTrailingSpaces(row.remarks) })}
                 placeholder="Remarks"
                 placeholderTextColor={Colors.textLight}
                 returnKeyType="next"

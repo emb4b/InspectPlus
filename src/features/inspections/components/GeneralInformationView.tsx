@@ -5,6 +5,7 @@ import { Colors } from '../../../constants/colors';
 import { database, collections } from '../../../db/database';
 import { FormSection, TextField, SelectField, DateField, DynamicRowTable, focusInput } from '../../../components/form';
 import type { DynamicRow } from '../../../components/form';
+import { PROVINCE_OPTIONS, getCityOptions, getBarangayOptions } from '../../../constants/provinces';
 import { SectionEditActions } from './SectionEditActions';
 import { useEditableSection } from '../hooks/useEditableSection';
 import { SimpleTable } from './ComplianceReadPrimitives';
@@ -333,6 +334,7 @@ const EditablePermitCard = React.memo(function EditablePermitCard({
           label="Permit / Serial No."
           value={permit.permit_serial}
           onChangeText={permit_serial => onChange({ ...permit, permit_serial })}
+          textCase="upper"
           placeholder="Enter permit number"
           returnKeyType="next"
           blurOnSubmit={false}
@@ -389,9 +391,6 @@ const DetailsSection = React.memo(function DetailsSection({
 }: DetailsSectionProps) {
   const formerNameRef = useRef<TextInput>(null);
   const addressRef = useRef<TextInput>(null);
-  const barangayRef = useRef<TextInput>(null);
-  const cityRef = useRef<TextInput>(null);
-  const provinceRef = useRef<TextInput>(null);
   const natureRef = useRef<TextInput>(null);
   const psicRef = useRef<TextInput>(null);
   const latRef = useRef<TextInput>(null);
@@ -423,18 +422,54 @@ const DetailsSection = React.memo(function DetailsSection({
         />
       }>
       <View style={styles.row}>
-        <TextField label="Establishment Name" value={details.draft.name} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, name: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(formerNameRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.name, liveDetails.name) : undefined} />
+        <TextField label="Establishment Name" value={details.draft.name} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, name: v }))} textCase="upper" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(formerNameRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.name, liveDetails.name) : undefined} />
       </View>
       <View style={styles.row}>
-        <TextField ref={formerNameRef} label="Former Establishment Name" value={details.draft.formerName} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, formerName: v }))} placeholder="—" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(addressRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.formerName, liveDetails.formerName) : undefined} />
+        <TextField ref={formerNameRef} label="Former Establishment Name" value={details.draft.formerName} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, formerName: v }))} textCase="upper" placeholder="—" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(addressRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.formerName, liveDetails.formerName) : undefined} />
       </View>
       <View style={styles.row}>
-        <TextField ref={addressRef} label="Address" value={details.draft.addressLine} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, addressLine: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(barangayRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.addressLine, liveDetails.addressLine) : undefined} />
-        <TextField ref={barangayRef} label="Barangay" value={details.draft.barangay} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, barangay: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(cityRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.barangay, liveDetails.barangay) : undefined} />
+        <TextField ref={addressRef} label="Address" value={details.draft.addressLine} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, addressLine: v }))} placeholder="Street / building / lot no. (if known)" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(natureRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.addressLine, liveDetails.addressLine) : undefined} />
       </View>
       <View style={styles.row}>
-        <TextField ref={cityRef} label="City / Municipality" value={details.draft.city} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, city: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(provinceRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.city, liveDetails.city) : undefined} />
-        <TextField ref={provinceRef} label="Province" value={details.draft.province} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, province: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(natureRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.province, liveDetails.province) : undefined} />
+        {details.editing ? (
+          <SelectField
+            label="Province"
+            value={details.draft.province}
+            options={PROVINCE_OPTIONS}
+            onSelect={v => details.setDraft(d => ({ ...d, province: v, city: '', barangay: '' }))}
+            required
+          />
+        ) : (
+          <TextField label="Province" value={details.draft.province} readOnly changeNote={liveDetails ? liveRecordNote(details.draft.province, liveDetails.province) : undefined} />
+        )}
+        {details.editing ? (
+          <SelectField
+            label="City / Municipality"
+            value={details.draft.city}
+            options={getCityOptions(details.draft.province)}
+            onSelect={v => details.setDraft(d => ({ ...d, city: v, barangay: '' }))}
+            placeholder={details.draft.province ? 'Select…' : 'Select province first'}
+            disabled={!details.draft.province}
+            required
+          />
+        ) : (
+          <TextField label="City / Municipality" value={details.draft.city} readOnly changeNote={liveDetails ? liveRecordNote(details.draft.city, liveDetails.city) : undefined} />
+        )}
+      </View>
+      <View style={styles.row}>
+        {details.editing ? (
+          <SelectField
+            label="Barangay"
+            value={details.draft.barangay}
+            options={getBarangayOptions(details.draft.province, details.draft.city)}
+            onSelect={v => details.setDraft(d => ({ ...d, barangay: v }))}
+            placeholder={details.draft.city ? 'Select…' : 'Select city/municipality first'}
+            disabled={!details.draft.city}
+            required
+          />
+        ) : (
+          <TextField label="Barangay" value={details.draft.barangay} readOnly changeNote={liveDetails ? liveRecordNote(details.draft.barangay, liveDetails.barangay) : undefined} />
+        )}
       </View>
       <View style={styles.row}>
         <TextField ref={natureRef} label="Nature of Business" value={details.draft.natureOfBusiness} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, natureOfBusiness: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(psicRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.natureOfBusiness, liveDetails.natureOfBusiness) : undefined} />
@@ -520,7 +555,7 @@ const PersonnelSection = React.memo(function PersonnelSection({
       </View>
       <View style={styles.row}>
         <TextField ref={phoneRef} label="Phone / Fax" value={personnel.draft.phoneFax} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, phoneFax: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(emailRef.current)} changeNote={livePersonnel ? liveRecordNote(personnel.draft.phoneFax, livePersonnel.phoneFax) : undefined} />
-        <TextField ref={emailRef} label="Email Address" value={personnel.draft.email} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, email: v }))} keyboardType="email-address" returnKeyType="done" changeNote={livePersonnel ? liveRecordNote(personnel.draft.email, livePersonnel.email) : undefined} />
+        <TextField ref={emailRef} label="Email Address" value={personnel.draft.email} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, email: v }))} textCase="none" keyboardType="email-address" returnKeyType="done" changeNote={livePersonnel ? liveRecordNote(personnel.draft.email, livePersonnel.email) : undefined} />
       </View>
       {personnel.error && <Text style={styles.errorText}>{personnel.error}</Text>}
     </FormSection>

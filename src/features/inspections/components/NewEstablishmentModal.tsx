@@ -14,7 +14,7 @@ import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
-import { PROVINCE_OPTIONS } from '../../../constants/provinces';
+import { PROVINCE_OPTIONS, getCityOptions, getBarangayOptions } from '../../../constants/provinces';
 import { TextField, SelectField, DateField, RadioGroup, useScrollToInput, focusInput } from '../../../components/form';
 import { emptyGeneralInfoForm, GeneralInfoFormState } from '../types';
 
@@ -57,8 +57,6 @@ export const NewEstablishmentModal: React.FC<NewEstablishmentModalProps> = ({
   const scrollRef = useRef<ScrollView>(null);
   const scrollToInput = useScrollToInput(scrollRef);
   const addressRef = useRef<TextInput>(null);
-  const barangayRef = useRef<TextInput>(null);
-  const cityRef = useRef<TextInput>(null);
   const latRef = useRef<TextInput>(null);
   const lngRef = useRef<TextInput>(null);
   const natureRef = useRef<TextInput>(null);
@@ -90,7 +88,6 @@ export const NewEstablishmentModal: React.FC<NewEstablishmentModalProps> = ({
 
   const canSubmit =
     form.name.trim() &&
-    form.addressLine.trim() &&
     form.barangay.trim() &&
     form.city.trim() &&
     form.province.trim() &&
@@ -155,6 +152,7 @@ export const NewEstablishmentModal: React.FC<NewEstablishmentModalProps> = ({
               label="Establishment Name"
               value={form.name}
               onChangeText={name => setForm({ ...form, name })}
+              textCase="upper"
               required
               placeholder="Enter establishment or company name"
               returnKeyType="next"
@@ -167,42 +165,39 @@ export const NewEstablishmentModal: React.FC<NewEstablishmentModalProps> = ({
                 label="Address Line"
                 value={form.addressLine}
                 onChangeText={addressLine => setForm({ ...form, addressLine })}
-                required
-                placeholder="Street / building / lot no."
-                returnKeyType="next"
-                blurOnSubmit={false}
-                onSubmitEditing={() => focusInput(barangayRef.current)}
-                onFocus={() => scrollToInput(addressRef)}
-              />
-              <TextField
-                ref={barangayRef}
-                label="Barangay"
-                value={form.barangay}
-                onChangeText={barangay => setForm({ ...form, barangay })}
-                required
-                returnKeyType="next"
-                blurOnSubmit={false}
-                onSubmitEditing={() => focusInput(cityRef.current)}
-                onFocus={() => scrollToInput(barangayRef)}
-              />
-            </View>
-            <View style={styles.row}>
-              <TextField
-                ref={cityRef}
-                label="City / Municipality"
-                value={form.city}
-                onChangeText={city => setForm({ ...form, city })}
-                required
+                placeholder="Street / building / lot no. (if known)"
                 returnKeyType="next"
                 blurOnSubmit={false}
                 onSubmitEditing={() => focusInput(latRef.current)}
-                onFocus={() => scrollToInput(cityRef)}
+                onFocus={() => scrollToInput(addressRef)}
               />
+            </View>
+            <View style={styles.row}>
               <SelectField
                 label="Province"
                 value={form.province}
                 options={PROVINCE_OPTIONS}
-                onSelect={province => setForm({ ...form, province })}
+                onSelect={province => setForm({ ...form, province, city: '', barangay: '' })}
+                required
+              />
+              <SelectField
+                label="City / Municipality"
+                value={form.city}
+                options={getCityOptions(form.province)}
+                onSelect={city => setForm({ ...form, city, barangay: '' })}
+                placeholder={form.province ? 'Select…' : 'Select province first'}
+                disabled={!form.province}
+                required
+              />
+            </View>
+            <View style={styles.row}>
+              <SelectField
+                label="Barangay"
+                value={form.barangay}
+                options={getBarangayOptions(form.province, form.city)}
+                onSelect={barangay => setForm({ ...form, barangay })}
+                placeholder={form.city ? 'Select…' : 'Select city/municipality first'}
+                disabled={!form.city}
                 required
               />
             </View>

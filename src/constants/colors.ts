@@ -9,7 +9,11 @@ export const Colors = {
   // Backgrounds
   white: '#ffffff',
   bgLight: '#f3f4f6',
-  bgMuted: '#f8fafc', 
+  bgMuted: '#f8fafc',
+  // Non-fillable fields (readOnly TextField, disabled SelectField) — darker
+  // than bgLight so locked inputs read as clearly inactive next to bgMuted's
+  // near-white fillable fields, rather than blending together.
+  bgDisabled: '#e5e7eb',
 
   // Text
   textPrimary: '#0f172a',
