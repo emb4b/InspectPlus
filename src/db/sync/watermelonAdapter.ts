@@ -178,6 +178,29 @@ export const watermelonEntityAdapter: LocalEntitySyncAdapter = {
   softDeleteMany,
 };
 
+// ── User-switch reset ───────────────────────────────────────────────────────
+
+// Deletes only rows already confirmed synced to the server (syncState ===
+// 'synced', set explicitly by upsertMany/softDeleteMany/markLocalChangesAsSynced
+// above) across every table. Rows in any other state — pending_create,
+// pending_update, pending_delete, or never explicitly marked (local-only
+// drafts) — are left untouched. Used by ensureSyncScopedToUser in
+// syncOrchestrator.ts to force a correctly-scoped full re-pull on a detected
+// user switch without destroying not-yet-synced local work.
+export async function clearSyncedRecords(): Promise<void> {
+  const entities = Object.keys(syncSchema) as SyncEntityName[];
+
+  await database.write(async () => {
+    for (const entity of entities) {
+      const records = await collectionFor(entity)
+        .query(Q.where('syncState', 'synced'))
+        .fetch();
+
+      await Promise.all(records.map(record => record.destroyPermanently()));
+    }
+  });
+}
+
 // ── Post-push bookkeeping ───────────────────────────────────────────────────
 
 // Flips the local records that were just successfully pushed back to

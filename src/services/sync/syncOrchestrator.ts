@@ -1,4 +1,4 @@
-import { database } from '../../db/database';
+import { clearSyncedRecords } from '../../db/sync/watermelonAdapter';
 import { checkOnline } from '../../utils/network';
 import { syncClient } from './syncClient';
 import { RunSyncResult } from './syncService';
@@ -15,26 +15,29 @@ import { notifySyncDataChanged } from './syncEvents';
 // inspector logs into the same device, their pull is scoped differently —
 // an incremental pull would silently skip anything outside the previous
 // user's jurisdiction whose updated_at is older than the watermark, even
-// though the new user is allowed to see it. Wiping local data and the
-// watermark on a detected user switch forces a full, correctly-scoped
-// re-pull, and also keeps the outgoing user's data from lingering on a
-// shared/multi-inspector device.
+// though the new user is allowed to see it. Clearing the already-synced
+// local cache and the watermark on a detected user switch forces a full,
+// correctly-scoped re-pull, and also keeps the outgoing user's synced data
+// from lingering on a shared/multi-inspector device.
 //
-// Developer logins are exempt: a Developer's RLS visibility is a superset
-// of any inspector's (read-all, plus write-all on establishments/reports/
-// purpose records — see the supabase migrations granting the Developer
-// role), so an incremental pull under a wider scope never has the
-// under-scoping problem this wipe exists to prevent. Skipping it also
-// means a Developer signing into a shared device to check on another
-// inspector's work no longer destroys that inspector's still-unsynced
-// local changes — see the incident that prompted this: switching to a Dev
-// login wiped an inspector's pending-create establishment before it ever
-// reached the server.
-export async function ensureSyncScopedToUser(userId: string, role?: string | null): Promise<void> {
+// Only rows already confirmed synced are cleared (see clearSyncedRecords) —
+// anything still pending_create/pending_update/pending_delete, from *any*
+// account, survives every switch untouched until it actually reaches the
+// server. This used to be a full database.unsafeResetDatabase(), gated by
+// an incoming-role check (skip on Developer login, since a Developer's RLS
+// visibility is a superset of any inspector's and never under-scopes). That
+// destroyed not-yet-synced local work on every switch it didn't skip (see
+// the incident that prompted this: switching to a Dev login then back to
+// the original inspector wiped that inspector's pending-create
+// establishment before it ever reached the server — the role check only
+// guarded the inbound Developer login, not the switch back). Since the
+// clear is no longer destructive to unsynced rows, the role check is no
+// longer needed for correctness.
+export async function ensureSyncScopedToUser(userId: string): Promise<void> {
   const lastUserId = await getLastSyncedUserId();
 
-  if (lastUserId && lastUserId !== userId && role !== 'Developer') {
-    await database.write(() => database.unsafeResetDatabase());
+  if (lastUserId && lastUserId !== userId) {
+    await clearSyncedRecords();
     await resetSyncMetadata();
   }
 
@@ -45,12 +48,12 @@ export async function ensureSyncScopedToUser(userId: string, role?: string | nul
 // button, and any future automatic trigger) so the user-switch check above
 // always runs first and every trigger notifies listeners the same way.
 // Returns null without syncing if the device is offline.
-export async function runManagedSync(userId: string, role?: string | null): Promise<RunSyncResult | null> {
+export async function runManagedSync(userId: string): Promise<RunSyncResult | null> {
   if (!(await checkOnline())) {
     return null;
   }
 
-  await ensureSyncScopedToUser(userId, role);
+  await ensureSyncScopedToUser(userId);
 
   try {
     return await syncClient.runFullSync();

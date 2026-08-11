@@ -31,7 +31,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
   collapsed,
   disableCollapse = false,
 }) => {
-  const { session, signOut, role } = useAuthContext();
+  const { session, signOut } = useAuthContext();
   const [syncing, setSyncing] = useState(false);
   const uid = (session as { user?: { id?: string } } | null)?.user?.id;
 
@@ -42,7 +42,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
     if (syncing || !uid) return;
     setSyncing(true);
     try {
-      const result = await runManagedSync(uid, role);
+      const result = await runManagedSync(uid);
       if (!result) {
         Alert.alert('Sync skipped', 'No internet connection right now.');
         return;

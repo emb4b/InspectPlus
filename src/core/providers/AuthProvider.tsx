@@ -223,7 +223,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         // syncOrchestrator.ts.
         const uid = (result.session as { user?: { id?: string } }).user?.id;
         if (uid) {
-          runManagedSync(uid, result.role).catch(err => {
+          runManagedSync(uid).catch(err => {
             console.warn('[AuthProvider] Post-login sync failed:', err);
           });
         }
