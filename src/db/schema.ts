@@ -25,7 +25,7 @@ import { appSchema, tableSchema } from '@nozbe/watermelondb';
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const schema = appSchema({
-  version: 8,
+  version: 9,
   tables: [
 
     // ── ESTABLISHMENTS ───────────────────────────────────────────────────────
@@ -50,6 +50,10 @@ export const schema = appSchema({
         { name: 'operatingHoursDay',           type: 'number', isOptional: true },
         { name: 'operatingDaysWeek',           type: 'number', isOptional: true },
         { name: 'operatingDaysYear',           type: 'number', isOptional: true },
+        // Only meaningful when operatingStatus isn't 'Operational' — the
+        // date (mm-dd-yyyy / mm-yyyy / yyyy, kept as free text) the
+        // establishment became closed/non-operational. See flexibleDate.ts.
+        { name: 'operatingStatusSince',        type: 'string', isOptional: true },
         { name: 'productLines',                type: 'string', isOptional: true },
         { name: 'ownerName',                   type: 'string' },
         { name: 'managingHeadName',            type: 'string' },

@@ -78,23 +78,29 @@ export const EstablishmentInfoSections: React.FC<EstablishmentInfoSectionsProps>
         <View style={styles.row}>
           <TextField label="Status of Operation" value={establishment.operatingStatus || '—'} readOnly />
         </View>
-        <View style={styles.row3}>
-          <TextField
-            label="Operating Hours/Day"
-            value={establishment.operatingHoursDay != null ? String(establishment.operatingHoursDay) : '—'}
-            readOnly
-          />
-          <TextField
-            label="Operating Days/Week"
-            value={establishment.operatingDaysWeek != null ? String(establishment.operatingDaysWeek) : '—'}
-            readOnly
-          />
-          <TextField
-            label="Operating Days/Year"
-            value={establishment.operatingDaysYear != null ? String(establishment.operatingDaysYear) : '—'}
-            readOnly
-          />
-        </View>
+        {establishment.operatingStatus !== 'Operational' ? (
+          <View style={styles.row}>
+            <TextField label="Closed / Non-Operational Since" value={establishment.operatingStatusSince || '—'} readOnly />
+          </View>
+        ) : (
+          <View style={styles.row3}>
+            <TextField
+              label="Operating Hours/Day"
+              value={establishment.operatingHoursDay != null ? String(establishment.operatingHoursDay) : '—'}
+              readOnly
+            />
+            <TextField
+              label="Operating Days/Week"
+              value={establishment.operatingDaysWeek != null ? String(establishment.operatingDaysWeek) : '—'}
+              readOnly
+            />
+            <TextField
+              label="Operating Days/Year"
+              value={establishment.operatingDaysYear != null ? String(establishment.operatingDaysYear) : '—'}
+              readOnly
+            />
+          </View>
+        )}
       </FormSection>
 
       <FormSection icon="person-outline" title="Key Personnel">

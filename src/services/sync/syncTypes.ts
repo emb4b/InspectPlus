@@ -83,6 +83,10 @@ export interface EstablishmentSnapshot {
   operating_hours_day: number | null;
   operating_days_week: number | null;
   operating_days_year: number | null;
+  // Only meaningful when operating_status isn't 'Operational' — see
+  // src/utils/flexibleDate.ts for the mm-dd-yyyy / mm-yyyy / yyyy formats
+  // this free-text field accepts.
+  operating_status_since: string | null;
   owner_name: string;
   managing_head_name: string;
   pco_name: string | null;
@@ -144,6 +148,7 @@ export interface EstablishmentDTO {
   operating_hours_day?: number | null;
   operating_days_week?: number | null;
   operating_days_year?: number | null;
+  operating_status_since?: string | null;
   product_lines?: ProductLineItem[];
   owner_name: string;
   managing_head_name: string;

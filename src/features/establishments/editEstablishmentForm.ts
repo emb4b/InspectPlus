@@ -22,6 +22,7 @@ export interface EditEstablishmentFormState {
   operatingHoursDay: string;
   operatingDaysWeek: string;
   operatingDaysYear: string;
+  operatingStatusSince: string;
   ownerName: string;
   managingHeadName: string;
   pcoName: string;
@@ -51,6 +52,7 @@ export function buildEditFormFromEstablishment(estab: EstablishmentDTO): EditEst
     operatingHoursDay: estab.operatingHoursDay != null ? String(estab.operatingHoursDay) : '',
     operatingDaysWeek: estab.operatingDaysWeek != null ? String(estab.operatingDaysWeek) : '',
     operatingDaysYear: estab.operatingDaysYear != null ? String(estab.operatingDaysYear) : '',
+    operatingStatusSince: estab.operatingStatusSince ?? '',
     ownerName: estab.ownerName,
     managingHeadName: estab.managingHeadName,
     pcoName: estab.pcoName ?? '',

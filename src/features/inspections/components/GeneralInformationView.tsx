@@ -6,6 +6,7 @@ import { database, collections } from '../../../db/database';
 import { FormSection, TextField, SelectField, DateField, DynamicRowTable, focusInput } from '../../../components/form';
 import type { DynamicRow } from '../../../components/form';
 import { PROVINCE_OPTIONS, getCityOptions, getBarangayOptions } from '../../../constants/provinces';
+import { maskFlexibleDate, isValidFlexibleDate, FLEXIBLE_DATE_HINT, FLEXIBLE_DATE_INVALID_HINT } from '../../../utils/flexibleDate';
 import { SectionEditActions } from './SectionEditActions';
 import { useEditableSection } from '../hooks/useEditableSection';
 import { SimpleTable } from './ComplianceReadPrimitives';
@@ -87,6 +88,7 @@ interface DetailsFields {
   operatingHoursDay: string;
   operatingDaysWeek: string;
   operatingDaysYear: string;
+  operatingStatusSince: string;
 }
 
 function toDetailsFields(s: EstablishmentSnapshot): DetailsFields {
@@ -105,6 +107,7 @@ function toDetailsFields(s: EstablishmentSnapshot): DetailsFields {
     operatingHoursDay: s.operating_hours_day != null ? String(s.operating_hours_day) : '',
     operatingDaysWeek: s.operating_days_week != null ? String(s.operating_days_week) : '',
     operatingDaysYear: s.operating_days_year != null ? String(s.operating_days_year) : '',
+    operatingStatusSince: s.operating_status_since ?? '',
   };
 }
 
@@ -124,6 +127,7 @@ function toLiveDetailsFields(e: EstablishmentDTO): DetailsFields {
     operatingHoursDay: e.operatingHoursDay != null ? String(e.operatingHoursDay) : '',
     operatingDaysWeek: e.operatingDaysWeek != null ? String(e.operatingDaysWeek) : '',
     operatingDaysYear: e.operatingDaysYear != null ? String(e.operatingDaysYear) : '',
+    operatingStatusSince: e.operatingStatusSince ?? '',
   };
 }
 
@@ -143,6 +147,7 @@ function fromDetailsFields(f: DetailsFields): Partial<EstablishmentSnapshot> {
     operating_hours_day: f.operatingHoursDay ? Number(f.operatingHoursDay) : null,
     operating_days_week: f.operatingDaysWeek ? Number(f.operatingDaysWeek) : null,
     operating_days_year: f.operatingDaysYear ? Number(f.operatingDaysYear) : null,
+    operating_status_since: f.operatingStatusSince || null,
   };
 }
 
@@ -398,6 +403,7 @@ const DetailsSection = React.memo(function DetailsSection({
   const hoursRef = useRef<TextInput>(null);
   const daysWeekRef = useRef<TextInput>(null);
   const daysYearRef = useRef<TextInput>(null);
+  const sinceRef = useRef<TextInput>(null);
 
   const details = useEditableSection<DetailsFields>({
     value: toDetailsFields(snapshot),
@@ -406,6 +412,8 @@ const DetailsSection = React.memo(function DetailsSection({
       onSaved();
     },
   });
+
+  const isNonOperational = details.draft.operatingStatus !== 'Operational';
 
   return (
     <FormSection
@@ -477,7 +485,7 @@ const DetailsSection = React.memo(function DetailsSection({
       </View>
       <View style={styles.row}>
         <TextField ref={latRef} label="Latitude" value={details.draft.geoLat} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, geoLat: v }))} keyboardType="numeric" placeholder="e.g. 11.144" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(lngRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.geoLat, liveDetails.geoLat) : undefined} />
-        <TextField ref={lngRef} label="Longitude" value={details.draft.geoLng} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, geoLng: v }))} keyboardType="numeric" placeholder="e.g. 119.395" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(hoursRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.geoLng, liveDetails.geoLng) : undefined} />
+        <TextField ref={lngRef} label="Longitude" value={details.draft.geoLng} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, geoLng: v }))} keyboardType="numeric" placeholder="e.g. 119.395" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(isNonOperational ? sinceRef.current : hoursRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.geoLng, liveDetails.geoLng) : undefined} />
       </View>
       <View style={styles.row}>
         {details.editing ? (
@@ -491,11 +499,29 @@ const DetailsSection = React.memo(function DetailsSection({
           <TextField label="Status of Operation" value={details.draft.operatingStatus} readOnly changeNote={liveDetails ? liveRecordNote(details.draft.operatingStatus, liveDetails.operatingStatus) : undefined} />
         )}
       </View>
-      <View style={styles.row3}>
-        <TextField ref={hoursRef} label="Operating Hours/Day" value={details.draft.operatingHoursDay} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, operatingHoursDay: v }))} keyboardType="numeric" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(daysWeekRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.operatingHoursDay, liveDetails.operatingHoursDay) : undefined} />
-        <TextField ref={daysWeekRef} label="Operating Days/Week" value={details.draft.operatingDaysWeek} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, operatingDaysWeek: v }))} keyboardType="numeric" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(daysYearRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.operatingDaysWeek, liveDetails.operatingDaysWeek) : undefined} />
-        <TextField ref={daysYearRef} label="Operating Days/Year" value={details.draft.operatingDaysYear} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, operatingDaysYear: v }))} keyboardType="numeric" returnKeyType="done" changeNote={liveDetails ? liveRecordNote(details.draft.operatingDaysYear, liveDetails.operatingDaysYear) : undefined} />
-      </View>
+      {isNonOperational ? (
+        <View style={styles.row}>
+          <TextField
+            ref={sinceRef}
+            label="Closed / Non-Operational Since"
+            value={details.draft.operatingStatusSince}
+            readOnly={!details.editing}
+            onChangeText={raw => details.setDraft(d => ({ ...d, operatingStatusSince: maskFlexibleDate(raw) }))}
+            textCase="none"
+            placeholder="mm-dd-yyyy, mm-yyyy, or yyyy"
+            hint={details.editing ? (isValidFlexibleDate(details.draft.operatingStatusSince) ? FLEXIBLE_DATE_HINT : FLEXIBLE_DATE_INVALID_HINT) : undefined}
+            keyboardType="numbers-and-punctuation"
+            returnKeyType="done"
+            changeNote={liveDetails ? liveRecordNote(details.draft.operatingStatusSince, liveDetails.operatingStatusSince) : undefined}
+          />
+        </View>
+      ) : (
+        <View style={styles.row3}>
+          <TextField ref={hoursRef} label="Operating Hours/Day" value={details.draft.operatingHoursDay} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, operatingHoursDay: v }))} keyboardType="numeric" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(daysWeekRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.operatingHoursDay, liveDetails.operatingHoursDay) : undefined} />
+          <TextField ref={daysWeekRef} label="Operating Days/Week" value={details.draft.operatingDaysWeek} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, operatingDaysWeek: v }))} keyboardType="numeric" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(daysYearRef.current)} changeNote={liveDetails ? liveRecordNote(details.draft.operatingDaysWeek, liveDetails.operatingDaysWeek) : undefined} />
+          <TextField ref={daysYearRef} label="Operating Days/Year" value={details.draft.operatingDaysYear} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, operatingDaysYear: v }))} keyboardType="numeric" returnKeyType="done" changeNote={liveDetails ? liveRecordNote(details.draft.operatingDaysYear, liveDetails.operatingDaysYear) : undefined} />
+        </View>
+      )}
       {details.error && <Text style={styles.errorText}>{details.error}</Text>}
     </FormSection>
   );

@@ -32,6 +32,11 @@ import { schemaMigrations, addColumns, unsafeExecuteSql } from '@nozbe/watermelo
 // lastSyncedSnapshot alongside 'synced', a 'synced' establishment with no
 // snapshot is unreachable via current code and is a reliable signature of
 // that earlier bug — reset it to 'pending_create' too.
+//
+// v8 -> v9: establishments gains operatingStatusSince — the date (kept as
+// free text; see flexibleDate.ts) an establishment became closed/non-
+// operational, shown in place of the operating hours/days fields once
+// operatingStatus isn't 'Operational'.
 export const migrations = schemaMigrations({
   migrations: [
     {
@@ -76,6 +81,15 @@ export const migrations = schemaMigrations({
         unsafeExecuteSql(
           `UPDATE inspection_reports SET syncState = 'pending_create' WHERE syncState = 'pending';`
         ),
+      ],
+    },
+    {
+      toVersion: 9,
+      steps: [
+        addColumns({
+          table: 'establishments',
+          columns: [{ name: 'operatingStatusSince', type: 'string', isOptional: true }],
+        }),
       ],
     },
   ],

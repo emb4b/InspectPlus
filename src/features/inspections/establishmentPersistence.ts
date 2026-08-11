@@ -35,6 +35,7 @@ export const ESTABLISHMENT_CONTENT_FIELDS = [
   'name', 'formerName', 'addressLine', 'barangay', 'city', 'province',
   'geoLat', 'geoLng', 'natureOfBusiness', 'psicCode', 'product', 'yearEstablished',
   'operatingStatus', 'operatingHoursDay', 'operatingDaysWeek', 'operatingDaysYear',
+  'operatingStatusSince',
   'productLines', 'ownerName', 'managingHeadName', 'pcoName', 'pcoAccreditationNo',
   'pcoEffectivity', 'phoneFax', 'email', 'contactPersonName', 'contactPersonPosition',
   'denrPermits',
@@ -149,6 +150,7 @@ export async function createEstablishmentRecord({
     rec.operatingHoursDay = generalInfo.operatingHoursDay ? Number(generalInfo.operatingHoursDay) : null;
     rec.operatingDaysWeek = generalInfo.operatingDaysWeek ? Number(generalInfo.operatingDaysWeek) : null;
     rec.operatingDaysYear = generalInfo.operatingDaysYear ? Number(generalInfo.operatingDaysYear) : null;
+    rec.operatingStatusSince = generalInfo.operatingStatusSince || null;
     rec.ownerName = generalInfo.ownerName;
     rec.managingHeadName = generalInfo.managingHeadName;
     rec.contactPersonName = generalInfo.contactPersonName;
@@ -206,6 +208,7 @@ export async function updateEstablishmentRecord({ estabId, form }: UpdateEstabli
     operatingHoursDay: form.operatingHoursDay ? Number(form.operatingHoursDay) : null,
     operatingDaysWeek: form.operatingDaysWeek ? Number(form.operatingDaysWeek) : null,
     operatingDaysYear: form.operatingDaysYear ? Number(form.operatingDaysYear) : null,
+    operatingStatusSince: form.operatingStatusSince || null,
     ownerName: form.ownerName,
     managingHeadName: form.managingHeadName,
     contactPersonName: form.contactPersonName,

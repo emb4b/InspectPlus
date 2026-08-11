@@ -19,6 +19,7 @@ import { database } from '../../../db/database';
 import { useEstablishment } from '../hooks/useEstablishment';
 import { FormSection, TextField, SelectField, DateField, DynamicRowTable, focusInput } from '../../../components/form';
 import { PROVINCE_OPTIONS, getCityOptions, getBarangayOptions } from '../../../constants/provinces';
+import { maskFlexibleDate, isValidFlexibleDate, FLEXIBLE_DATE_HINT, FLEXIBLE_DATE_INVALID_HINT } from '../../../utils/flexibleDate';
 import { updateEstablishmentRecord } from '../../inspections/establishmentPersistence';
 import { notifySyncDataChanged } from '../../../services/sync/syncEvents';
 import { buildEditFormFromEstablishment, EditEstablishmentFormState } from '../editEstablishmentForm';
@@ -55,6 +56,7 @@ export const EditEstablishmentScreen: React.FC<EditEstablishmentScreenProps> = (
   const hoursRef = useRef<TextInput>(null);
   const daysWeekRef = useRef<TextInput>(null);
   const daysYearRef = useRef<TextInput>(null);
+  const sinceRef = useRef<TextInput>(null);
   const ownerRef = useRef<TextInput>(null);
   const headRef = useRef<TextInput>(null);
   const pcoNameRef = useRef<TextInput>(null);
@@ -152,6 +154,7 @@ export const EditEstablishmentScreen: React.FC<EditEstablishmentScreenProps> = (
   }
 
   const location = [form.addressLine, form.city, form.province].filter(Boolean).join(', ');
+  const isNonOperational = form.operatingStatus !== 'Operational';
 
   return (
     <View style={styles.flex}>
@@ -308,7 +311,7 @@ export const EditEstablishmentScreen: React.FC<EditEstablishmentScreenProps> = (
               keyboardType="numeric"
               returnKeyType="next"
               blurOnSubmit={false}
-              onSubmitEditing={() => focusInput(hoursRef.current)}
+              onSubmitEditing={() => focusInput(isNonOperational ? sinceRef.current : hoursRef.current)}
             />
           </View>
           <View style={styles.row}>
@@ -321,38 +324,56 @@ export const EditEstablishmentScreen: React.FC<EditEstablishmentScreenProps> = (
               }
             />
           </View>
-          <View style={styles.row}>
-            <TextField
-              ref={hoursRef}
-              label="Hours / Day"
-              value={form.operatingHoursDay}
-              onChangeText={operatingHoursDay => setForm({ ...form, operatingHoursDay })}
-              keyboardType="numeric"
-              returnKeyType="next"
-              blurOnSubmit={false}
-              onSubmitEditing={() => focusInput(daysWeekRef.current)}
-            />
-            <TextField
-              ref={daysWeekRef}
-              label="Days / Week"
-              value={form.operatingDaysWeek}
-              onChangeText={operatingDaysWeek => setForm({ ...form, operatingDaysWeek })}
-              keyboardType="numeric"
-              returnKeyType="next"
-              blurOnSubmit={false}
-              onSubmitEditing={() => focusInput(daysYearRef.current)}
-            />
-            <TextField
-              ref={daysYearRef}
-              label="Days / Year"
-              value={form.operatingDaysYear}
-              onChangeText={operatingDaysYear => setForm({ ...form, operatingDaysYear })}
-              keyboardType="numeric"
-              returnKeyType="next"
-              blurOnSubmit={false}
-              onSubmitEditing={() => focusInput(ownerRef.current)}
-            />
-          </View>
+          {isNonOperational ? (
+            <View style={styles.row}>
+              <TextField
+                ref={sinceRef}
+                label="Closed / Non-Operational Since"
+                value={form.operatingStatusSince}
+                onChangeText={raw => setForm({ ...form, operatingStatusSince: maskFlexibleDate(raw) })}
+                textCase="none"
+                placeholder="mm-dd-yyyy, mm-yyyy, or yyyy"
+                hint={isValidFlexibleDate(form.operatingStatusSince) ? FLEXIBLE_DATE_HINT : FLEXIBLE_DATE_INVALID_HINT}
+                keyboardType="numbers-and-punctuation"
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={() => focusInput(ownerRef.current)}
+              />
+            </View>
+          ) : (
+            <View style={styles.row}>
+              <TextField
+                ref={hoursRef}
+                label="Hours / Day"
+                value={form.operatingHoursDay}
+                onChangeText={operatingHoursDay => setForm({ ...form, operatingHoursDay })}
+                keyboardType="numeric"
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={() => focusInput(daysWeekRef.current)}
+              />
+              <TextField
+                ref={daysWeekRef}
+                label="Days / Week"
+                value={form.operatingDaysWeek}
+                onChangeText={operatingDaysWeek => setForm({ ...form, operatingDaysWeek })}
+                keyboardType="numeric"
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={() => focusInput(daysYearRef.current)}
+              />
+              <TextField
+                ref={daysYearRef}
+                label="Days / Year"
+                value={form.operatingDaysYear}
+                onChangeText={operatingDaysYear => setForm({ ...form, operatingDaysYear })}
+                keyboardType="numeric"
+                returnKeyType="next"
+                blurOnSubmit={false}
+                onSubmitEditing={() => focusInput(ownerRef.current)}
+              />
+            </View>
+          )}
         </FormSection>
 
         <FormSection icon="person-outline" title="Key Personnel">

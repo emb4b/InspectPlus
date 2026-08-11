@@ -49,11 +49,21 @@ export function isEstablishmentVisible(
 // Resolves the signed-in user's own uid/province/role for the visibility
 // check above. Empty until auth finishes loading — callers should treat
 // "no province yet" as "show nothing" rather than "show everything", since
-// an empty check would otherwise fail open.
+// an empty check would otherwise fail open. Administrator/Developer accounts
+// never have a province (they bypass province scoping entirely — see
+// isPrivilegedRole above and auth.ts's CRED_ROLE_KEY comment), so requiring
+// one for them would fail closed permanently instead of just until auth
+// resolves.
 function useJurisdiction(): { myUid: string; myProvince: string; myRole: string; ready: boolean } {
   const { session, province, role } = useAuthContext();
   const myUid = (session as { user?: { id?: string } } | null)?.user?.id ?? '';
-  return { myUid, myProvince: province ?? '', myRole: role ?? '', ready: !!myUid && !!province };
+  const myRole = role ?? '';
+  return {
+    myUid,
+    myProvince: province ?? '',
+    myRole,
+    ready: !!myUid && (isPrivilegedRole(myRole) || !!province),
+  };
 }
 
 // ── Report type → compliance tag mapping ──────────────────────────────────────
@@ -140,6 +150,7 @@ async function modelToDTO(model: Establishment): Promise<EstablishmentDTO> {
     operatingHoursDay:      model.operatingHoursDay,
     operatingDaysWeek:      model.operatingDaysWeek,
     operatingDaysYear:      model.operatingDaysYear,
+    operatingStatusSince:   model.operatingStatusSince,
     productLines:           model.productLines ?? [],
     ownerName:              model.ownerName,
     managingHeadName:       model.managingHeadName,

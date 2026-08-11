@@ -57,6 +57,7 @@ export interface EstablishmentDTO {
   operatingHoursDay: number | null;
   operatingDaysWeek: number | null;
   operatingDaysYear: number | null;
+  operatingStatusSince: string | null;
   productLines: ProductLineItem[];
   ownerName: string;
   managingHeadName: string;

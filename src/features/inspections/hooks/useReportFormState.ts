@@ -121,6 +121,7 @@ export function useReportFormState({
               operatingHoursDay: generalInfo.operatingHoursDay ? Number(generalInfo.operatingHoursDay) : null,
               operatingDaysWeek: generalInfo.operatingDaysWeek ? Number(generalInfo.operatingDaysWeek) : null,
               operatingDaysYear: generalInfo.operatingDaysYear ? Number(generalInfo.operatingDaysYear) : null,
+              operatingStatusSince: generalInfo.operatingStatusSince || null,
               ownerName: generalInfo.ownerName,
               managingHeadName: generalInfo.managingHeadName,
               contactPersonName: generalInfo.contactPersonName,

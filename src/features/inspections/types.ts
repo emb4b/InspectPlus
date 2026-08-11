@@ -26,6 +26,7 @@ export interface GeneralInfoFormState {
   operatingHoursDay: string;
   operatingDaysWeek: string;
   operatingDaysYear: string;
+  operatingStatusSince: string;
   ownerName: string;
   managingHeadName: string;
   contactPersonName: string;
@@ -99,6 +100,7 @@ export function emptyGeneralInfoForm(): GeneralInfoFormState {
     operatingHoursDay: '',
     operatingDaysWeek: '',
     operatingDaysYear: '',
+    operatingStatusSince: '',
     ownerName: '',
     managingHeadName: '',
     contactPersonName: '',
@@ -131,6 +133,7 @@ export function buildGeneralInfoFromEstablishment(estab: EstablishmentDTO): Gene
     operatingHoursDay: estab.operatingHoursDay != null ? String(estab.operatingHoursDay) : '',
     operatingDaysWeek: estab.operatingDaysWeek != null ? String(estab.operatingDaysWeek) : '',
     operatingDaysYear: estab.operatingDaysYear != null ? String(estab.operatingDaysYear) : '',
+    operatingStatusSince: estab.operatingStatusSince ?? '',
     ownerName: estab.ownerName,
     managingHeadName: estab.managingHeadName,
     contactPersonName: estab.contactPersonName,
@@ -168,6 +171,7 @@ export function buildEstablishmentSnapshot(g: GeneralInfoFormState, estabId: str
     operating_hours_day: g.operatingHoursDay ? Number(g.operatingHoursDay) : null,
     operating_days_week: g.operatingDaysWeek ? Number(g.operatingDaysWeek) : null,
     operating_days_year: g.operatingDaysYear ? Number(g.operatingDaysYear) : null,
+    operating_status_since: g.operatingStatusSince || null,
     owner_name: g.ownerName,
     managing_head_name: g.managingHeadName,
     pco_name: g.pcoName || null,

@@ -49,6 +49,7 @@ export const syncSchema: Record<SyncEntityName, SyncEntitySchema> = {
       operating_hours_day:     'operatingHoursDay',
       operating_days_week:     'operatingDaysWeek',
       operating_days_year:     'operatingDaysYear',
+      operating_status_since:  'operatingStatusSince',
       product_lines:           'productLines',
       owner_name:              'ownerName',
       managing_head_name:      'managingHeadName',

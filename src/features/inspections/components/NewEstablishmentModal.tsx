@@ -15,6 +15,7 @@ import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { PROVINCE_OPTIONS, getCityOptions, getBarangayOptions } from '../../../constants/provinces';
+import { maskFlexibleDate, isValidFlexibleDate, FLEXIBLE_DATE_HINT, FLEXIBLE_DATE_INVALID_HINT } from '../../../utils/flexibleDate';
 import { TextField, SelectField, DateField, RadioGroup, useScrollToInput, focusInput } from '../../../components/form';
 import { emptyGeneralInfoForm, GeneralInfoFormState } from '../types';
 
@@ -65,6 +66,8 @@ export const NewEstablishmentModal: React.FC<NewEstablishmentModalProps> = ({
   const hoursRef = useRef<TextInput>(null);
   const daysWeekRef = useRef<TextInput>(null);
   const daysYearRef = useRef<TextInput>(null);
+  const sinceRef = useRef<TextInput>(null);
+  const isNonOperational = form.operatingStatus !== 'Operational';
 
   useEffect(() => {
     if (!visible) {
@@ -256,7 +259,7 @@ export const NewEstablishmentModal: React.FC<NewEstablishmentModalProps> = ({
               required
               returnKeyType="next"
               blurOnSubmit={false}
-              onSubmitEditing={() => focusInput(hoursRef.current)}
+              onSubmitEditing={() => focusInput(isNonOperational ? sinceRef.current : hoursRef.current)}
               onFocus={() => scrollToInput(inspectionDateRef)}
             />
             <RadioGroup
@@ -266,39 +269,54 @@ export const NewEstablishmentModal: React.FC<NewEstablishmentModalProps> = ({
               onChange={operatingStatus => setForm({ ...form, operatingStatus })}
               required
             />
-            <View style={styles.row3}>
+            {isNonOperational ? (
               <TextField
-                ref={hoursRef}
-                label="Operating Hours/Day"
-                value={form.operatingHoursDay}
-                onChangeText={operatingHoursDay => setForm({ ...form, operatingHoursDay })}
-                keyboardType="numeric"
-                returnKeyType="next"
-                blurOnSubmit={false}
-                onSubmitEditing={() => focusInput(daysWeekRef.current)}
-                onFocus={() => scrollToInput(hoursRef)}
-              />
-              <TextField
-                ref={daysWeekRef}
-                label="Operating Days/Week"
-                value={form.operatingDaysWeek}
-                onChangeText={operatingDaysWeek => setForm({ ...form, operatingDaysWeek })}
-                keyboardType="numeric"
-                returnKeyType="next"
-                blurOnSubmit={false}
-                onSubmitEditing={() => focusInput(daysYearRef.current)}
-                onFocus={() => scrollToInput(daysWeekRef)}
-              />
-              <TextField
-                ref={daysYearRef}
-                label="Operating Days/Year"
-                value={form.operatingDaysYear}
-                onChangeText={operatingDaysYear => setForm({ ...form, operatingDaysYear })}
-                keyboardType="numeric"
+                ref={sinceRef}
+                label="Closed / Non-Operational Since"
+                value={form.operatingStatusSince}
+                onChangeText={raw => setForm({ ...form, operatingStatusSince: maskFlexibleDate(raw) })}
+                textCase="none"
+                placeholder="mm-dd-yyyy, mm-yyyy, or yyyy"
+                hint={isValidFlexibleDate(form.operatingStatusSince) ? FLEXIBLE_DATE_HINT : FLEXIBLE_DATE_INVALID_HINT}
+                keyboardType="numbers-and-punctuation"
                 returnKeyType="done"
-                onFocus={() => scrollToInput(daysYearRef)}
+                onFocus={() => scrollToInput(sinceRef)}
               />
-            </View>
+            ) : (
+              <View style={styles.row3}>
+                <TextField
+                  ref={hoursRef}
+                  label="Operating Hours/Day"
+                  value={form.operatingHoursDay}
+                  onChangeText={operatingHoursDay => setForm({ ...form, operatingHoursDay })}
+                  keyboardType="numeric"
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => focusInput(daysWeekRef.current)}
+                  onFocus={() => scrollToInput(hoursRef)}
+                />
+                <TextField
+                  ref={daysWeekRef}
+                  label="Operating Days/Week"
+                  value={form.operatingDaysWeek}
+                  onChangeText={operatingDaysWeek => setForm({ ...form, operatingDaysWeek })}
+                  keyboardType="numeric"
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => focusInput(daysYearRef.current)}
+                  onFocus={() => scrollToInput(daysWeekRef)}
+                />
+                <TextField
+                  ref={daysYearRef}
+                  label="Operating Days/Year"
+                  value={form.operatingDaysYear}
+                  onChangeText={operatingDaysYear => setForm({ ...form, operatingDaysYear })}
+                  keyboardType="numeric"
+                  returnKeyType="done"
+                  onFocus={() => scrollToInput(daysYearRef)}
+                />
+              </View>
+            )}
             <Text style={styles.hint}>
               Key personnel, PCO details, and DENR permits can be filled in on the General
               Information tab after this report is created.

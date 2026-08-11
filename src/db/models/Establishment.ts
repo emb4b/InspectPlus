@@ -25,6 +25,7 @@ export class Establishment extends Model {
   @field('operatingHoursDay')     operatingHoursDay!: number | null;
   @field('operatingDaysWeek')     operatingDaysWeek!: number | null;
   @field('operatingDaysYear')     operatingDaysYear!: number | null;
+  @field('operatingStatusSince')  operatingStatusSince!: string | null;
   @json('productLines', asArray)  productLines!: ProductLineItem[];
   @field('ownerName')             ownerName!: string;
   @field('managingHeadName')      managingHeadName!: string;
