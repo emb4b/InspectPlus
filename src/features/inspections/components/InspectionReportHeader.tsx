@@ -72,12 +72,9 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
   const IconAsset = typeMeta.iconAsset;
   const isSubmitted = reportStatus === 'submitted';
 
-  // collapsed is now mapped directly and continuously from scroll position
-  // (see InspectionReportDetailScreen's handleScroll) rather than from
-  // HeaderScrollContext's threshold-triggered, separately-timed animation —
-  // so, like HomeHeader, this can just read it straight through. There's no
-  // discrete state to jump between and nothing to smooth: collapsed always
-  // exactly matches the current scroll offset.
+  // collapsed is HeaderScrollContext's own animated 0..1 value (a single,
+  // bounded transition per threshold crossing — see HeaderScrollContext) —
+  // this can just read it straight through, same as HomeHeader.
   const progress = useDerivedValue(() => (collapsed ? collapsed.value : 0), [collapsed]);
 
   // The collapsing blocks below need their own natural (expanded) height as

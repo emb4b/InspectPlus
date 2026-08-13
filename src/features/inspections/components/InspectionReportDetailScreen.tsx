@@ -34,14 +34,11 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
   // drifted apart instead of the two silently going out of sync.
   const { establishment: liveEstablishment, loading: liveEstablishmentLoading } = useEstablishment(report?.estabId);
   const scrollRef = useRef<ScrollView>(null);
-  // Same threshold-triggered snap onScroll every other screen uses (see
-  // HeaderScrollContext) — the card fully collapses or expands once a scroll
-  // gesture crosses its distance threshold, rather than tracking scroll
-  // position continuously. Trade-off: unlike the previous continuous version,
-  // the swipe that crosses the threshold also keeps scrolling the form
-  // content underneath at the same time, since content offset moves with the
-  // finger immediately while the header's snap animation runs on its own
-  // fixed timer.
+  // Same onScroll every other screen uses (see HeaderScrollContext) — the
+  // card fully collapses or expands once scroll crosses one of two fixed
+  // offset thresholds, animated as a single bounded transition rather than
+  // tracked continuously (continuous per-frame updates forced a layout pass
+  // on every scroll frame, which was expensive enough to drop frames).
   const { collapsed, onScroll } = useHeaderScroll();
   const { session, role } = useAuthContext();
   const currentUid = (session as { user?: { id?: string } } | null)?.user?.id ?? '';
