@@ -214,10 +214,20 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
         return (
           <FormSection title="A. Type of Wastewater Treatment System">
             <RadioGroup label="Has WWTP?" options={YES_NO} value={value.hasWwtp} onChange={v => set('hasWwtp', v as 'yes' | 'no')} />
+            {value.hasWwtp === 'no' && (
+              <Text style={styles.emptyText}>Subsections B-E will be marked as not applicable.</Text>
+            )}
           </FormSection>
         );
 
       case 'wwtpType':
+        if (value.hasWwtp === 'no') {
+          return (
+            <FormSection title="B. Type of WWTP">
+              <Text style={styles.emptyText}>No WWTP on record for this establishment — this doesn't apply.</Text>
+            </FormSection>
+          );
+        }
         return (
           <FormSection title="B. Type of WWTP">
             <SelectField label="WWTP Type" value={value.wwtpType} options={WWTP_TYPE_OPTIONS} onSelect={v => set('wwtpType', v)} />
@@ -225,6 +235,13 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
         );
 
       case 'wwtpDetails':
+        if (value.hasWwtp === 'no') {
+          return (
+            <FormSection title="C. WWTP Details">
+              <Text style={styles.emptyText}>No WWTP on record for this establishment — this doesn't apply.</Text>
+            </FormSection>
+          );
+        }
         return (
           <FormSection title="C. WWTP Details">
             <Text style={styles.subTitle}>WWTP Details (per outlet)</Text>
@@ -336,6 +353,13 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
         );
 
       case 'wwtpComponents':
+        if (value.hasWwtp === 'no') {
+          return (
+            <FormSection title="D. Components of the WWTP">
+              <Text style={styles.emptyText}>No WWTP on record for this establishment — this doesn't apply.</Text>
+            </FormSection>
+          );
+        }
         return (
           <FormSection title="D. Components of the WWTP">
             <Text style={styles.subTitle}>WWTP Treatment Components (per outlet)</Text>
@@ -409,6 +433,13 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
         );
 
       case 'wwtpCondition':
+        if (value.hasWwtp === 'no') {
+          return (
+            <FormSection title="E. Condition of the WWTP">
+              <Text style={styles.emptyText}>No WWTP on record for this establishment — this doesn't apply.</Text>
+            </FormSection>
+          );
+        }
         return (
           <FormSection title="E. Condition of the WWTP">
             <View style={styles.row}>

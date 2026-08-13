@@ -233,7 +233,15 @@ export const AbstractedWaterQualitySection: React.FC<{
 
 // ── Wastewater Treatment Plant (WWTP) — split into its 5 template
 // subsections (5A-5E), each independently editable/savable, matching the
-// per-subsection tab navigation. See waterReportTabs.ts.
+// per-subsection tab navigation. See waterReportTabs.ts. Subsections B-E
+// describe the WWTP itself, so once 5A records no WWTP on site they're
+// read-only "doesn't apply" remarks instead of editable content.
+
+export const WwtpUnavailableSection: React.FC<{ title: string }> = ({ title }) => (
+  <FormSection title={title}>
+    <Text style={sharedStyles.emptyText}>No WWTP on record for this establishment — this doesn't apply.</Text>
+  </FormSection>
+);
 
 export const TreatmentSystemTypeSection: React.FC<{
   complianceId: string;
@@ -264,6 +272,9 @@ export const TreatmentSystemTypeSection: React.FC<{
         />
       ) : (
         <TextField label="Has WWTP?" value={section.draft == null ? '—' : section.draft ? 'Yes' : 'No'} readOnly />
+      )}
+      {section.draft === false && (
+        <Text style={sharedStyles.emptyText}>Subsections B-E are marked as not applicable.</Text>
       )}
       {section.error && <Text style={styles.errorText}>{section.error}</Text>}
     </FormSection>
@@ -1343,13 +1354,27 @@ export const WaterExtraSectionsView: React.FC<WaterExtraSectionsViewProps> = ({
       case 'treatmentSystemType':
         return <TreatmentSystemTypeSection complianceId={complianceId} value={compliance.hasWwtp} canEdit={canEdit} onSaved={onSaved} />;
       case 'wwtpType':
-        return <WwtpTypeSection complianceId={complianceId} value={compliance.wwtpType} canEdit={canEdit} onSaved={onSaved} />;
+        return compliance.hasWwtp === false ? (
+          <WwtpUnavailableSection title="B. Type of WWTP" />
+        ) : (
+          <WwtpTypeSection complianceId={complianceId} value={compliance.wwtpType} canEdit={canEdit} onSaved={onSaved} />
+        );
       case 'wwtpDetails':
-        return <WwtpDetailsSection complianceId={complianceId} value={compliance.wwtpDetails} canEdit={canEdit} onSaved={onSaved} />;
+        return compliance.hasWwtp === false ? (
+          <WwtpUnavailableSection title="C. WWTP Details" />
+        ) : (
+          <WwtpDetailsSection complianceId={complianceId} value={compliance.wwtpDetails} canEdit={canEdit} onSaved={onSaved} />
+        );
       case 'wwtpComponents':
-        return <WwtpComponentsSection complianceId={complianceId} value={compliance.wwtpComponents} canEdit={canEdit} onSaved={onSaved} />;
+        return compliance.hasWwtp === false ? (
+          <WwtpUnavailableSection title="D. Components of the WWTP" />
+        ) : (
+          <WwtpComponentsSection complianceId={complianceId} value={compliance.wwtpComponents} canEdit={canEdit} onSaved={onSaved} />
+        );
       case 'wwtpCondition':
-        return (
+        return compliance.hasWwtp === false ? (
+          <WwtpUnavailableSection title="E. Condition of the WWTP" />
+        ) : (
           <WwtpConditionSection
             complianceId={complianceId}
             value={{ wwtpCondition: compliance.wwtpCondition, wwtpUnderConstruction: compliance.wwtpUnderConstruction }}
