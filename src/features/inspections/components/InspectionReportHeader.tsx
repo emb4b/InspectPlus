@@ -13,13 +13,15 @@ import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { useInspectorName } from '../../../core/hooks/useInspectorName';
 import { canManageAllRecords } from '../../establishments/hooks/useEstablishment';
 import { getReportTypeMeta } from '../reportTypeMeta';
+import { TwoRowTabs, TwoRowMainTabDef } from './TwoRowTabs';
 
-export type ReportDetailTabKey = 'geninfo' | 'purpose' | 'compliance';
-
-const TABS: { key: ReportDetailTabKey; label: string }[] = [
-  { key: 'geninfo', label: 'General Information' },
-  { key: 'purpose', label: 'Purpose of Inspection' },
-  { key: 'compliance', label: 'Compliance Status' },
+// Non-water report kinds (hazwaste, air, eia) still use this original
+// 3-tab structure — only water reports get the full 1-6 section/subsection
+// menu built by buildWaterReportTabs. See InspectionReportDetailScreen.
+export const DEFAULT_REPORT_DETAIL_TABS: TwoRowMainTabDef[] = [
+  { key: 'geninfo', number: '1', label: 'General Information' },
+  { key: 'purpose', number: '2', label: 'Purpose of Inspection' },
+  { key: 'compliance', number: '3', label: 'Compliance Status' },
 ];
 
 function formatDate(iso: string): string {
@@ -36,8 +38,9 @@ interface InspectionReportHeaderProps {
   inspectionDate: string;
   reportStatus: string;
   inspectorUid: string;
-  activeTab: ReportDetailTabKey;
-  onTabChange: (tab: ReportDetailTabKey) => void;
+  tabs: TwoRowMainTabDef[];
+  activeMain: string;
+  onMainChange: (key: string) => void;
   onBack: () => void;
   // Only the inspector who owns the report (or a Developer account, which
   // gets unrestricted write access — see canManageAllRecords) can delete
@@ -58,8 +61,9 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
   inspectionDate,
   reportStatus,
   inspectorUid,
-  activeTab,
-  onTabChange,
+  tabs,
+  activeMain,
+  onMainChange,
   onBack,
   onDelete,
   collapsed,
@@ -226,17 +230,7 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
       </View>
 
       <View style={styles.tabRow}>
-        {TABS.map(tab => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.tabBtn, activeTab === tab.key && styles.tabBtnActive]}
-            activeOpacity={0.7}
-            onPress={() => onTabChange(tab.key)}>
-            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        <TwoRowTabs tabs={tabs} activeMain={activeMain} onMainChange={onMainChange} />
       </View>
     </View>
   );
@@ -408,30 +402,7 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
   tabRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 8,
     marginTop: 8,
-  },
-  tabBtn: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-    paddingVertical: 10,
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
-  },
-  tabBtnActive: {
-    borderBottomColor: Colors.green,
-  },
-  tabText: {
-    flexShrink: 1,
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: Colors.textMuted,
-    textAlign: 'center',
-  },
-  tabTextActive: {
-    color: Colors.navy,
+    paddingBottom: 8,
   },
 });

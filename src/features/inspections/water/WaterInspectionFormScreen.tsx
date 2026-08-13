@@ -10,15 +10,17 @@ import { generateId } from '../../../utils/crypto';
 import { getDeviceId } from '../../../utils/device';
 import { EstablishmentPickerStep } from '../components/EstablishmentPickerStep';
 import { NewEstablishmentModal } from '../components/NewEstablishmentModal';
-import { ReportFormHeader, ReportFormTabKey } from '../components/ReportFormHeader';
+import { ReportFormHeader } from '../components/ReportFormHeader';
 import { GeneralInformationTab } from '../components/GeneralInformationTab';
 import { PurposeOfInspectionTab } from '../components/PurposeOfInspectionTab';
+import { DenrPermitsFormSection } from '../components/DenrPermitsFormSection';
 import { SaveBar } from '../components/SaveBar';
 import { useReportFormState } from '../hooks/useReportFormState';
 import { createEstablishmentRecord } from '../establishmentPersistence';
 import { buildGeneralInfoFromEstablishment, GeneralInfoFormState, PurposeFormState } from '../types';
-import { WaterComplianceTab } from './WaterComplianceTab';
+import { WaterExtraFormSectionsView } from './WaterExtraFormSections';
 import { emptyWaterComplianceForm, WaterComplianceFormState } from './waterTypes';
+import { buildWaterReportTabs, establishmentHasDischargePermit } from './waterReportTabs';
 import type { EstablishmentDTO } from '../../establishments/types';
 import { useHeaderScroll } from '../../home/context/HeaderScrollContext';
 import { useScreenFooter } from '../../home/context/ScreenFooterContext';
@@ -34,7 +36,7 @@ export interface ShellStart {
 }
 
 export function WaterFormShell({ start }: { start: ShellStart }) {
-  const [activeTab, setActiveTab] = useState<ReportFormTabKey>('geninfo');
+  const [activeMain, setActiveMain] = useState('geninfo');
   const [waterCompliance, setWaterCompliance] = useState<WaterComplianceFormState>(
     emptyWaterComplianceForm,
   );
@@ -123,6 +125,10 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
     [generalInfo.name, saving, handleSave]
   );
 
+  const hasDp = establishmentHasDischargePermit(generalInfo.denrPermits);
+  const tabs = buildWaterReportTabs(hasDp);
+  const activeMainTab = tabs.find(t => t.key === activeMain) ?? tabs[0];
+
   return (
     <View style={styles.flex}>
       <ReportFormHeader
@@ -131,8 +137,9 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
         typeLabel="Water Monitoring"
         typeColor={Colors.water.text}
         typeBgColor={Colors.water.bg}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
+        tabs={tabs}
+        activeMain={activeMainTab.key}
+        onMainChange={setActiveMain}
       />
 
       <KeyboardAwareScrollView
@@ -143,14 +150,20 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
         keyboardShouldPersistTaps="handled"
         onScroll={onScroll}
         scrollEventThrottle={16}>
-        {activeTab === 'geninfo' && (
+        {activeMainTab.key === 'geninfo' && (
           <GeneralInformationTab value={generalInfo} onChange={setGeneralInfo} />
         )}
-        {activeTab === 'purpose' && (
+        {activeMainTab.key === 'purpose' && (
           <PurposeOfInspectionTab value={purpose} onChange={setPurpose} />
         )}
-        {activeTab === 'compliance' && (
-          <WaterComplianceTab value={waterCompliance} onChange={setWaterCompliance} />
+        {activeMainTab.key === 'compliance' && (
+          <DenrPermitsFormSection
+            value={generalInfo.denrPermits}
+            onChange={denrPermits => setGeneralInfo({ ...generalInfo, denrPermits })}
+          />
+        )}
+        {(activeMainTab.key === 'watersupply' || activeMainTab.key === 'wastewaterpollution' || activeMainTab.key === 'samplingfindings') && (
+          <WaterExtraFormSectionsView value={waterCompliance} onChange={setWaterCompliance} mainTab={activeMainTab} />
         )}
       </KeyboardAwareScrollView>
     </View>

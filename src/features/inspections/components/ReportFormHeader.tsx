@@ -3,8 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Colors } from '../../../constants/colors';
-
-export type ReportFormTabKey = 'geninfo' | 'purpose' | 'compliance';
+import { TwoRowTabs, TwoRowMainTabDef } from './TwoRowTabs';
 
 interface ReportFormHeaderProps {
   establishmentName: string;
@@ -12,15 +11,10 @@ interface ReportFormHeaderProps {
   typeLabel: string;
   typeColor: string;
   typeBgColor: string;
-  activeTab: ReportFormTabKey;
-  onTabChange: (tab: ReportFormTabKey) => void;
+  tabs: TwoRowMainTabDef[];
+  activeMain: string;
+  onMainChange: (key: string) => void;
 }
-
-const TABS: { key: ReportFormTabKey; label: string }[] = [
-  { key: 'geninfo', label: 'General Information' },
-  { key: 'purpose', label: 'Purpose of Inspection' },
-  { key: 'compliance', label: 'Compliance Status' },
-];
 
 export const ReportFormHeader: React.FC<ReportFormHeaderProps> = ({
   establishmentName,
@@ -28,8 +22,9 @@ export const ReportFormHeader: React.FC<ReportFormHeaderProps> = ({
   typeLabel,
   typeColor,
   typeBgColor,
-  activeTab,
-  onTabChange,
+  tabs,
+  activeMain,
+  onMainChange,
 }) => (
   <View style={styles.container}>
     <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} activeOpacity={0.7}>
@@ -54,17 +49,7 @@ export const ReportFormHeader: React.FC<ReportFormHeaderProps> = ({
     </View>
 
     <View style={styles.tabRow}>
-      {TABS.map(tab => (
-        <TouchableOpacity
-          key={tab.key}
-          style={[styles.tabBtn, activeTab === tab.key && styles.tabBtnActive]}
-          activeOpacity={0.7}
-          onPress={() => onTabChange(tab.key)}>
-          <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
-            {tab.label}
-          </Text>
-        </TouchableOpacity>
-      ))}
+      <TwoRowTabs tabs={tabs} activeMain={activeMain} onMainChange={onMainChange} />
     </View>
   </View>
 );
@@ -149,30 +134,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   tabRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 8,
     marginTop: 8,
-  },
-  tabBtn: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-    paddingVertical: 10,
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
-  },
-  tabBtnActive: {
-    borderBottomColor: Colors.green,
-  },
-  tabText: {
-    flexShrink: 1,
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: Colors.textMuted,
-    textAlign: 'center',
-  },
-  tabTextActive: {
-    color: Colors.navy,
+    paddingBottom: 8,
   },
 });

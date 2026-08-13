@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text } from 'react-native';
 import { FormSection, TextField } from '../../../components/form';
 import type { ComplianceView, ChecklistGroup } from '../hooks/useInspectionReport';
-import { WaterComplianceEditSections } from '../water/WaterComplianceEditSections';
 import {
   SimpleTable,
   ChecklistList,
@@ -12,10 +11,7 @@ import {
 } from './ComplianceReadPrimitives';
 
 interface ComplianceStatusViewProps {
-  reportId: string;
   compliance: ComplianceView;
-  canEdit: boolean;
-  onSaved: () => void;
 }
 
 const ChecklistGroups: React.FC<{ groups: ChecklistGroup[] }> = ({ groups }) => {
@@ -128,17 +124,11 @@ const EiaComplianceView: React.FC<{ c: Extract<ComplianceView, { kind: 'eia' }> 
   </View>
 );
 
-export const ComplianceStatusView: React.FC<ComplianceStatusViewProps> = ({ reportId, compliance, canEdit, onSaved }) => {
+// Water reports don't reach this component at all — InspectionReportDetailScreen
+// gives them their own 1-6 tab structure (see waterReportTabs.ts) instead of the
+// single flat "Compliance Status" tab every other report kind still uses here.
+export const ComplianceStatusView: React.FC<ComplianceStatusViewProps> = ({ compliance }) => {
   switch (compliance.kind) {
-    case 'water':
-      return (
-        <WaterComplianceEditSections
-          reportId={reportId}
-          compliance={compliance}
-          canEdit={canEdit}
-          onSaved={onSaved}
-        />
-      );
     case 'hazwaste':
       return <HazwasteComplianceView c={compliance} />;
     case 'air':

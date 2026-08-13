@@ -9,18 +9,23 @@ import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { useInspectionReport } from '../hooks/useInspectionReport';
 import { deleteInspectionReportRecord } from '../reportPersistence';
 import { INSPECTION_TYPE_LABELS, canManageAllRecords, useEstablishment } from '../../establishments/hooks/useEstablishment';
-import { InspectionReportHeader, ReportDetailTabKey } from './InspectionReportHeader';
+import { InspectionReportHeader, DEFAULT_REPORT_DETAIL_TABS } from './InspectionReportHeader';
 import { GeneralInformationView } from './GeneralInformationView';
 import { PurposeOfInspectionView } from './PurposeOfInspectionView';
 import { ComplianceStatusView } from './ComplianceStatusView';
+import { DenrPermitsSection } from './DenrPermitsSection';
 import { useHeaderScroll } from '../../home/context/HeaderScrollContext';
+import { WaterExtraSectionsView } from '../water/WaterComplianceEditSections';
+import { buildWaterReportTabs, establishmentHasDischargePermit } from '../water/waterReportTabs';
+
+const WATER_REPORT_TYPE = 'water_monitoring';
 
 interface InspectionReportDetailScreenProps {
   reportId: string;
 }
 
 export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreenProps> = ({ reportId }) => {
-  const [activeTab, setActiveTab] = useState<ReportDetailTabKey>('geninfo');
+  const [activeMain, setActiveMain] = useState('geninfo');
   const [noteBarDismissed, setNoteBarDismissed] = useState(false);
   const { report, purpose, compliance, loading, error, refetch } = useInspectionReport(reportId);
   // Loaded independently of `report.establishmentSnapshot` — that's a
@@ -118,6 +123,16 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
     .filter(Boolean)
     .join(', ');
 
+  // Water reports get the full 1-6 section/subsection tab menu from the
+  // report template; every other report kind keeps the original 3-tab
+  // layout — see waterReportTabs.ts and DEFAULT_REPORT_DETAIL_TABS.
+  const isWater = report.reportType === WATER_REPORT_TYPE;
+  const hasDp = establishmentHasDischargePermit(report.permitsSnapshot);
+  const waterTabs = buildWaterReportTabs(hasDp);
+  const tabs = isWater ? waterTabs : DEFAULT_REPORT_DETAIL_TABS;
+  const activeMainTab = tabs.find(t => t.key === activeMain) ?? tabs[0];
+  const activeWaterMainTab = waterTabs.find(t => t.key === activeMain) ?? waterTabs[0];
+
   return (
     <View style={styles.flex}>
       <InspectionReportHeader
@@ -128,8 +143,9 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
         inspectionDate={report.inspectionDate}
         reportStatus={report.reportStatus}
         inspectorUid={report.inspectorUid}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
+        tabs={tabs}
+        activeMain={activeMainTab.key}
+        onMainChange={setActiveMain}
         onBack={() => router.back()}
         onDelete={handleDelete}
         collapsed={collapsed}
@@ -169,7 +185,7 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
         keyboardShouldPersistTaps="handled"
         onScroll={onScroll}
         scrollEventThrottle={16}>
-        {activeTab === 'geninfo' && (
+        {activeMainTab.key === 'geninfo' && (
           <GeneralInformationView
             reportId={report.reportId}
             snapshot={report.establishmentSnapshot}
@@ -178,9 +194,10 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
             onSaved={refetch}
             liveEstablishment={liveEstablishment}
             liveEstablishmentLoading={liveEstablishmentLoading}
+            showPermits={!isWater}
           />
         )}
-        {activeTab === 'purpose' &&
+        {activeMainTab.key === 'purpose' &&
           (purpose ? (
             <PurposeOfInspectionView
               purposeId={report.purposeId}
@@ -191,13 +208,19 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
           ) : (
             <Text style={styles.stateText}>No purpose of inspection recorded for this report.</Text>
           ))}
-        {activeTab === 'compliance' && (
-          <ComplianceStatusView
-            reportId={report.reportId}
-            compliance={compliance}
-            canEdit={canEdit}
-            onSaved={refetch}
-          />
+        {activeMainTab.key === 'compliance' &&
+          (isWater ? (
+            <DenrPermitsSection
+              reportId={report.reportId}
+              permits={report.permitsSnapshot}
+              canEdit={canEdit}
+              onSaved={refetch}
+            />
+          ) : (
+            <ComplianceStatusView compliance={compliance} />
+          ))}
+        {isWater && compliance.kind === 'water' && (activeMainTab.key === 'watersupply' || activeMainTab.key === 'wastewaterpollution' || activeMainTab.key === 'samplingfindings') && (
+          <WaterExtraSectionsView compliance={compliance} canEdit={canEdit} onSaved={refetch} mainTab={activeWaterMainTab} />
         )}
       </KeyboardAwareScrollView>
     </View>

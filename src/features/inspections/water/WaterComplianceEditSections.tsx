@@ -49,6 +49,7 @@ import {
   emptyDpCondition,
 } from './waterTypes';
 import type { ComplianceWater } from '../../../db/models';
+import type { WaterMainTabDef } from './waterReportTabs';
 
 const YES_NO = [
   { label: 'Yes', value: 'yes' },
@@ -74,7 +75,7 @@ const AddCardButton: React.FC<{ label: string; onPress: () => void }> = ({ label
 
 // ── Water Sources ───────────────────────────────────────────────────────────
 
-const WaterSourcesSection: React.FC<{
+export const WaterSourcesSection: React.FC<{
   complianceId: string;
   value: DynamicRow[];
   canEdit: boolean;
@@ -93,7 +94,7 @@ const WaterSourcesSection: React.FC<{
   return (
     <FormSection
       icon="water-outline"
-      title="Water Sources"
+      title="A. Water Sources"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
@@ -127,7 +128,7 @@ const WaterSourcesSection: React.FC<{
 
 // ── Wastewater Sources ──────────────────────────────────────────────────────
 
-const WastewaterSourcesSection: React.FC<{
+export const WastewaterSourcesSection: React.FC<{
   complianceId: string;
   value: DynamicRow[];
   canEdit: boolean;
@@ -146,7 +147,7 @@ const WastewaterSourcesSection: React.FC<{
   return (
     <FormSection
       icon="business-outline"
-      title="Wastewater Sources"
+      title="B. Wastewater Sources"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
@@ -180,7 +181,7 @@ const WastewaterSourcesSection: React.FC<{
 
 // ── Abstracted Water Quality ─────────────────────────────────────────────────
 
-const AbstractedWaterQualitySection: React.FC<{
+export const AbstractedWaterQualitySection: React.FC<{
   complianceId: string;
   value: DynamicRow[];
   canEdit: boolean;
@@ -199,7 +200,7 @@ const AbstractedWaterQualitySection: React.FC<{
   return (
     <FormSection
       icon="flask-outline"
-      title="Abstracted Water Quality"
+      title="C. Quality of Abstracted Water"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
@@ -233,114 +234,115 @@ const AbstractedWaterQualitySection: React.FC<{
   );
 };
 
-// ── Wastewater Treatment Plant (WWTP) ──────────────────────────────────────
+// ── Wastewater Treatment Plant (WWTP) — split into its 5 template
+// subsections (5A-5E), each independently editable/savable, matching the
+// per-subsection tab navigation. See waterReportTabs.ts.
 
-interface WwtpFields {
-  hasWwtp: boolean | null;
-  wwtpType: string | null;
-  wwtpCondition: string | null;
-  wwtpUnderConstruction: boolean | null;
-  wwtpDetails: WwtpDetailCard[];
-  wwtpComponents: WwtpComponentCard[];
-}
-
-const WwtpSection: React.FC<{
+export const TreatmentSystemTypeSection: React.FC<{
   complianceId: string;
-  value: WwtpFields;
+  value: boolean | null;
   canEdit: boolean;
   onSaved: () => void;
-}> = ({
-  complianceId,
-  value,
-  canEdit,
-  onSaved,
-}) => {
+}> = ({ complianceId, value, canEdit, onSaved }) => {
+  const section = useEditableSection<boolean | null>({
+    value,
+    onSave: async hasWwtp => {
+      await patchComplianceWater(complianceId, { hasWwtp });
+      onSaved();
+    },
+  });
+
+  return (
+    <FormSection
+      icon="cog-outline"
+      title="A. Type of Wastewater Treatment System"
+      headerRight={
+        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
+      }>
+      {section.editing ? (
+        <RadioGroup
+          label="Has WWTP?"
+          options={YES_NO}
+          value={section.draft == null ? null : section.draft ? 'yes' : 'no'}
+          onChange={v => section.setDraft(v === 'yes')}
+        />
+      ) : (
+        <TextField label="Has WWTP?" value={section.draft == null ? '—' : section.draft ? 'Yes' : 'No'} readOnly />
+      )}
+      {section.error && <Text style={styles.errorText}>{section.error}</Text>}
+    </FormSection>
+  );
+};
+
+export const WwtpTypeSection: React.FC<{
+  complianceId: string;
+  value: string | null;
+  canEdit: boolean;
+  onSaved: () => void;
+}> = ({ complianceId, value, canEdit, onSaved }) => {
+  const section = useEditableSection<string | null>({
+    value,
+    onSave: async wwtpType => {
+      await patchComplianceWater(complianceId, { wwtpType: wwtpType || null });
+      onSaved();
+    },
+  });
+
+  return (
+    <FormSection
+      icon="cog-outline"
+      title="B. Type of WWTP"
+      headerRight={
+        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
+      }>
+      {section.editing ? (
+        <SelectField label="WWTP Type" value={section.draft || ''} options={WWTP_TYPE_OPTIONS} onSelect={v => section.setDraft(v)} />
+      ) : (
+        <TextField label="WWTP Type" value={section.draft || '—'} readOnly />
+      )}
+      {section.error && <Text style={styles.errorText}>{section.error}</Text>}
+    </FormSection>
+  );
+};
+
+export const WwtpDetailsSection: React.FC<{
+  complianceId: string;
+  value: WwtpDetailCard[];
+  canEdit: boolean;
+  onSaved: () => void;
+}> = ({ complianceId, value, canEdit, onSaved }) => {
   const fieldRefs = useRef<Record<string, TextInput | null>>({});
   const focus = (key: string) => focusInput(fieldRefs.current[key]);
   const setRef = (key: string) => (el: TextInput | null) => { fieldRefs.current[key] = el; };
 
-  const section = useEditableSection<WwtpFields>({
+  const section = useEditableSection<WwtpDetailCard[]>({
     value,
-    onSave: async fields => {
-      await patchComplianceWater(complianceId, {
-        hasWwtp: fields.hasWwtp,
-        wwtpType: fields.wwtpType || null,
-        wwtpDetails: fields.wwtpDetails,
-        wwtpComponents: fields.wwtpComponents,
-        wwtpCondition: fields.wwtpCondition || null,
-        wwtpUnderConstruction: fields.wwtpUnderConstruction,
-      });
+    onSave: async wwtpDetails => {
+      await patchComplianceWater(complianceId, { wwtpDetails });
       onSaved();
     },
   });
 
   const updateDetail = (i: number, patch: Partial<WwtpDetailCard>) => {
-    const rows = section.draft.wwtpDetails.slice();
+    const rows = section.draft.slice();
     rows[i] = { ...rows[i], ...patch };
-    section.setDraft(d => ({ ...d, wwtpDetails: rows }));
+    section.setDraft(rows);
   };
-  const removeDetail = (i: number) => section.setDraft(d => ({ ...d, wwtpDetails: d.wwtpDetails.filter((_, idx) => idx !== i) }));
-  const addDetail = () => section.setDraft(d => ({ ...d, wwtpDetails: [...d.wwtpDetails, emptyWwtpDetail(String(d.wwtpDetails.length + 1))] }));
-
-  const updateComponent = (i: number, patch: Partial<WwtpComponentCard>) => {
-    const rows = section.draft.wwtpComponents.slice();
-    rows[i] = { ...rows[i], ...patch };
-    section.setDraft(d => ({ ...d, wwtpComponents: rows }));
-  };
-  const removeComponent = (i: number) => section.setDraft(d => ({ ...d, wwtpComponents: d.wwtpComponents.filter((_, idx) => idx !== i) }));
-  const addComponent = () => section.setDraft(d => ({ ...d, wwtpComponents: [...d.wwtpComponents, emptyWwtpComponent(String(d.wwtpComponents.length + 1))] }));
+  const removeDetail = (i: number) => section.setDraft(section.draft.filter((_, idx) => idx !== i));
+  const addDetail = () => section.setDraft([...section.draft, emptyWwtpDetail(String(section.draft.length + 1))]);
 
   return (
     <FormSection
       icon="cog-outline"
-      title="Wastewater Treatment Plant (WWTP)"
+      title="C. WWTP Details"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
-      <View style={styles.row}>
-        {section.editing ? (
-          <RadioGroup
-            label="Has WWTP?"
-            options={YES_NO}
-            value={section.draft.hasWwtp == null ? null : section.draft.hasWwtp ? 'yes' : 'no'}
-            onChange={v => section.setDraft(d => ({ ...d, hasWwtp: v === 'yes' }))}
-          />
-        ) : (
-          <TextField label="Has WWTP?" value={section.draft.hasWwtp == null ? '—' : section.draft.hasWwtp ? 'Yes' : 'No'} readOnly />
-        )}
-        {section.editing ? (
-          <SelectField label="WWTP Type" value={section.draft.wwtpType || ''} options={WWTP_TYPE_OPTIONS} onSelect={v => section.setDraft(d => ({ ...d, wwtpType: v }))} />
-        ) : (
-          <TextField label="WWTP Type" value={section.draft.wwtpType || '—'} readOnly />
-        )}
-      </View>
-      <View style={styles.row}>
-        {section.editing ? (
-          <SelectField label="WWTP Condition" value={section.draft.wwtpCondition || ''} options={WWTP_CONDITION_OPTIONS} onSelect={v => section.setDraft(d => ({ ...d, wwtpCondition: v }))} />
-        ) : (
-          <TextField label="WWTP Condition" value={section.draft.wwtpCondition || '—'} readOnly />
-        )}
-        {section.editing ? (
-          <RadioGroup
-            label="Under Construction / Rehabilitation?"
-            options={YES_NO}
-            value={section.draft.wwtpUnderConstruction == null ? null : section.draft.wwtpUnderConstruction ? 'yes' : 'no'}
-            onChange={v => section.setDraft(d => ({ ...d, wwtpUnderConstruction: v === 'yes' }))}
-          />
-        ) : (
-          <TextField
-            label="Under Construction?"
-            value={section.draft.wwtpUnderConstruction == null ? '—' : section.draft.wwtpUnderConstruction ? 'Yes' : 'No'}
-            readOnly
-          />
-        )}
-      </View>
-
       <Text style={sharedStyles.subTitle}>WWTP Details (per outlet)</Text>
-      {section.draft.wwtpDetails.length === 0 && !section.editing && (
+      {section.draft.length === 0 && !section.editing && (
         <Text style={sharedStyles.emptyText}>No WWTP outlet details recorded.</Text>
       )}
-      {section.draft.wwtpDetails.map((d, i) => {
+      {section.draft.map((d, i) => {
         const k = (field: string) => `wwtpDetail:${i}:${field}`;
         return section.editing ? (
           <View key={i} style={styles.editCard}>
@@ -468,12 +470,49 @@ const WwtpSection: React.FC<{
         );
       })}
       {section.editing && <AddCardButton label="+ Add WWTP Outlet Detail" onPress={addDetail} />}
+      {section.error && <Text style={styles.errorText}>{section.error}</Text>}
+    </FormSection>
+  );
+};
 
-      <Text style={[sharedStyles.subTitle, sharedStyles.subTitleSpaced]}>WWTP Treatment Components (per outlet)</Text>
-      {section.draft.wwtpComponents.length === 0 && !section.editing && (
+export const WwtpComponentsSection: React.FC<{
+  complianceId: string;
+  value: WwtpComponentCard[];
+  canEdit: boolean;
+  onSaved: () => void;
+}> = ({ complianceId, value, canEdit, onSaved }) => {
+  const fieldRefs = useRef<Record<string, TextInput | null>>({});
+  const focus = (key: string) => focusInput(fieldRefs.current[key]);
+  const setRef = (key: string) => (el: TextInput | null) => { fieldRefs.current[key] = el; };
+
+  const section = useEditableSection<WwtpComponentCard[]>({
+    value,
+    onSave: async wwtpComponents => {
+      await patchComplianceWater(complianceId, { wwtpComponents });
+      onSaved();
+    },
+  });
+
+  const updateComponent = (i: number, patch: Partial<WwtpComponentCard>) => {
+    const rows = section.draft.slice();
+    rows[i] = { ...rows[i], ...patch };
+    section.setDraft(rows);
+  };
+  const removeComponent = (i: number) => section.setDraft(section.draft.filter((_, idx) => idx !== i));
+  const addComponent = () => section.setDraft([...section.draft, emptyWwtpComponent(String(section.draft.length + 1))]);
+
+  return (
+    <FormSection
+      icon="cog-outline"
+      title="D. Components of the WWTP"
+      headerRight={
+        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
+      }>
+      <Text style={sharedStyles.subTitle}>WWTP Treatment Components (per outlet)</Text>
+      {section.draft.length === 0 && !section.editing && (
         <Text style={sharedStyles.emptyText}>No treatment components recorded.</Text>
       )}
-      {section.draft.wwtpComponents.map((c, i) => {
+      {section.draft.map((c, i) => {
         const k = (field: string) => `wwtpComponent:${i}:${field}`;
         return section.editing ? (
           <View key={i} style={styles.editCard}>
@@ -560,9 +599,64 @@ const WwtpSection: React.FC<{
   );
 };
 
+interface WwtpConditionFields {
+  wwtpCondition: string | null;
+  wwtpUnderConstruction: boolean | null;
+}
+
+export const WwtpConditionSection: React.FC<{
+  complianceId: string;
+  value: WwtpConditionFields;
+  canEdit: boolean;
+  onSaved: () => void;
+}> = ({ complianceId, value, canEdit, onSaved }) => {
+  const section = useEditableSection<WwtpConditionFields>({
+    value,
+    onSave: async fields => {
+      await patchComplianceWater(complianceId, {
+        wwtpCondition: fields.wwtpCondition || null,
+        wwtpUnderConstruction: fields.wwtpUnderConstruction,
+      });
+      onSaved();
+    },
+  });
+
+  return (
+    <FormSection
+      icon="cog-outline"
+      title="E. Condition of the WWTP"
+      headerRight={
+        <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
+      }>
+      <View style={styles.row}>
+        {section.editing ? (
+          <SelectField label="WWTP Condition" value={section.draft.wwtpCondition || ''} options={WWTP_CONDITION_OPTIONS} onSelect={v => section.setDraft(d => ({ ...d, wwtpCondition: v }))} />
+        ) : (
+          <TextField label="WWTP Condition" value={section.draft.wwtpCondition || '—'} readOnly />
+        )}
+        {section.editing ? (
+          <RadioGroup
+            label="Under Construction / Rehabilitation?"
+            options={YES_NO}
+            value={section.draft.wwtpUnderConstruction == null ? null : section.draft.wwtpUnderConstruction ? 'yes' : 'no'}
+            onChange={v => section.setDraft(d => ({ ...d, wwtpUnderConstruction: v === 'yes' }))}
+          />
+        ) : (
+          <TextField
+            label="Under Construction?"
+            value={section.draft.wwtpUnderConstruction == null ? '—' : section.draft.wwtpUnderConstruction ? 'Yes' : 'No'}
+            readOnly
+          />
+        )}
+      </View>
+      {section.error && <Text style={styles.errorText}>{section.error}</Text>}
+    </FormSection>
+  );
+};
+
 // ── Sampling Points ─────────────────────────────────────────────────────────
 
-const SamplingPointsSection: React.FC<{
+export const SamplingPointsSection: React.FC<{
   complianceId: string;
   value: SamplingPointCard[];
   canEdit: boolean;
@@ -618,7 +712,7 @@ const SamplingPointsSection: React.FC<{
   return (
     <FormSection
       icon="stats-chart-outline"
-      title="Sampling Points"
+      title="I. Water Quality Sampling"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
@@ -784,7 +878,7 @@ const SamplingPointsSection: React.FC<{
 
 // ── Previous Inspection Summary ─────────────────────────────────────────────
 
-const PreviousInspectionSection: React.FC<{
+export const PreviousInspectionSection: React.FC<{
   complianceId: string;
   value: PreviousInspectionState;
   canEdit: boolean;
@@ -819,7 +913,7 @@ const PreviousInspectionSection: React.FC<{
   return (
     <FormSection
       icon="time-outline"
-      title="Previous Inspection Summary"
+      title="II. Previous Inspection"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
@@ -960,9 +1054,9 @@ const PreviousInspectionSection: React.FC<{
   );
 };
 
-// ── Checklist — DAO 2005-10 ─────────────────────────────────────────────────
+// ── Summary of Findings — Checklist, DAO 2005-10 ────────────────────────────
 
-const ChecklistSection: React.FC<{
+export const SummaryOfFindingsSection: React.FC<{
   complianceId: string;
   value: ChecklistValue[];
   canEdit: boolean;
@@ -990,7 +1084,7 @@ const ChecklistSection: React.FC<{
   return (
     <FormSection
       icon="list-outline"
-      title="Checklist — DAO 2005-10 (Water Quality)"
+      title="III. Summary of Findings"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
@@ -1021,7 +1115,7 @@ const ChecklistSection: React.FC<{
 
 // ── Discharge Permit Conditions ────────────────────────────────────────────
 
-const DpConditionsSection: React.FC<{
+export const DpConditionsSection: React.FC<{
   complianceId: string;
   value: DpConditionRow[];
   canEdit: boolean;
@@ -1057,7 +1151,7 @@ const DpConditionsSection: React.FC<{
   return (
     <FormSection
       icon="document-text-outline"
-      title="Discharge Permit Conditions"
+      title="IV. Compliance to DP Conditions"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
@@ -1138,7 +1232,7 @@ interface ObservationsFields {
   documentsReviewed: string[];
 }
 
-const ObservationsSection: React.FC<{
+export const ObservationsSection: React.FC<{
   complianceId: string;
   value: ObservationsFields;
   canEdit: boolean;
@@ -1175,7 +1269,7 @@ const ObservationsSection: React.FC<{
   return (
     <FormSection
       icon="clipboard-outline"
-      title="Observations & Recommendations"
+      title="V. Observations and Recommendations"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
@@ -1218,73 +1312,88 @@ const ObservationsSection: React.FC<{
   );
 };
 
-// ── Top-level ─────────────────────────────────────────────────────────────
+// ── Top-level stacked view ───────────────────────────────────────────────
+// Renders every subsection of the active main tab in template order, top
+// to bottom, each headed by its marker (A-E or I-V) — the tab bar itself
+// only switches between the 6 main sections (see TwoRowTabs), so
+// subsections are page content, not separate tabs.
 
-interface WaterComplianceEditSectionsProps {
-  reportId: string;
+interface WaterExtraSectionsViewProps {
   compliance: WaterComplianceData;
   canEdit: boolean;
   onSaved: () => void;
+  mainTab: WaterMainTabDef;
 }
 
-export const WaterComplianceEditSections: React.FC<WaterComplianceEditSectionsProps> = ({ compliance, canEdit, onSaved }) => {
-  const checklistValues: ChecklistValue[] = DAO_2005_10_CHECKLIST.map((_, i) => ({
-    compliant: compliance.checklistDao200510[i]?.compliant ?? null,
-    remarks: compliance.checklistDao200510[i]?.remarks ?? '',
-  }));
+export const WaterExtraSectionsView: React.FC<WaterExtraSectionsViewProps> = ({
+  compliance,
+  canEdit,
+  onSaved,
+  mainTab,
+}) => {
+  const complianceId = compliance.complianceId;
+
+  const renderSection = (subKey: string): React.ReactNode => {
+    switch (subKey) {
+      case 'waterSources':
+        return <WaterSourcesSection complianceId={complianceId} value={compliance.waterSources as DynamicRow[]} canEdit={canEdit} onSaved={onSaved} />;
+      case 'wastewaterSources':
+        return <WastewaterSourcesSection complianceId={complianceId} value={compliance.wastewaterSources as DynamicRow[]} canEdit={canEdit} onSaved={onSaved} />;
+      case 'abstractedWaterQuality':
+        return <AbstractedWaterQualitySection complianceId={complianceId} value={compliance.abstractedWaterQuality as DynamicRow[]} canEdit={canEdit} onSaved={onSaved} />;
+      case 'treatmentSystemType':
+        return <TreatmentSystemTypeSection complianceId={complianceId} value={compliance.hasWwtp} canEdit={canEdit} onSaved={onSaved} />;
+      case 'wwtpType':
+        return <WwtpTypeSection complianceId={complianceId} value={compliance.wwtpType} canEdit={canEdit} onSaved={onSaved} />;
+      case 'wwtpDetails':
+        return <WwtpDetailsSection complianceId={complianceId} value={compliance.wwtpDetails} canEdit={canEdit} onSaved={onSaved} />;
+      case 'wwtpComponents':
+        return <WwtpComponentsSection complianceId={complianceId} value={compliance.wwtpComponents} canEdit={canEdit} onSaved={onSaved} />;
+      case 'wwtpCondition':
+        return (
+          <WwtpConditionSection
+            complianceId={complianceId}
+            value={{ wwtpCondition: compliance.wwtpCondition, wwtpUnderConstruction: compliance.wwtpUnderConstruction }}
+            canEdit={canEdit}
+            onSaved={onSaved}
+          />
+        );
+      case 'samplingPoints':
+        return <SamplingPointsSection complianceId={complianceId} value={compliance.samplingPoints} canEdit={canEdit} onSaved={onSaved} />;
+      case 'previousInspection':
+        return <PreviousInspectionSection complianceId={complianceId} value={compliance.previousInspectionSummary} canEdit={canEdit} onSaved={onSaved} />;
+      case 'summaryOfFindings': {
+        const checklistValues: ChecklistValue[] = DAO_2005_10_CHECKLIST.map((_, i) => ({
+          compliant: compliance.checklistDao200510[i]?.compliant ?? null,
+          remarks: compliance.checklistDao200510[i]?.remarks ?? '',
+        }));
+        return <SummaryOfFindingsSection complianceId={complianceId} value={checklistValues} canEdit={canEdit} onSaved={onSaved} />;
+      }
+      case 'dpConditions':
+        return <DpConditionsSection complianceId={complianceId} value={compliance.dpConditions} canEdit={canEdit} onSaved={onSaved} />;
+      case 'observations':
+        return (
+          <ObservationsSection
+            complianceId={complianceId}
+            value={{
+              otherObservations: compliance.otherObservations || '',
+              remarksRecommendations: compliance.remarksRecommendations || '',
+              documentsReviewed: compliance.documentsReviewed,
+            }}
+            canEdit={canEdit}
+            onSaved={onSaved}
+          />
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <View>
-      <WaterSourcesSection
-        complianceId={compliance.complianceId}
-        value={compliance.waterSources as DynamicRow[]}
-        canEdit={canEdit}
-        onSaved={onSaved}
-      />
-      <WastewaterSourcesSection
-        complianceId={compliance.complianceId}
-        value={compliance.wastewaterSources as DynamicRow[]}
-        canEdit={canEdit}
-        onSaved={onSaved}
-      />
-      <AbstractedWaterQualitySection
-        complianceId={compliance.complianceId}
-        value={compliance.abstractedWaterQuality as DynamicRow[]}
-        canEdit={canEdit}
-        onSaved={onSaved}
-      />
-      <WwtpSection
-        complianceId={compliance.complianceId}
-        value={{
-          hasWwtp: compliance.hasWwtp,
-          wwtpType: compliance.wwtpType,
-          wwtpCondition: compliance.wwtpCondition,
-          wwtpUnderConstruction: compliance.wwtpUnderConstruction,
-          wwtpDetails: compliance.wwtpDetails,
-          wwtpComponents: compliance.wwtpComponents,
-        }}
-        canEdit={canEdit}
-        onSaved={onSaved}
-      />
-      <SamplingPointsSection complianceId={compliance.complianceId} value={compliance.samplingPoints} canEdit={canEdit} onSaved={onSaved} />
-      <PreviousInspectionSection
-        complianceId={compliance.complianceId}
-        value={compliance.previousInspectionSummary}
-        canEdit={canEdit}
-        onSaved={onSaved}
-      />
-      <ChecklistSection complianceId={compliance.complianceId} value={checklistValues} canEdit={canEdit} onSaved={onSaved} />
-      <DpConditionsSection complianceId={compliance.complianceId} value={compliance.dpConditions} canEdit={canEdit} onSaved={onSaved} />
-      <ObservationsSection
-        complianceId={compliance.complianceId}
-        value={{
-          otherObservations: compliance.otherObservations || '',
-          remarksRecommendations: compliance.remarksRecommendations || '',
-          documentsReviewed: compliance.documentsReviewed,
-        }}
-        canEdit={canEdit}
-        onSaved={onSaved}
-      />
+      {(mainTab.subTabs ?? []).map(sub => (
+        <View key={sub.key}>{renderSection(sub.key)}</View>
+      ))}
     </View>
   );
 };
