@@ -128,7 +128,7 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
   // layout — see waterReportTabs.ts and DEFAULT_REPORT_DETAIL_TABS.
   const isWater = report.reportType === WATER_REPORT_TYPE;
   const hasDp = establishmentHasDischargePermit(report.permitsSnapshot);
-  const waterTabs = buildWaterReportTabs(hasDp);
+  const waterTabs = buildWaterReportTabs();
   const tabs = isWater ? waterTabs : DEFAULT_REPORT_DETAIL_TABS;
   const activeMainTab = tabs.find(t => t.key === activeMain) ?? tabs[0];
   const activeWaterMainTab = waterTabs.find(t => t.key === activeMain) ?? waterTabs[0];
@@ -220,7 +220,7 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
             <ComplianceStatusView compliance={compliance} />
           ))}
         {isWater && compliance.kind === 'water' && (activeMainTab.key === 'watersupply' || activeMainTab.key === 'wastewaterpollution' || activeMainTab.key === 'samplingfindings') && (
-          <WaterExtraSectionsView compliance={compliance} canEdit={canEdit} onSaved={refetch} mainTab={activeWaterMainTab} />
+          <WaterExtraSectionsView compliance={compliance} canEdit={canEdit} onSaved={refetch} mainTab={activeWaterMainTab} hasDp={hasDp} />
         )}
       </KeyboardAwareScrollView>
     </View>

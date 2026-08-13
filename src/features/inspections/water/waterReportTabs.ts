@@ -66,27 +66,24 @@ const SAMPLING_FINDINGS_SUBTABS: WaterSubTabDef<SamplingFindingsSubKey>[] = [
   { key: 'observations', marker: 'V', label: 'Observations and Recommendations' },
 ];
 
-// The "Compliance to DP Conditions" subsection only applies when the
-// establishment has an existing Discharge Permit on record — inferred from
-// its DENR permits list rather than a dedicated flag, since that's the only
-// place a DP shows up today (see the "DENR Permits, Licenses & Clearances"
-// section under "3. Compliance Status").
+// Whether "IV. Compliance to DP Conditions" can be edited — inferred from
+// the establishment's DENR permits list rather than a dedicated flag, since
+// that's the only place a DP shows up today (see the "DENR Permits,
+// Licenses & Clearances" section under "3. Compliance Status"). The
+// subsection itself is always shown (see buildWaterReportTabs); when this
+// is false its content is a read-only remarks note instead of the editable
+// conditions table — see WaterExtraSectionsView / WaterExtraFormSectionsView.
 export function establishmentHasDischargePermit(permits: PermitSnapshotItem[]): boolean {
   return permits.some(p => /discharge permit/i.test(p.permit_type) || /discharge permit/i.test(p.envi_law));
 }
 
-export function buildWaterReportTabs(hasDp: boolean): WaterMainTabDef[] {
+export function buildWaterReportTabs(): WaterMainTabDef[] {
   return [
     { key: 'geninfo', number: '1', label: 'General Information' },
     { key: 'purpose', number: '2', label: 'Purpose of Inspection' },
     { key: 'compliance', number: '3', label: 'Compliance Status' },
     { key: 'watersupply', number: '4', label: 'Water Supply and Wastewater Generation', subTabs: WATER_SUPPLY_SUBTABS },
     { key: 'wastewaterpollution', number: '5', label: 'Information on Wastewater Pollution', subTabs: WASTEWATER_POLLUTION_SUBTABS },
-    {
-      key: 'samplingfindings',
-      number: '6',
-      label: 'Sampling and Compliance Findings',
-      subTabs: hasDp ? SAMPLING_FINDINGS_SUBTABS : SAMPLING_FINDINGS_SUBTABS.filter(t => t.key !== 'dpConditions'),
-    },
+    { key: 'samplingfindings', number: '6', label: 'Sampling and Compliance Findings', subTabs: SAMPLING_FINDINGS_SUBTABS },
   ];
 }

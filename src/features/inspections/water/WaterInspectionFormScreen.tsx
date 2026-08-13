@@ -126,7 +126,7 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
   );
 
   const hasDp = establishmentHasDischargePermit(generalInfo.denrPermits);
-  const tabs = buildWaterReportTabs(hasDp);
+  const tabs = buildWaterReportTabs();
   const activeMainTab = tabs.find(t => t.key === activeMain) ?? tabs[0];
 
   return (
@@ -163,7 +163,7 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
           />
         )}
         {(activeMainTab.key === 'watersupply' || activeMainTab.key === 'wastewaterpollution' || activeMainTab.key === 'samplingfindings') && (
-          <WaterExtraFormSectionsView value={waterCompliance} onChange={setWaterCompliance} mainTab={activeMainTab} />
+          <WaterExtraFormSectionsView value={waterCompliance} onChange={setWaterCompliance} mainTab={activeMainTab} hasDp={hasDp} />
         )}
       </KeyboardAwareScrollView>
     </View>

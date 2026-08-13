@@ -697,16 +697,15 @@ export const SamplingPointsSection: React.FC<{
     section.setDraft(rows);
   };
 
-  if (section.draft.length === 0 && !section.editing) {
-    return null;
-  }
-
   return (
     <FormSection
       title="I. Water Quality Sampling"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
+      {section.draft.length === 0 && !section.editing && (
+        <Text style={sharedStyles.emptyText}>No sampling points recorded.</Text>
+      )}
       {section.draft.map((pt, i) => {
         const k = (field: string) => `samplingPoint:${i}:${field}`;
         const pk = (pi: number, field: string) => `samplingParam:${i}:${pi}:${field}`;
@@ -1103,6 +1102,17 @@ export const SummaryOfFindingsSection: React.FC<{
 };
 
 // ── Discharge Permit Conditions ────────────────────────────────────────────
+// No discharge permit on record for this establishment — the itemized
+// conditions table doesn't apply, so this stands in for it, read only. See
+// establishmentHasDischargePermit in waterReportTabs.ts.
+
+export const DpConditionsUnavailableSection: React.FC = () => (
+  <FormSection title="IV. Compliance to DP Conditions">
+    <Text style={sharedStyles.emptyText}>
+      No discharge permit on record for this establishment — compliance to DP conditions doesn't apply.
+    </Text>
+  </FormSection>
+);
 
 export const DpConditionsSection: React.FC<{
   complianceId: string;
@@ -1310,6 +1320,7 @@ interface WaterExtraSectionsViewProps {
   canEdit: boolean;
   onSaved: () => void;
   mainTab: WaterMainTabDef;
+  hasDp: boolean;
 }
 
 export const WaterExtraSectionsView: React.FC<WaterExtraSectionsViewProps> = ({
@@ -1317,6 +1328,7 @@ export const WaterExtraSectionsView: React.FC<WaterExtraSectionsViewProps> = ({
   canEdit,
   onSaved,
   mainTab,
+  hasDp,
 }) => {
   const complianceId = compliance.complianceId;
 
@@ -1357,7 +1369,11 @@ export const WaterExtraSectionsView: React.FC<WaterExtraSectionsViewProps> = ({
         return <SummaryOfFindingsSection complianceId={complianceId} value={checklistValues} canEdit={canEdit} onSaved={onSaved} />;
       }
       case 'dpConditions':
-        return <DpConditionsSection complianceId={complianceId} value={compliance.dpConditions} canEdit={canEdit} onSaved={onSaved} />;
+        return hasDp ? (
+          <DpConditionsSection complianceId={complianceId} value={compliance.dpConditions} canEdit={canEdit} onSaved={onSaved} />
+        ) : (
+          <DpConditionsUnavailableSection />
+        );
       case 'observations':
         return (
           <ObservationsSection

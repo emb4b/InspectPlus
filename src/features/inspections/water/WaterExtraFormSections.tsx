@@ -42,6 +42,7 @@ interface WaterExtraFormSectionsViewProps {
   value: WaterComplianceFormState;
   onChange: (value: WaterComplianceFormState) => void;
   mainTab: WaterMainTabDef;
+  hasDp: boolean;
 }
 
 // Renders every subsection of the active main tab in template order, top to
@@ -54,6 +55,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
   value,
   onChange,
   mainTab,
+  hasDp,
 }) => {
   const fieldRefs = useRef<Record<string, TextInput | null>>({});
   const focus = (key: string) => focusInput(fieldRefs.current[key]);
@@ -692,6 +694,15 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
         );
 
       case 'dpConditions':
+        if (!hasDp) {
+          return (
+            <FormSection title="IV. Compliance to DP Conditions">
+              <Text style={styles.emptyText}>
+                No discharge permit on record for this establishment — compliance to DP conditions doesn't apply.
+              </Text>
+            </FormSection>
+          );
+        }
         return (
           <FormSection title="IV. Compliance to DP Conditions">
             {value.dpConditions.map((c, i) => {
@@ -815,6 +826,11 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: 14,
+  },
+  emptyText: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    fontStyle: 'italic',
   },
   subTitle: {
     fontSize: 11,
