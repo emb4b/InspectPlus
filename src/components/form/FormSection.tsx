@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
 
 interface FormSectionProps {
-  icon: keyof typeof Ionicons.glyphMap;
+  icon?: keyof typeof Ionicons.glyphMap;
   title: string;
   headerRight?: React.ReactNode;
   children: React.ReactNode;
@@ -14,7 +14,7 @@ export const FormSection: React.FC<FormSectionProps> = ({ icon, title, headerRig
   <View style={styles.section}>
     <View style={styles.titleRow}>
       <View style={styles.titleLeft}>
-        <Ionicons name={icon} size={16} color={Colors.navy} />
+        {icon && <Ionicons name={icon} size={16} color={Colors.navy} />}
         <Text style={styles.title} numberOfLines={1}>{title}</Text>
       </View>
       {headerRight}
