@@ -145,7 +145,7 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
             </View>
             <View style={styles.content}>
               <View style={styles.titleRow}>
-                <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+                <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
                 {item.status && (
                   <View
                     style={[
@@ -163,8 +163,8 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
                 )}
               </View>
               <View style={styles.metaRow}>
-                <Ionicons name="business-outline" size={10} color={Colors.textMuted} />
-                <Text style={styles.estabName} numberOfLines={1}>{item.estabName}</Text>
+                <Ionicons name="business-outline" size={10} color={Colors.textMuted} style={styles.metaIcon} />
+                <Text style={styles.estabName} numberOfLines={2}>{item.estabName}</Text>
               </View>
 
               {/* Sync status indicator */}
@@ -290,7 +290,7 @@ const styles = StyleSheet.create({
   },
   titleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: 6,
   },
@@ -312,9 +312,16 @@ const styles = StyleSheet.create({
   },
   metaRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 4,
     marginTop: 3,
+  },
+  // Nudges the icon down from the row's true top edge to align with the
+  // text's cap-height instead of its full line-height box, now that
+  // metaRow no longer vertically centers it against (potentially 2-line)
+  // wrapped estabName text.
+  metaIcon: {
+    marginTop: 1,
   },
   estabName: {
     fontSize: 10.5,

@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, LayoutChangeEvent } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import type { EstablishmentDTO } from '../types';
@@ -31,17 +31,35 @@ export const EstablishmentHeaderCard: React.FC<EstablishmentHeaderCardProps> = (
     .filter(Boolean)
     .join(', ');
 
+  // Icon box grows to match the combined height of the name + address (not
+  // the sync row, which is conditional and would make the box size jump
+  // around) — measured once on first layout and locked in, so it reads as
+  // a logo spanning the title block rather than a small fixed square next
+  // to two lines of wrapped text. Width tracks height 1:1 to stay square,
+  // and the glyph scales with it at its original ~1:2 ratio (19/40).
+  const [titleBlockHeight, setTitleBlockHeight] = useState<number | null>(null);
+  const titleBlockMeasured = useRef(false);
+  const handleTitleBlockLayout = (e: LayoutChangeEvent) => {
+    if (titleBlockMeasured.current) return;
+    titleBlockMeasured.current = true;
+    setTitleBlockHeight(e.nativeEvent.layout.height);
+  };
+  const iconSize = titleBlockHeight ?? 40;
+  const iconGlyphSize = Math.round(iconSize * 0.475);
+
   return (
     <View style={styles.card}>
       <View style={styles.topRow}>
-        <View style={styles.iconWrap}>
-          <Ionicons name="business" size={19} color={Colors.green} />
+        <View style={[styles.iconWrap, { width: iconSize, height: iconSize }]}>
+          <Ionicons name="business" size={iconGlyphSize} color={Colors.green} />
         </View>
         <View style={styles.titleInfo}>
-          <Text style={styles.name} numberOfLines={2}>{establishment.name}</Text>
-          <View style={styles.locationRow}>
-            <Ionicons name="location" size={11} color={Colors.green} />
-            <Text style={styles.location} numberOfLines={1}>{location}</Text>
+          <View onLayout={handleTitleBlockLayout}>
+            <Text style={styles.name} numberOfLines={2}>{establishment.name}</Text>
+            <View style={styles.locationRow}>
+              <Ionicons name="location" size={11} color={Colors.green} style={styles.locationIcon} />
+              <Text style={styles.location} numberOfLines={1}>{location}</Text>
+            </View>
           </View>
           {establishment.syncStatus === 'pending' && (
             <View style={styles.syncRow}>
@@ -147,9 +165,14 @@ const styles = StyleSheet.create({
   },
   locationRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 4,
     marginTop: 3,
+  },
+  // Nudges the icon down from the row's true top edge to align with the
+  // text's cap-height instead of its full line-height box.
+  locationIcon: {
+    marginTop: 2,
   },
   location: {
     fontSize: 11,

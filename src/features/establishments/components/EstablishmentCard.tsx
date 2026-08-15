@@ -9,6 +9,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
+import { REPORT_TYPES, ReportTypeKey } from '../../../constants/reportTypes';
 import type { EstablishmentDTO, ComplianceTag } from '../types';
 
 interface EstablishmentCardProps {
@@ -19,13 +20,28 @@ interface EstablishmentCardProps {
   onDelete?: (item: EstablishmentDTO) => void;
 }
 
-const TAG_STYLES: Record<ComplianceTag, { bg: string; text: string; icon: string }> = {
-  'Air Monitoring':   { bg: '#e0f0f8', text: '#2c7da0', icon: 'partly-sunny-outline' },
-  'Water Monitoring': { bg: '#ddf3e4', text: '#2d7a52', icon: 'water-outline' },
-  'Hazwaste':         { bg: '#fce8e8', text: '#c0392b', icon: 'warning-outline' },
-  'Survey':           { bg: '#fef3cd', text: '#8a6200', icon: 'leaf-outline' },
-  'EIA':              { bg: '#ede9fe', text: '#5b21b6', icon: 'globe-outline' },
+// ComplianceTag (the establishment-level rollup label — see
+// REPORT_TYPE_TO_TAG in useEstablishment.ts) -> the ReportTypeKey that
+// carries its law citation, color scheme, and icon in REPORT_TYPES — the
+// same source InspectionReportHeader's type-flag pill reads from. One
+// lookup here instead of a second, separately-hardcoded style map means a
+// tag's law/colors/icon can never drift from what the report screens show
+// for that same type, and a new report type only ever needs adding once.
+const TAG_TO_REPORT_TYPE_KEY: Record<ComplianceTag, ReportTypeKey> = {
+  'Air Monitoring': 'air',
+  'Water Monitoring': 'water',
+  'Hazwaste': 'hazwaste_generator',
+  'EIA': 'eia',
+  'Survey': 'survey',
 };
+
+function getTagMeta(tag: ComplianceTag) {
+  const found = REPORT_TYPES.find(t => t.key === TAG_TO_REPORT_TYPE_KEY[tag]);
+  if (!found) {
+    return { label: tag, bg: Colors.bgLight, text: Colors.textMuted, IconAsset: undefined };
+  }
+  return { label: found.law || found.title, bg: found.bgColor, text: found.textColor, IconAsset: found.iconAsset };
+}
 
 const MAX_VISIBLE_TAGS = 3;
 
@@ -141,7 +157,7 @@ export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
 
             {/* Content */}
             <View style={styles.content}>
-              <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
+              <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
 
               {/* Location */}
               <View style={styles.locationRow}>
@@ -166,11 +182,13 @@ export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
               {/* Compliance tags */}
               <View style={styles.tagRow}>
                 {visibleTags.map(tag => {
-                  const s = TAG_STYLES[tag];
+                  const meta = getTagMeta(tag);
                   return (
-                    <View key={tag} style={[styles.tag, { backgroundColor: s.bg }]}>
-                      <Ionicons name={s.icon as any} size={9} color={s.text} />
-                      <Text style={[styles.tagText, { color: s.text }]}>{tag}</Text>
+                    <View key={tag} style={[styles.tag, { backgroundColor: meta.bg }]}>
+                      {meta.IconAsset && <meta.IconAsset width={9} height={9} />}
+                      <Text style={[styles.tagText, { color: meta.text }]} numberOfLines={1}>
+                        {meta.label}
+                      </Text>
                     </View>
                   );
                 })}

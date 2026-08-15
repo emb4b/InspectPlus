@@ -178,10 +178,8 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
     <View style={styles.flex}>
       <ReportFormHeader
         establishmentName={generalInfo.name || 'New Establishment'}
-        establishmentLocation={[generalInfo.city, generalInfo.province].filter(Boolean).join(', ')}
-        typeLabel="Water Monitoring"
-        typeColor={Colors.water.text}
-        typeBgColor={Colors.water.bg}
+        establishmentLocation={[generalInfo.addressLine, generalInfo.city, generalInfo.province].filter(Boolean).join(', ')}
+        reportType={REPORT_TYPE}
         tabs={tabs}
         activeMain={activeMainTab.key}
         onMainChange={setActiveMain}

@@ -118,6 +118,21 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
     setMetaBlockHeight(e.nativeEvent.layout.height);
   };
 
+  // Same measure-once pattern as above — the leading icon box grows to
+  // match the combined height of the name + address (never the sync row,
+  // which is conditional and would make the icon's size jump around), so
+  // it reads as a logo spanning the full title block instead of a small
+  // fixed square dwarfed by two lines of wrapped text. Locked in from the
+  // first (expanded, uncollapsed) layout pass rather than re-measured live,
+  // so it doesn't chase the scroll-collapse animation's shrinking height.
+  const [titleBlockHeight, setTitleBlockHeight] = useState<number | null>(null);
+  const titleBlockMeasured = useRef(false);
+  const handleTitleBlockLayout = (e: LayoutChangeEvent) => {
+    if (titleBlockMeasured.current) return;
+    titleBlockMeasured.current = true;
+    setTitleBlockHeight(e.nativeEvent.layout.height);
+  };
+
   const iconAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: interpolate(progress.value, [0, 1], [1, 0.7], Extrapolation.CLAMP) }],
   }));
@@ -150,6 +165,14 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
     ? fullName || 'You'
     : resolvedInspectorName ?? (inspectorNameLoading ? 'Loading…' : 'Unknown inspector');
 
+  // Square box — width tracks the measured height 1:1 so the icon reads as
+  // a logo scaling proportionally rather than a fixed square stretching
+  // into a rectangle. Glyph grows with the box at its original ~1:2 ratio
+  // (22/44) so it stays visually balanced instead of shrinking into a
+  // corner of a much taller box.
+  const iconSize = titleBlockHeight ?? 44;
+  const iconGlyphSize = Math.round(iconSize * 0.5);
+
   return (
     <View style={styles.container}>
       <View style={styles.topBar}>
@@ -167,16 +190,21 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
 
       <View style={styles.card}>
         <View style={styles.topRow}>
-          <Reanimated.View style={[styles.iconWrap, iconAnimatedStyle]}>
-            <Ionicons name="business" size={22} color={Colors.green} />
+          <Reanimated.View style={[styles.iconWrap, { width: iconSize, height: iconSize }, iconAnimatedStyle]}>
+            <Ionicons name="document-text" size={iconGlyphSize} color={Colors.green} />
           </Reanimated.View>
           <View style={styles.titleInfo}>
-            <Text style={styles.name} numberOfLines={2}>{establishmentName}</Text>
-            <Reanimated.View
-              style={[styles.locationWrap, locationAnimatedStyle]}
-              onLayout={handleLocationLayout}>
-              <Text style={styles.location} numberOfLines={2}>{establishmentLocation}</Text>
-            </Reanimated.View>
+            <View onLayout={handleTitleBlockLayout}>
+              <Text style={styles.name} numberOfLines={2}>{establishmentName}</Text>
+              <Reanimated.View
+                style={[styles.locationWrap, locationAnimatedStyle]}
+                onLayout={handleLocationLayout}>
+                <View style={styles.locationRow}>
+                  <Ionicons name="location" size={11} color={Colors.green} style={styles.locationIcon} />
+                  <Text style={styles.location} numberOfLines={2}>{establishmentLocation}</Text>
+                </View>
+              </Reanimated.View>
+            </View>
             {syncStatus === 'pending' && (
               <View style={styles.syncRow}>
                 <Ionicons name="cloud-upload-outline" size={10} color={Colors.pending} />
@@ -192,8 +220,10 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
           </View>
           <View style={styles.badgeGroup}>
             {/* The law citation (e.g. "R.A. 9275") stands in for the full report
-                type name here — short enough to sit beside the status badge
-                without the two competing for width the way the full label did. */}
+                type name here. Stacked top-to-bottom rather than side by side —
+                a row of both pills was wide enough to squeeze the name/address
+                column into truncating; stacked, badgeGroup only needs to be as
+                wide as the wider single pill. */}
             <View style={[styles.pill, { backgroundColor: typeMeta.bgColor }]}>
               {IconAsset && <IconAsset width={11} height={11} />}
               <Text style={[styles.pillText, { color: typeMeta.textColor }]} numberOfLines={1}>
@@ -303,19 +333,12 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   topRow: {
-    // center, not flex-start: iconWrap is a fixed 44x44 box (not stretched
-    // to the title column's height), so when the card is collapsed and
-    // titleInfo shrinks down to just the single-line name, it's shorter
-    // than the icon — flex-start would leave the name/badge pinned to the
-    // top of the row while the icon sits centered in its own taller box,
-    // visibly misaligned. Center keeps the icon, name, and badge group on
-    // the same visual midline whether expanded or collapsed. This no longer
-    // reintroduces the old wobble concern: the row's height now changes
-    // smoothly with the scroll-linked collapse rather than snapping between
-    // states, so the recentering happens gradually, in step with everything
-    // else, instead of as a sudden jump.
+    // flex-start: icon and badge group pin to the top of the row rather
+    // than recentering as titleInfo's height changes (collapsing, or
+    // syncRow appearing/disappearing) — a fixed anchor point instead of a
+    // midline that shifts with content.
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 10,
   },
   iconWrap: {
@@ -332,9 +355,9 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   name: {
-    fontSize: 17,
+    fontSize: 15.5,
     fontWeight: '800',
-    color: Colors.navy,
+    color: Colors.textPrimary,
   },
   // Not part of the collapsing block below — the address collapses away,
   // but the name above it never does.
@@ -344,15 +367,11 @@ const styles = StyleSheet.create({
   metaWrap: {
     overflow: 'hidden',
   },
-  // Report-type flag + status badge, stacked beside each other on the
-  // right. wrap (rather than a fixed row) is a safety net for narrow
-  // screens or an unusually long law citation — never lets the pair push
-  // into the name's column.
+  // Report-type flag + status badge, stacked top-to-bottom on the right —
+  // see the JSX comment above for why column rather than row.
   badgeGroup: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'flex-end',
     gap: 6,
     flexShrink: 0,
   },
@@ -369,10 +388,23 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: '700',
   },
-  location: {
-    fontSize: 11.5,
-    color: Colors.textMuted,
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 4,
     marginTop: 4,
+  },
+  // Nudges the icon down from the row's true top edge to align with the
+  // text's cap-height instead of its full line-height box — needed now
+  // that locationRow no longer vertically centers the icon against
+  // (potentially 2-line) wrapped address text.
+  locationIcon: {
+    marginTop: 2,
+  },
+  location: {
+    flex: 1,
+    fontSize: 11,
+    color: Colors.textMuted,
   },
   syncRow: {
     flexDirection: 'row',
