@@ -95,7 +95,20 @@ async function getPendingRecords(entity: SyncEntityName): Promise<LocalPendingRe
   return { created, updated, deleted };
 }
 
-export const watermelonPushSource: LocalPushSourceAdapter = { getPendingRecords };
+// See collectPushChanges.ts's repairMissingParents for why this exists — a
+// plain lookup, deliberately not filtered by syncState.
+async function findLocalRecord(entity: SyncEntityName, id: string): Promise<LocalSyncRecord | null> {
+  const record = await findById(entity, id);
+  if (!record) return null;
+
+  const localFieldNames = Object.values(syncSchema[entity].fields);
+  return toLocalRecord(record, localFieldNames);
+}
+
+export const watermelonPushSource: LocalPushSourceAdapter = {
+  getPendingRecords,
+  findLocalRecord,
+};
 
 // ── Entity adapter (pull -> applyPulledChanges) ────────────────────────────
 

@@ -14,7 +14,12 @@ export interface SupabaseLikeClient {
     options?: { signal?: AbortSignal }
   ): Promise<{
     data: TResponse | null;
-    error: { message?: string } | null;
+    // details/hint carry Postgres's own DETAIL/HINT lines (e.g. the exact
+    // key value that failed a foreign key check) — supabase-js's
+    // PostgrestError always has these, but the narrow shape here used to
+    // only declare `message`, silently discarding them before they ever
+    // reached the thrown Error below.
+    error: { message?: string; details?: string; hint?: string; code?: string } | null;
   }>;
 }
 
@@ -70,8 +75,9 @@ export async function pushChanges(
   );
 
   if (error) {
+    const extra = [error.details, error.hint].filter(Boolean).join(' — ');
     throw new Error(
-      `Failed to push changes: ${error.message ?? 'Unknown RPC error'}`
+      `Failed to push changes: ${error.message ?? 'Unknown RPC error'}${extra ? ` (${extra})` : ''}`
     );
   }
 
