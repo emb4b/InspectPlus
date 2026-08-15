@@ -2,8 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { Q } from '@nozbe/watermelondb';
 import { collections } from '../../../db/database';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
-import { isEstablishmentVisible, isPrivilegedRole } from '../../establishments/hooks/useEstablishment';
+import { isEstablishmentVisible, isPrivilegedRole, reportSyncStatusWithAttachments } from '../../establishments/hooks/useEstablishment';
 import { buildPurposeFormFromModel, PurposeFormState } from '../types';
+import type { SyncStatus } from '../../establishments/types';
 import type { EstablishmentSnapshot, PermitSnapshotItem } from '../../../services/sync/syncTypes';
 import type { YnValue } from '../../../components/form';
 import type {
@@ -24,6 +25,11 @@ export interface InspectionReportSummary {
   inspectionDate: string;
   reportStatus: string;
   syncState: string;
+  // Normalized 'synced' | 'pending' | 'conflict', folding in this report's
+  // own attachments — see reportSyncStatusWithAttachments. Distinct from the
+  // raw syncState above, which is the report row's own WatermelonDB state
+  // only.
+  syncStatus: SyncStatus;
   establishmentSnapshot: EstablishmentSnapshot;
   permitsSnapshot: PermitSnapshotItem[];
   createdAt: string;
@@ -199,6 +205,10 @@ export function useInspectionReport(reportId: string | undefined): UseInspection
           return;
         }
 
+        const reportAttachments = await collections.attachments
+          .query(Q.where('inspectionReportId', reportModel.reportId))
+          .fetch();
+
         const summary: InspectionReportSummary = {
           reportId: reportModel.reportId,
           estabId: reportModel.estabId,
@@ -209,6 +219,10 @@ export function useInspectionReport(reportId: string | undefined): UseInspection
           inspectionDate: reportModel.inspectionDate,
           reportStatus: reportModel.reportStatus,
           syncState: reportModel.syncState,
+          syncStatus: reportSyncStatusWithAttachments(
+            reportModel.syncState,
+            reportAttachments.map(a => a.syncState),
+          ),
           establishmentSnapshot: reportModel.establishmentSnapshot,
           permitsSnapshot: reportModel.permitsSnapshot ?? [],
           createdAt: reportModel.createdAt,

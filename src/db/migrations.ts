@@ -1,4 +1,4 @@
-import { schemaMigrations, addColumns, unsafeExecuteSql } from '@nozbe/watermelondb/Schema/migrations';
+import { schemaMigrations, addColumns, createTable, unsafeExecuteSql } from '@nozbe/watermelondb/Schema/migrations';
 
 // v5 -> v6: compliance_air/water/hazwaste/eia never had a syncState column,
 // so edits to those tables couldn't be flagged for push sync. See
@@ -37,6 +37,13 @@ import { schemaMigrations, addColumns, unsafeExecuteSql } from '@nozbe/watermelo
 // free text; see flexibleDate.ts) an establishment became closed/non-
 // operational, shown in place of the operating hours/days fields once
 // operatingStatus isn't 'Operational'.
+//
+// v9 -> v10: adds the attachments table (photo attachments on inspection
+// reports — see schema.ts's column comment for the full shape). First
+// createTable step in this codebase's migration history; every prior step
+// only added columns to existing tables.
+//
+// v10 -> v11: attachments gains an optional inspector-entered caption.
 export const migrations = schemaMigrations({
   migrations: [
     {
@@ -89,6 +96,45 @@ export const migrations = schemaMigrations({
         addColumns({
           table: 'establishments',
           columns: [{ name: 'operatingStatusSince', type: 'string', isOptional: true }],
+        }),
+      ],
+    },
+    {
+      toVersion: 10,
+      steps: [
+        createTable({
+          name: 'attachments',
+          columns: [
+            { name: 'attachmentId',       type: 'string' },
+            { name: 'inspectionReportId', type: 'string', isOptional: true },
+            { name: 'surveyReportId',     type: 'string', isOptional: true },
+            { name: 'inspectorUid',       type: 'string' },
+            { name: 'storagePath',        type: 'string', isOptional: true },
+            { name: 'fileName',           type: 'string' },
+            { name: 'mimeType',           type: 'string' },
+            { name: 'fileSize',           type: 'number' },
+            { name: 'geoLat',             type: 'number', isOptional: true },
+            { name: 'geoLng',             type: 'number', isOptional: true },
+            { name: 'capturedAt',         type: 'string' },
+            { name: 'deviceId',           type: 'string' },
+            { name: 'createdAt',          type: 'string' },
+            { name: 'updatedAt',          type: 'string' },
+            { name: 'updated_at',         type: 'number' },
+            { name: 'deletedAt',          type: 'string', isOptional: true },
+            { name: 'syncState',          type: 'string' },
+            { name: 'localUri',           type: 'string', isOptional: true },
+            { name: 'uploadStatus',       type: 'string' },
+            { name: 'uploadError',        type: 'string', isOptional: true },
+          ],
+        }),
+      ],
+    },
+    {
+      toVersion: 11,
+      steps: [
+        addColumns({
+          table: 'attachments',
+          columns: [{ name: 'caption', type: 'string', isOptional: true }],
         }),
       ],
     },

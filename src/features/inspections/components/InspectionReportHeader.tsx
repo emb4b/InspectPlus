@@ -14,6 +14,7 @@ import { useInspectorName } from '../../../core/hooks/useInspectorName';
 import { canManageAllRecords } from '../../establishments/hooks/useEstablishment';
 import { getReportTypeMeta } from '../reportTypeMeta';
 import { TwoRowTabs, TwoRowMainTabDef } from './TwoRowTabs';
+import type { SyncStatus } from '../../establishments/types';
 
 // Non-water report kinds (hazwaste, air, eia) still use this original
 // 3-tab structure — only water reports get the full 1-6 section/subsection
@@ -22,6 +23,7 @@ export const DEFAULT_REPORT_DETAIL_TABS: TwoRowMainTabDef[] = [
   { key: 'geninfo', number: '1', label: 'General Information' },
   { key: 'purpose', number: '2', label: 'Purpose of Inspection' },
   { key: 'compliance', number: '3', label: 'Compliance Status' },
+  { key: 'attachments', number: '4', label: 'Attachments' },
 ];
 
 function formatDate(iso: string): string {
@@ -37,6 +39,11 @@ interface InspectionReportHeaderProps {
   reportControlNo: string | null;
   inspectionDate: string;
   reportStatus: string;
+  // Normalized sync status ('synced' | 'pending' | 'conflict'), already
+  // folding in this report's own attachments — see
+  // reportSyncStatusWithAttachments and useInspectionReport.ts. The badge
+  // is omitted entirely when 'synced' (nothing to flag).
+  syncStatus: SyncStatus;
   inspectorUid: string;
   tabs: TwoRowMainTabDef[];
   activeMain: string;
@@ -60,6 +67,7 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
   reportControlNo,
   inspectionDate,
   reportStatus,
+  syncStatus,
   inspectorUid,
   tabs,
   activeMain,
@@ -169,6 +177,18 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
               onLayout={handleLocationLayout}>
               <Text style={styles.location} numberOfLines={2}>{establishmentLocation}</Text>
             </Reanimated.View>
+            {syncStatus === 'pending' && (
+              <View style={styles.syncRow}>
+                <Ionicons name="cloud-upload-outline" size={10} color={Colors.pending} />
+                <Text style={styles.syncText}>Pending sync</Text>
+              </View>
+            )}
+            {syncStatus === 'conflict' && (
+              <View style={styles.syncRow}>
+                <Ionicons name="alert-circle-outline" size={10} color={Colors.conflict} />
+                <Text style={[styles.syncText, { color: Colors.conflict }]}>Sync conflict</Text>
+              </View>
+            )}
           </View>
           <View style={styles.badgeGroup}>
             {/* The law citation (e.g. "R.A. 9275") stands in for the full report
@@ -353,6 +373,17 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     color: Colors.textMuted,
     marginTop: 4,
+  },
+  syncRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 4,
+  },
+  syncText: {
+    fontSize: 10,
+    color: Colors.pending,
+    fontWeight: '600',
   },
   statusBadge: {
     paddingHorizontal: 10,

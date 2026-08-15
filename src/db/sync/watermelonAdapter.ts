@@ -27,6 +27,8 @@ function collectionFor(entity: SyncEntityName): Collection<Model> {
       return collections.complianceHazwaste as unknown as Collection<Model>;
     case 'compliance_eia':
       return collections.complianceEia as unknown as Collection<Model>;
+    case 'attachments':
+      return collections.attachments as unknown as Collection<Model>;
   }
 }
 
@@ -69,6 +71,16 @@ async function getPendingRecords(entity: SyncEntityName): Promise<LocalPendingRe
     if (syncState === 'pending_delete') {
       deleted.push(record.id);
       continue;
+    }
+
+    // An attachment's binary file uploads to Supabase Storage on its own
+    // pipeline (attachmentUploadQueue.ts), separate from this metadata push.
+    // Pushing before the upload finishes would send storage_path: null,
+    // which the server would then need a follow-up update to reconcile —
+    // simpler to just hold the row back until the file has actually landed.
+    if (entity === 'attachments') {
+      const uploadStatus = (record as unknown as { uploadStatus: string }).uploadStatus;
+      if (uploadStatus !== 'uploaded') continue;
     }
 
     const plain = toLocalRecord(record, localFieldNames);

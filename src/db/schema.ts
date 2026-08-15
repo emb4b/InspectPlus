@@ -25,7 +25,7 @@ import { appSchema, tableSchema } from '@nozbe/watermelondb';
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const schema = appSchema({
-  version: 9,
+  version: 11,
   tables: [
 
     // ── ESTABLISHMENTS ───────────────────────────────────────────────────────
@@ -254,6 +254,48 @@ export const schema = appSchema({
         { name: 'remarksRecommendations', type: 'string', isOptional: true },
         { name: 'documentsReviewed',      type: 'string', isOptional: true },
         { name: 'syncState',              type: 'string', isOptional: true }, // ← not syncStatus
+      ],
+    }),
+
+    // ── ATTACHMENTS ──────────────────────────────────────────────────────────
+    // References exactly one of inspectionReportId / surveyReportId — enforced
+    // app-side in attachmentPersistence.ts (WatermelonDB has no CHECK-constraint
+    // support locally; the backend enforces it via a real CHECK constraint, see
+    // the create_attachments_table migration). Only inspection reports are
+    // wired up in the UI for now — surveyReportId exists so survey report
+    // support is a pure UI follow-up later, not a schema/sync change.
+    //
+    // localUri / uploadStatus / uploadError are local-only: deliberately
+    // excluded from syncSchema.ts's `attachments.fields` map so they never
+    // reach the push payload. The binary file itself never syncs through
+    // pull_changes/push_changes — see attachmentUploadQueue.ts, which uploads
+    // directly to Supabase Storage and stores the resulting path in
+    // storagePath (which IS synced).
+    tableSchema({
+      name: 'attachments',
+      columns: [
+        { name: 'attachmentId',      type: 'string' },
+        { name: 'inspectionReportId', type: 'string', isOptional: true },
+        { name: 'surveyReportId',    type: 'string', isOptional: true },
+        { name: 'inspectorUid',      type: 'string' },
+        { name: 'storagePath',       type: 'string', isOptional: true },
+        { name: 'fileName',          type: 'string' },
+        { name: 'mimeType',          type: 'string' },
+        { name: 'fileSize',          type: 'number' },
+        { name: 'geoLat',            type: 'number', isOptional: true },
+        { name: 'geoLng',            type: 'number', isOptional: true },
+        { name: 'capturedAt',        type: 'string' },
+        { name: 'caption',           type: 'string', isOptional: true },
+        { name: 'deviceId',          type: 'string' },
+        { name: 'createdAt',         type: 'string' },
+        { name: 'updatedAt',         type: 'string' },
+        { name: 'updated_at',        type: 'number' }, // reserved — see note above, not used by app code
+        { name: 'deletedAt',         type: 'string', isOptional: true },
+        { name: 'syncState',         type: 'string' }, // ← not syncStatus
+        // Local-only — never synced, see column comment above.
+        { name: 'localUri',          type: 'string', isOptional: true },
+        { name: 'uploadStatus',      type: 'string' }, // 'pending' | 'uploading' | 'uploaded' | 'failed'
+        { name: 'uploadError',       type: 'string', isOptional: true },
       ],
     }),
 

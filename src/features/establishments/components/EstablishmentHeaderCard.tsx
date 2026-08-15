@@ -43,6 +43,18 @@ export const EstablishmentHeaderCard: React.FC<EstablishmentHeaderCardProps> = (
             <Ionicons name="location" size={11} color={Colors.green} />
             <Text style={styles.location} numberOfLines={1}>{location}</Text>
           </View>
+          {establishment.syncStatus === 'pending' && (
+            <View style={styles.syncRow}>
+              <Ionicons name="cloud-upload-outline" size={10} color={Colors.pending} />
+              <Text style={styles.syncText}>Pending sync</Text>
+            </View>
+          )}
+          {establishment.syncStatus === 'conflict' && (
+            <View style={styles.syncRow}>
+              <Ionicons name="alert-circle-outline" size={10} color={Colors.conflict} />
+              <Text style={[styles.syncText, { color: Colors.conflict }]}>Sync conflict</Text>
+            </View>
+          )}
         </View>
       </View>
 
@@ -143,6 +155,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textMuted,
     flex: 1,
+  },
+  syncRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 4,
+  },
+  syncText: {
+    fontSize: 10,
+    color: Colors.pending,
+    fontWeight: '600',
   },
   actions: {
     flexDirection: 'row',

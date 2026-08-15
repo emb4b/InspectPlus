@@ -6,3 +6,4 @@ export { ComplianceAir }        from './ComplianceAir';
 export { ComplianceWater }      from './ComplianceWater';
 export { ComplianceHazwaste }   from './ComplianceHazwaste';
 export { ComplianceEia }        from './ComplianceEia';
+export { Attachment }           from './Attachment';

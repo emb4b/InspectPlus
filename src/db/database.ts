@@ -11,6 +11,7 @@ import {
   ComplianceWater,
   ComplianceHazwaste,
   ComplianceEia,
+  Attachment,
 } from './models';
 
 // ── SQLite adapter ────────────────────────────────────────────────────────────
@@ -36,6 +37,7 @@ export const database = new Database({
     ComplianceWater,
     ComplianceHazwaste,
     ComplianceEia,
+    Attachment,
   ],
 });
 
@@ -51,4 +53,5 @@ export const collections = {
   complianceWater:     database.collections.get<ComplianceWater>('compliance_water'),
   complianceHazwaste:  database.collections.get<ComplianceHazwaste>('compliance_hazwaste'),
   complianceEia:       database.collections.get<ComplianceEia>('compliance_eia'),
+  attachments:         database.collections.get<Attachment>('attachments'),
 };

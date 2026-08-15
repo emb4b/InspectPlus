@@ -13,7 +13,8 @@ export type WaterMainTabKey =
   | 'compliance'
   | 'watersupply'
   | 'wastewaterpollution'
-  | 'samplingfindings';
+  | 'samplingfindings'
+  | 'attachments';
 
 export type WaterSupplySubKey = 'waterSources' | 'wastewaterSources' | 'abstractedWaterQuality';
 
@@ -77,8 +78,15 @@ export function establishmentHasDischargePermit(permits: PermitSnapshotItem[]): 
   return permits.some(p => /discharge permit/i.test(p.permit_type) || /discharge permit/i.test(p.envi_law));
 }
 
-export function buildWaterReportTabs(): WaterMainTabDef[] {
-  return [
+// buildWaterReportTabs() is shared between the report DETAIL screen
+// (InspectionReportDetailScreen, where a saved reportId exists and photos
+// can actually be attached) and the CREATE form (WaterInspectionFormScreen,
+// reached before the report has been saved at all). Attachments need a real
+// reportId to attach to, so the create form has nothing to render for that
+// tab — it must opt in explicitly via includeAttachments, or it gets an
+// "Attachments" tab in the bar with no matching content underneath it.
+export function buildWaterReportTabs(options?: { includeAttachments?: boolean }): WaterMainTabDef[] {
+  const tabs: WaterMainTabDef[] = [
     { key: 'geninfo', number: '1', label: 'General Information' },
     { key: 'purpose', number: '2', label: 'Purpose of Inspection' },
     { key: 'compliance', number: '3', label: 'Compliance Status' },
@@ -86,4 +94,10 @@ export function buildWaterReportTabs(): WaterMainTabDef[] {
     { key: 'wastewaterpollution', number: '5', label: 'Information on Wastewater Pollution', subTabs: WASTEWATER_POLLUTION_SUBTABS },
     { key: 'samplingfindings', number: '6', label: 'Sampling and Compliance Findings', subTabs: SAMPLING_FINDINGS_SUBTABS },
   ];
+
+  if (options?.includeAttachments) {
+    tabs.push({ key: 'attachments', number: '7', label: 'Attachments' });
+  }
+
+  return tabs;
 }

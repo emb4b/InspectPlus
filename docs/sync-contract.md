@@ -58,6 +58,7 @@ The current synced entities are:
 - `compliance_water`
 - `compliance_hazwaste`
 - `compliance_eia`
+- `attachments`
 
 ### Directly-accessed entities
 
@@ -141,6 +142,7 @@ The following entities use soft delete:
 
 - `inspection_reports`
 - `survey_reports`
+- `attachments`
 
 For these entities:
 
@@ -527,6 +529,46 @@ report-creation time. Deliberately excludes `product`, `year_established`,
 
 ---
 
+## 9. `attachments`
+
+Photo attachments captured or picked by an inspector, attached to either an
+`inspection_reports` or a `survey_reports` row. Only `inspection_reports` is
+wired into the UI so far — `survey_report_id` exists so survey report
+support is a pure UI follow-up, not a schema change.
+
+The row itself (metadata) syncs through `pull_changes`/`push_changes` like
+every other entity here. The actual file bytes do **not** — they upload
+directly to Supabase Storage (bucket `attachments`) via a separate pipeline
+that runs before the metadata push (see `attachmentUploadQueue.ts`), and
+`storage_path` is only populated, and the row only pushed, once that upload
+succeeds. Downstream devices display an attachment via an on-demand signed
+URL (`createSignedUrl`), not by downloading the file to local storage.
+
+### Primary key
+- `attachment_id`
+
+### Foreign keys
+- `inspection_report_id` → `inspection_reports.report_id` (nullable)
+- `survey_report_id` → `survey_reports.survey_id` (nullable)
+- exactly one of the two must be set — enforced by a `CHECK` constraint server-side (`num_nonnulls(inspection_report_id, survey_report_id) = 1`); WatermelonDB's local SQLite schema has no CHECK-constraint support, so this is only enforced in app code (`attachmentPersistence.ts`) on the client
+- `inspector_uid` → `user_accounts.uid`
+
+### Important fields
+- `storage_path` (nullable — null until the file finishes uploading to Storage)
+- `file_name`, `mime_type`, `file_size`
+- `geo_lat`, `geo_lng` (nullable — only set for camera captures, not library picks)
+- `captured_at`
+- `caption` (nullable — optional, inspector-entered, added/edited after capture)
+- `created_at`, `updated_at`, `deleted_at`
+- `sync_status`
+- `device_id`
+
+### Deletion behavior
+- soft delete, same as `inspection_reports`/`survey_reports`
+- deleting an attachment does **not** delete its underlying Storage object — accepted as a deliberate v1 simplification (low volume, cheap to leave orphaned)
+
+---
+
 ## Conflict Handling
 
 The current conflict strategy is:
@@ -552,6 +594,7 @@ The client must preserve and send the correct `updated_at` value for updated row
 Used for:
 - `inspection_reports`
 - `survey_reports`
+- `attachments`
 
 When deleted through sync:
 - row remains in database
@@ -629,6 +672,7 @@ Then add:
 6. `compliance_water`
 7. `compliance_hazwaste`
 8. `compliance_eia`
+9. `attachments`
 
 This gives a smaller end-to-end vertical slice first.
 
@@ -640,7 +684,6 @@ Possible future changes to this contract:
 
 - add version fields instead of relying only on `updated_at`
 - convert more entities to soft delete
-- add attachment/media sync entities
 - add explicit `updated` arrays in pull output when needed
 - introduce safer parent-child cascade handling rules
 

@@ -17,6 +17,7 @@ import { DenrPermitsSection } from './DenrPermitsSection';
 import { useHeaderScroll } from '../../home/context/HeaderScrollContext';
 import { WaterExtraSectionsView } from '../water/WaterComplianceEditSections';
 import { buildWaterReportTabs, establishmentHasDischargePermit } from '../water/waterReportTabs';
+import { AttachmentsSection } from '../../attachments/components/AttachmentsSection';
 
 const WATER_REPORT_TYPE = 'water_monitoring';
 
@@ -125,7 +126,7 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
   // layout — see waterReportTabs.ts and DEFAULT_REPORT_DETAIL_TABS.
   const isWater = report.reportType === WATER_REPORT_TYPE;
   const hasDp = establishmentHasDischargePermit(report.permitsSnapshot);
-  const waterTabs = buildWaterReportTabs();
+  const waterTabs = buildWaterReportTabs({ includeAttachments: true });
   const tabs = isWater ? waterTabs : DEFAULT_REPORT_DETAIL_TABS;
   const activeMainTab = tabs.find(t => t.key === activeMain) ?? tabs[0];
   const activeWaterMainTab = waterTabs.find(t => t.key === activeMain) ?? waterTabs[0];
@@ -139,6 +140,7 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
         reportControlNo={report.reportControlNo}
         inspectionDate={report.inspectionDate}
         reportStatus={report.reportStatus}
+        syncStatus={report.syncStatus}
         inspectorUid={report.inspectorUid}
         tabs={tabs}
         activeMain={activeMainTab.key}
@@ -218,6 +220,9 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
           ))}
         {isWater && compliance.kind === 'water' && (activeMainTab.key === 'watersupply' || activeMainTab.key === 'wastewaterpollution' || activeMainTab.key === 'samplingfindings') && (
           <WaterExtraSectionsView compliance={compliance} canEdit={canEdit} onSaved={refetch} mainTab={activeWaterMainTab} hasDp={hasDp} />
+        )}
+        {activeMainTab.key === 'attachments' && (
+          <AttachmentsSection parentType="inspection" parentId={report.reportId} canEdit={canEdit} />
         )}
       </KeyboardAwareScrollView>
     </View>

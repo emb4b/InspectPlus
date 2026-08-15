@@ -118,6 +118,13 @@ file_size_limit = "50MiB"
 # allowed_mime_types = ["image/png", "image/jpeg"]
 # objects_path = "./images"
 
+# Local dev only — the hosted project's bucket is provisioned by
+# create_attachments_storage_bucket.sql, not by this file.
+[storage.buckets.attachments]
+public = false
+file_size_limit = "50MiB"
+allowed_mime_types = ["image/jpeg", "image/png", "image/heic", "image/heif"]
+
 # Allow connections via S3 compatible clients
 [storage.s3_protocol]
 enabled = true

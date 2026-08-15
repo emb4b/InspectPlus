@@ -5,6 +5,7 @@ import { generateId } from '../../../utils/crypto';
 import { getDeviceId } from '../../../utils/device';
 import { createEstablishmentRecord, resolveEstablishmentContentEdit } from '../establishmentPersistence';
 import { notifySyncDataChanged } from '../../../services/sync/syncEvents';
+import { nextSyncStateForEdit } from '../../../utils/syncState';
 import {
   GeneralInfoFormState,
   PurposeFormState,
@@ -41,7 +42,10 @@ interface UseReportFormStateOptions {
 // caller can create its own type-specific compliance row(s) using the same
 // reportId. Must NOT open its own database.write — it already runs inside
 // one. Kept generic so other report types can reuse this hook later.
-type WriteComplianceFn = (args: { reportId: string }) => Promise<void>;
+// isUpdate mirrors save()'s own create-vs-update decision (see below) — a
+// caller whose first save() already created the report needs to know to
+// update its own compliance row on the next save() rather than re-create it.
+type WriteComplianceFn = (args: { reportId: string; isUpdate: boolean }) => Promise<void>;
 
 function nowIso() {
   return new Date().toISOString();
@@ -67,6 +71,12 @@ export function useReportFormState({
   const [controlNumber, setControlNumber] = useState(initialControlNumber ?? '');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Set once the first save() completes, then reused (and updated in place)
+  // on every subsequent call — lets a caller invoke save() more than once
+  // for the same in-progress report (e.g. an early silent draft-save
+  // triggered by adding an attachment, followed later by the inspector's
+  // own explicit Save Draft/Submit) without inserting duplicate rows.
+  const [savedIds, setSavedIds] = useState<{ purposeId: string; reportId: string } | null>(null);
 
   const save = useCallback(
     async (status: ReportSaveStatus, writeCompliance: WriteComplianceFn) => {
@@ -75,8 +85,9 @@ export function useReportFormState({
       try {
         const deviceId = await getDeviceId();
         const resolvedEstabId = estabId ?? generateId();
-        const purposeId = generateId();
-        const reportId = generateId();
+        const isUpdate = !!savedIds;
+        const purposeId = savedIds?.purposeId ?? generateId();
+        const reportId = savedIds?.reportId ?? generateId();
         const now = nowIso();
 
         const verifyInfoList: VerifyInfoListItem[] = purpose.verifyInfoRows
@@ -154,47 +165,84 @@ export function useReportFormState({
             await createEstablishmentRecord({ estabId: resolvedEstabId, inspectorUid, deviceId, generalInfo });
           }
 
-          await collections.purposeOfInspection.create(rec => {
-            rec._raw.id = purposeId;
-            rec.purposeId = purposeId;
-            rec.estabId = resolvedEstabId;
-            rec.inspectorUid = inspectorUid;
-            rec.inspectionDate = purpose.inspectionDate;
-            rec.verifyInfo = purpose.verifyInfo;
-            rec.verifyInfoList = verifyInfoList;
-            rec.determineCompliance = purpose.determineCompliance;
-            rec.investigateComplaints = purpose.investigateComplaints;
-            rec.checkCommitments = purpose.checkCommitments;
-            rec.checkCommitmentsList = checkCommitmentsList;
-            rec.others = purpose.others || null;
-            rec.deviceId = deviceId;
-            rec.createdAt = now;
-            rec.updatedAt = now;
-            rec.syncState = 'pending_create';
-          });
+          if (isUpdate) {
+            const purposeRecord = await collections.purposeOfInspection.find(purposeId);
+            await purposeRecord.update(rec => {
+              rec.estabId = resolvedEstabId;
+              rec.inspectorUid = inspectorUid;
+              rec.inspectionDate = purpose.inspectionDate;
+              rec.verifyInfo = purpose.verifyInfo;
+              rec.verifyInfoList = verifyInfoList;
+              rec.determineCompliance = purpose.determineCompliance;
+              rec.investigateComplaints = purpose.investigateComplaints;
+              rec.checkCommitments = purpose.checkCommitments;
+              rec.checkCommitmentsList = checkCommitmentsList;
+              rec.others = purpose.others || null;
+              rec.deviceId = deviceId;
+              rec.updatedAt = now;
+              rec.syncState = nextSyncStateForEdit(rec.syncState);
+            });
+          } else {
+            await collections.purposeOfInspection.create(rec => {
+              rec._raw.id = purposeId;
+              rec.purposeId = purposeId;
+              rec.estabId = resolvedEstabId;
+              rec.inspectorUid = inspectorUid;
+              rec.inspectionDate = purpose.inspectionDate;
+              rec.verifyInfo = purpose.verifyInfo;
+              rec.verifyInfoList = verifyInfoList;
+              rec.determineCompliance = purpose.determineCompliance;
+              rec.investigateComplaints = purpose.investigateComplaints;
+              rec.checkCommitments = purpose.checkCommitments;
+              rec.checkCommitmentsList = checkCommitmentsList;
+              rec.others = purpose.others || null;
+              rec.deviceId = deviceId;
+              rec.createdAt = now;
+              rec.updatedAt = now;
+              rec.syncState = 'pending_create';
+            });
+          }
 
-          await collections.inspectionReports.create(rec => {
-            rec._raw.id = reportId;
-            rec.reportId = reportId;
-            rec.estabId = resolvedEstabId;
-            rec.inspectorUid = inspectorUid;
-            rec.purposeId = purposeId;
-            rec.reportType = reportType;
-            rec.reportControlNo = controlNumber.trim() || null;
-            rec.inspectionDate = purpose.inspectionDate;
-            rec.establishmentSnapshot = establishmentSnapshot;
-            rec.permitsSnapshot = permitsSnapshot;
-            rec.isArchived = false;
-            rec.deviceId = deviceId;
-            rec.createdAt = now;
-            rec.updatedAt = now;
-            rec.deletedAt = null;
-            rec.syncState = 'pending_create';
-            rec.reportStatus = status;
-          });
+          if (isUpdate) {
+            const reportRecord = await collections.inspectionReports.find(reportId);
+            await reportRecord.update(rec => {
+              rec.estabId = resolvedEstabId;
+              rec.purposeId = purposeId;
+              rec.reportControlNo = controlNumber.trim() || null;
+              rec.inspectionDate = purpose.inspectionDate;
+              rec.establishmentSnapshot = establishmentSnapshot;
+              rec.permitsSnapshot = permitsSnapshot;
+              rec.deviceId = deviceId;
+              rec.updatedAt = now;
+              rec.reportStatus = status;
+              rec.syncState = nextSyncStateForEdit(rec.syncState);
+            });
+          } else {
+            await collections.inspectionReports.create(rec => {
+              rec._raw.id = reportId;
+              rec.reportId = reportId;
+              rec.estabId = resolvedEstabId;
+              rec.inspectorUid = inspectorUid;
+              rec.purposeId = purposeId;
+              rec.reportType = reportType;
+              rec.reportControlNo = controlNumber.trim() || null;
+              rec.inspectionDate = purpose.inspectionDate;
+              rec.establishmentSnapshot = establishmentSnapshot;
+              rec.permitsSnapshot = permitsSnapshot;
+              rec.isArchived = false;
+              rec.deviceId = deviceId;
+              rec.createdAt = now;
+              rec.updatedAt = now;
+              rec.deletedAt = null;
+              rec.syncState = 'pending_create';
+              rec.reportStatus = status;
+            });
+          }
 
-          await writeCompliance({ reportId });
+          await writeCompliance({ reportId, isUpdate });
         });
+
+        if (!isUpdate) setSavedIds({ purposeId, reportId });
 
         // Home's establishment/report lists don't observe WatermelonDB
         // directly (see useEstablishments et al.) — this is what makes a
@@ -211,7 +259,7 @@ export function useReportFormState({
         setSaving(false);
       }
     },
-    [estabId, generalInfo, purpose, controlNumber, inspectorUid, reportType],
+    [estabId, generalInfo, purpose, controlNumber, inspectorUid, reportType, savedIds],
   );
 
   return {
@@ -223,6 +271,10 @@ export function useReportFormState({
     setControlNumber,
     saving,
     saveError,
+    // Non-null once save() has run at least once for this hook instance —
+    // lets a caller tell whether an in-progress report already has a real
+    // reportId to attach things to (see WaterFormShell's ensureDraftReport).
+    reportId: savedIds?.reportId ?? null,
     save,
   };
 }

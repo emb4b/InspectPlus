@@ -8,6 +8,7 @@ import {
   resetSyncMetadata,
 } from './syncState';
 import { notifySyncDataChanged } from './syncEvents';
+import { uploadPendingAttachments } from '../../features/attachments/attachmentUploadQueue';
 
 // The pull watermark (lastPulledAt) is a single incremental cursor: "we
 // already have everything up to this point." That's only true if every
@@ -56,6 +57,12 @@ export async function runManagedSync(userId: string): Promise<RunSyncResult | nu
   await ensureSyncScopedToUser(userId);
 
   try {
+    // Attachments' binary files upload to Storage on their own pipeline,
+    // separate from the metadata push below — a row only becomes
+    // push-eligible once its file has actually landed (see
+    // watermelonAdapter.ts's getPendingRecords), so this must run first for
+    // a newly-captured photo to sync at all in this pass.
+    await uploadPendingAttachments();
     return await syncClient.runFullSync();
   } finally {
     notifySyncDataChanged();

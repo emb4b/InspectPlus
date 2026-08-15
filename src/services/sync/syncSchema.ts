@@ -6,7 +6,8 @@ export type SyncEntityName =
   | 'compliance_air'
   | 'compliance_water'
   | 'compliance_hazwaste'
-  | 'compliance_eia';
+  | 'compliance_eia'
+  | 'attachments';
 
 export interface SyncEntitySchema {
   entity: SyncEntityName;
@@ -276,6 +277,40 @@ export const syncSchema: Record<SyncEntityName, SyncEntitySchema> = {
       other_observations:      'otherObservations',
       remarks_recommendations: 'remarksRecommendations',
       documents_reviewed:      'documentsReviewed',
+    },
+  },
+
+  // localUri, uploadStatus and uploadError are deliberately absent from
+  // `fields` below — mapLocalToBackend (syncMappers.ts) only emits keys
+  // present in this map, so those local-only columns never reach the push
+  // payload. See schema.ts's `attachments` tableSchema comment.
+  attachments: {
+    entity: 'attachments',
+    primaryKey: 'attachment_id',
+    localPrimaryKey: 'attachmentId',
+    updatedAtField: 'updated_at',
+    deletedAtField: 'deleted_at',
+    softDelete: true,
+    pushEnabled: true,
+    pullEnabled: true,
+    fields: {
+      attachment_id:        'attachmentId',
+      inspection_report_id: 'inspectionReportId',
+      survey_report_id:     'surveyReportId',
+      inspector_uid:        'inspectorUid',
+      storage_path:         'storagePath',
+      file_name:            'fileName',
+      mime_type:             'mimeType',
+      file_size:             'fileSize',
+      geo_lat:               'geoLat',
+      geo_lng:               'geoLng',
+      captured_at:           'capturedAt',
+      caption:                'caption',
+      device_id:             'deviceId',
+      created_at:            'createdAt',
+      updated_at:            'updatedAt',
+      deleted_at:            'deletedAt',
+      sync_status:           'syncState',  // ← syncState
     },
   },
 };

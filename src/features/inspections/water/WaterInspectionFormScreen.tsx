@@ -8,6 +8,7 @@ import { database, collections } from '../../../db/database';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { generateId } from '../../../utils/crypto';
 import { getDeviceId } from '../../../utils/device';
+import { nextSyncStateForEdit } from '../../../utils/syncState';
 import { EstablishmentPickerStep } from '../components/EstablishmentPickerStep';
 import { NewEstablishmentModal } from '../components/NewEstablishmentModal';
 import { ReportFormHeader } from '../components/ReportFormHeader';
@@ -24,6 +25,7 @@ import { buildWaterReportTabs, establishmentHasDischargePermit } from './waterRe
 import type { EstablishmentDTO } from '../../establishments/types';
 import { useHeaderScroll } from '../../home/context/HeaderScrollContext';
 import { useScreenFooter } from '../../home/context/ScreenFooterContext';
+import { AttachmentsSection } from '../../attachments/components/AttachmentsSection';
 
 const REPORT_TYPE = 'water_monitoring';
 
@@ -42,50 +44,83 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
   );
   const scrollRef = useRef<ScrollView>(null);
   const { onScroll } = useHeaderScroll();
+  // Set on the first save() (silent or explicit) and reused on every save()
+  // after that — save() itself updates rather than recreates once it sees
+  // a complianceIdRef, matching the create-or-update pattern of save()'s own
+  // purpose_of_inspection/inspection_reports rows.
+  const complianceIdRef = useRef<string | null>(null);
 
-  const { generalInfo, setGeneralInfo, purpose, setPurpose, saving, save } = useReportFormState({
-    estabId: start.estabId,
-    initialGeneralInfo: start.initialGeneralInfo,
-    initialInspectionDate: start.initialInspectionDate,
-    initialPurpose: start.initialPurpose,
-    initialControlNumber: start.initialControlNumber,
-    reportType: REPORT_TYPE,
-  });
+  const { generalInfo, setGeneralInfo, purpose, setPurpose, saving, save, reportId: draftReportId } =
+    useReportFormState({
+      estabId: start.estabId,
+      initialGeneralInfo: start.initialGeneralInfo,
+      initialInspectionDate: start.initialInspectionDate,
+      initialPurpose: start.initialPurpose,
+      initialControlNumber: start.initialControlNumber,
+      reportType: REPORT_TYPE,
+    });
+
+  const writeCompliance = useCallback(
+    async ({ reportId, isUpdate }: { reportId: string; isUpdate: boolean }) => {
+      const fields = {
+        reportId,
+        waterSources: waterCompliance.waterSources.filter(r => r.source_type?.trim()),
+        wastewaterSources: waterCompliance.wastewaterSources.filter(r => r.use_type?.trim()),
+        abstractedWaterQuality: waterCompliance.abstractedWaterQuality.filter(r => r.source?.trim()),
+        hasWwtp: waterCompliance.hasWwtp === 'yes',
+        wwtpType: waterCompliance.wwtpType || null,
+        wwtpDetails: waterCompliance.wwtpDetails,
+        wwtpComponents: waterCompliance.wwtpComponents,
+        wwtpCondition: waterCompliance.wwtpCondition || null,
+        wwtpUnderConstruction: waterCompliance.wwtpUnderConstruction === 'yes',
+        samplingPoints: waterCompliance.samplingPoints,
+        previousInspectionSummary: waterCompliance.previousInspection.dateOfSampling
+          ? waterCompliance.previousInspection
+          : {},
+        checklistDao200510: waterCompliance.checklistDao200510.map((v, i) => ({
+          legal_ref: `Section ${i + 3}`,
+          compliant: v.compliant,
+          remarks: v.remarks,
+        })),
+        dpConditions: waterCompliance.dpConditions.filter(c => c.description?.trim()),
+        otherObservations: waterCompliance.otherObservations || null,
+        remarksRecommendations: waterCompliance.remarksRecommendations || null,
+        documentsReviewed: waterCompliance.documentsReviewed,
+      } as const;
+
+      if (isUpdate && complianceIdRef.current) {
+        const complianceRecord = await collections.complianceWater.find(complianceIdRef.current);
+        await complianceRecord.update(rec => {
+          Object.assign(rec, fields);
+          rec.syncState = nextSyncStateForEdit(rec.syncState);
+        });
+        return;
+      }
+
+      const complianceId = generateId();
+      complianceIdRef.current = complianceId;
+      await collections.complianceWater.create(rec => {
+        rec._raw.id = complianceId;
+        rec.complianceId = complianceId;
+        Object.assign(rec, fields);
+        rec.syncState = 'pending_create';
+      });
+    },
+    [waterCompliance],
+  );
+
+  // No Alert, no navigation — used both by the explicit Save Draft/Submit
+  // buttons (via handleSave) and silently by ensureDraftReport, which must
+  // not interrupt the inspector just because they tapped "Take Photo".
+  const performSave = useCallback(
+    (status: 'draft' | 'submitted') => save(status, writeCompliance),
+    [save, writeCompliance],
+  );
 
   const handleSave = useCallback(
     async (status: 'draft' | 'submitted') => {
       try {
-        await save(status, async ({ reportId }) => {
-          const complianceId = generateId();
-          await collections.complianceWater.create(rec => {
-            rec._raw.id = complianceId;
-            rec.complianceId = complianceId;
-            rec.reportId = reportId;
-            rec.waterSources = waterCompliance.waterSources.filter(r => r.source_type?.trim());
-            rec.wastewaterSources = waterCompliance.wastewaterSources.filter(r => r.use_type?.trim());
-            rec.abstractedWaterQuality = waterCompliance.abstractedWaterQuality.filter(r => r.source?.trim());
-            rec.hasWwtp = waterCompliance.hasWwtp === 'yes';
-            rec.wwtpType = waterCompliance.wwtpType || null;
-            rec.wwtpDetails = waterCompliance.wwtpDetails;
-            rec.wwtpComponents = waterCompliance.wwtpComponents;
-            rec.wwtpCondition = waterCompliance.wwtpCondition || null;
-            rec.wwtpUnderConstruction = waterCompliance.wwtpUnderConstruction === 'yes';
-            rec.samplingPoints = waterCompliance.samplingPoints;
-            rec.previousInspectionSummary = waterCompliance.previousInspection.dateOfSampling
-              ? waterCompliance.previousInspection
-              : {};
-            rec.checklistDao200510 = waterCompliance.checklistDao200510.map((v, i) => ({
-              legal_ref: `Section ${i + 3}`,
-              compliant: v.compliant,
-              remarks: v.remarks,
-            }));
-            rec.dpConditions = waterCompliance.dpConditions.filter(c => c.description?.trim());
-            rec.otherObservations = waterCompliance.otherObservations || null;
-            rec.remarksRecommendations = waterCompliance.remarksRecommendations || null;
-            rec.documentsReviewed = waterCompliance.documentsReviewed;
-            rec.syncState = 'pending_create';
-          });
-        });
+        await performSave(status);
 
         Alert.alert(
           status === 'draft' ? 'Draft saved' : 'Report submitted',
@@ -105,8 +140,18 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
         );
       }
     },
-    [save, waterCompliance],
+    [performSave],
   );
+
+  // Passed to AttachmentsSection as ensureParentId: attachments need a real
+  // reportId to attach to, so the first photo added during report creation
+  // transparently saves the report as a draft first (once — subsequent
+  // photos reuse the same reportId already returned here).
+  const ensureDraftReport = useCallback(async (): Promise<string> => {
+    if (draftReportId) return draftReportId;
+    const result = await performSave('draft');
+    return result.reportId;
+  }, [draftReportId, performSave]);
 
   // Rendered by AppChrome as a sibling of the collapsing header rather than
   // inline here — see useScreenFooter for why nesting it below the header
@@ -126,7 +171,7 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
   );
 
   const hasDp = establishmentHasDischargePermit(generalInfo.denrPermits);
-  const tabs = buildWaterReportTabs();
+  const tabs = buildWaterReportTabs({ includeAttachments: true });
   const activeMainTab = tabs.find(t => t.key === activeMain) ?? tabs[0];
 
   return (
@@ -164,6 +209,14 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
         )}
         {(activeMainTab.key === 'watersupply' || activeMainTab.key === 'wastewaterpollution' || activeMainTab.key === 'samplingfindings') && (
           <WaterExtraFormSectionsView value={waterCompliance} onChange={setWaterCompliance} mainTab={activeMainTab} hasDp={hasDp} />
+        )}
+        {activeMainTab.key === 'attachments' && (
+          <AttachmentsSection
+            parentType="inspection"
+            parentId={draftReportId ?? undefined}
+            ensureParentId={ensureDraftReport}
+            canEdit
+          />
         )}
       </KeyboardAwareScrollView>
     </View>

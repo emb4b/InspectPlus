@@ -26,6 +26,7 @@ export interface PullChangesResponse {
     compliance_water: SyncEntityChanges<ComplianceWaterDTO>;
     compliance_hazwaste: SyncEntityChanges<ComplianceHazwasteDTO>;
     compliance_eia: SyncEntityChanges<ComplianceEiaDTO>;
+    attachments: SyncEntityChanges<AttachmentDTO>;
   };
   timestamp: number;
 }
@@ -39,6 +40,7 @@ export interface PushChangesPayload {
   compliance_water?: SyncEntityChanges<ComplianceWaterDTO>;
   compliance_hazwaste?: SyncEntityChanges<ComplianceHazwasteDTO>;
   compliance_eia?: SyncEntityChanges<ComplianceEiaDTO>;
+  attachments?: SyncEntityChanges<AttachmentDTO>;
 }
 
 export interface PushChangesResponse {
@@ -301,6 +303,26 @@ export interface ComplianceEiaDTO {
   other_observations?: string | null;
   remarks_recommendations?: string | null;
   documents_reviewed?: JsonArray;
+}
+
+export interface AttachmentDTO {
+  attachment_id: string;
+  inspection_report_id?: string | null;
+  survey_report_id?: string | null;
+  inspector_uid: string;
+  storage_path?: string | null;
+  file_name: string;
+  mime_type: string;
+  file_size: number;
+  geo_lat?: number | null;
+  geo_lng?: number | null;
+  captured_at: ISODateTimeString;
+  caption?: string | null;
+  device_id?: string | null;
+  created_at?: ISODateTimeString;
+  updated_at?: ISODateTimeString;
+  deleted_at?: ISODateTimeString | null;
+  sync_status?: SyncStatus | string;
 }
 
 export interface SyncMetadata {

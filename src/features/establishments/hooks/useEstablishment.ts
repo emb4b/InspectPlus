@@ -82,24 +82,80 @@ const REPORT_TYPE_TO_TAG: Record<string, ComplianceTag> = {
 const PENDING_LOCAL_STATES = new Set(['pending_create', 'pending_update', 'pending_delete']);
 
 // The establishment's own "Pending sync" badge should reflect its full state
-// as an inspector thinks of it — general info AND its inspection/survey
-// reports — not just the establishments row in isolation. Adding a report
-// keeps it pending on purpose (a reminder there's something unsynced), but
-// reverting a change (e.g. adding then deleting a never-synced report, or
-// editing a field back to its last-synced value) must actually clear it —
-// see resolveEstablishmentContentEdit and reportPersistence.ts's
+// as an inspector thinks of it — general info, its inspection/survey
+// reports, AND any attachments on those reports (a newly added photo, a
+// bulk delete, or an edited caption) — not just the establishments row in
+// isolation. Adding a report/attachment keeps it pending on purpose (a
+// reminder there's something unsynced), but reverting a change (e.g. adding
+// then deleting a never-synced report, or editing a field back to its
+// last-synced value) must actually clear it — see
+// resolveEstablishmentContentEdit and reportPersistence.ts's
 // hard-delete-if-never-synced path for the other half of that contract.
 function computeEstablishmentSyncStatus(
   estabSyncState: string,
   reportsRaw: { syncState: string }[],
   surveyReports: { syncState: string }[],
+  attachments: { syncState: string }[],
 ): SyncStatus {
   if (estabSyncState === 'conflict') return 'conflict';
-  const hasPendingReports =
+  const hasPendingChanges =
     reportsRaw.some(r => PENDING_LOCAL_STATES.has(r.syncState)) ||
-    surveyReports.some(r => PENDING_LOCAL_STATES.has(r.syncState));
-  if (hasPendingReports) return 'pending';
+    surveyReports.some(r => PENDING_LOCAL_STATES.has(r.syncState)) ||
+    attachments.some(a => PENDING_LOCAL_STATES.has(a.syncState));
+  if (hasPendingChanges) return 'pending';
   return toDisplaySyncStatus(estabSyncState);
+}
+
+// Attachments reference a report, not an establishment directly, so this
+// takes already-fetched report/survey ids rather than querying by estabId
+// itself, and groups the result by parent report id — both the aggregate
+// establishment-level check (computeEstablishmentSyncStatus) and each
+// individual report row's own badge (see reportSyncStatusWithAttachments)
+// need the same underlying data, just rolled up differently. Skips the
+// query entirely when there are no reports at all — an empty Q.oneOf(...)
+// would otherwise need special-casing per clause.
+async function fetchAttachmentSyncStatesByReport(
+  reportIds: string[],
+  surveyReportIds: string[],
+): Promise<Map<string, string[]>> {
+  const byReportId = new Map<string, string[]>();
+  if (reportIds.length === 0 && surveyReportIds.length === 0) return byReportId;
+
+  const clauses = [];
+  if (reportIds.length > 0) clauses.push(Q.where('inspectionReportId', Q.oneOf(reportIds)));
+  if (surveyReportIds.length > 0) clauses.push(Q.where('surveyReportId', Q.oneOf(surveyReportIds)));
+
+  const rows = (await database.collections
+    .get('attachments')
+    .query(clauses.length === 1 ? clauses[0] : Q.or(...clauses))
+    .fetch()) as unknown as { inspectionReportId: string | null; surveyReportId: string | null; syncState: string }[];
+
+  for (const row of rows) {
+    const parentId = row.inspectionReportId ?? row.surveyReportId;
+    if (!parentId) continue;
+    const list = byReportId.get(parentId);
+    if (list) {
+      list.push(row.syncState);
+    } else {
+      byReportId.set(parentId, [row.syncState]);
+    }
+  }
+  return byReportId;
+}
+
+// Per-report counterpart of computeEstablishmentSyncStatus, for report list
+// rows (ReportListCard) and the report detail header (InspectionReportHeader)
+// — a report whose own row is already 'synced' should still read as
+// 'pending' if one of its attachments (a new photo, a bulk delete, an
+// edited caption) hasn't reached the server yet. Exported so
+// useInspectionReport.ts can compute the same normalized status for the
+// single report it loads.
+export function reportSyncStatusWithAttachments(reportSyncState: string, attachmentSyncStates: string[]): SyncStatus {
+  if (reportSyncState === 'conflict') return 'conflict';
+  if (PENDING_LOCAL_STATES.has(reportSyncState) || attachmentSyncStates.some(s => PENDING_LOCAL_STATES.has(s))) {
+    return 'pending';
+  }
+  return toDisplaySyncStatus(reportSyncState);
 }
 
 // ── Map WatermelonDB model → EstablishmentDTO ──────────────────────────────────
@@ -114,6 +170,14 @@ async function modelToDTO(model: Establishment): Promise<EstablishmentDTO> {
     .get('survey_reports')
     .query(Q.where('estabId', model.estabId))
     .fetch();
+
+  const attachmentSyncStatesByReport = await fetchAttachmentSyncStatesByReport(
+    reportsRaw.map((r: any) => r.reportId),
+    surveyReports.map((r: any) => r.surveyId),
+  );
+  const attachments = Array.from(attachmentSyncStatesByReport.values())
+    .flat()
+    .map(syncState => ({ syncState }));
 
   // Same rule as useEstablishmentReports: a soft-deleted report (pending_delete
   // locally, or deletedAt set by a pulled remote delete) must not count toward
@@ -164,7 +228,7 @@ async function modelToDTO(model: Establishment): Promise<EstablishmentDTO> {
     denrPermits:            model.denrPermits ?? [],
     createdAt:              model.createdAt,
     updatedAt:              model.updatedAt,
-    syncStatus:             computeEstablishmentSyncStatus(model.syncState, reportsRaw as any, surveyReports as any),
+    syncStatus:             computeEstablishmentSyncStatus(model.syncState, reportsRaw as any, surveyReports as any, attachments),
     deviceId:               model.deviceId,
     isArchived:             model.isArchived,
     complianceTags:         Array.from(tagSet),
@@ -509,6 +573,11 @@ export function useEstablishmentReports(estabId: string | undefined): UseEstabli
           r => !r.deletedAt && r.syncState !== 'pending_delete',
         );
 
+        const attachmentSyncStatesByReport = await fetchAttachmentSyncStatesByReport(
+          inspectionReports.map(r => r.reportId),
+          surveyReports.map(r => r.surveyId),
+        );
+
         const items: EstablishmentReportItem[] = [
           ...inspectionReports.map(r => ({
             key: `inspection-${r.reportId}`,
@@ -520,7 +589,7 @@ export function useEstablishmentReports(estabId: string | undefined): UseEstabli
             date: r.inspectionDate,
             controlNo: r.reportControlNo,
             status: r.reportStatus,
-            syncStatus: toDisplaySyncStatus(r.syncState),
+            syncStatus: reportSyncStatusWithAttachments(r.syncState, attachmentSyncStatesByReport.get(r.reportId) ?? []),
             purposeId: r.purposeId,
           })),
           ...surveyReports.map(r => ({
@@ -534,7 +603,7 @@ export function useEstablishmentReports(estabId: string | undefined): UseEstabli
             controlNo: r.reportControlNumber,
             // Mobile-only field, absent on rows written before it existed.
             status: r.reportStatus ?? 'draft',
-            syncStatus: toDisplaySyncStatus(r.syncState),
+            syncStatus: reportSyncStatusWithAttachments(r.syncState, attachmentSyncStatesByReport.get(r.surveyId) ?? []),
           })),
         ];
 
@@ -655,6 +724,11 @@ export function useAllReports(
         r => visibleEstabIds.has(r.estabId) || r.inspectorUid === myUid,
       );
 
+      const attachmentSyncStatesByReport = await fetchAttachmentSyncStatesByReport(
+        inspectionReports.map(r => r.reportId),
+        surveyReports.map(r => r.surveyId),
+      );
+
       const items: AllReportItem[] = [
         ...inspectionReports.map(r => ({
           key: `inspection-${r.reportId}`,
@@ -670,7 +744,7 @@ export function useAllReports(
           date: r.inspectionDate,
           controlNo: r.reportControlNo,
           status: r.reportStatus,
-          syncStatus: toDisplaySyncStatus(r.syncState),
+          syncStatus: reportSyncStatusWithAttachments(r.syncState, attachmentSyncStatesByReport.get(r.reportId) ?? []),
           purposeId: r.purposeId,
         })),
         ...surveyReports.map(r => ({
@@ -687,7 +761,7 @@ export function useAllReports(
           date: r.inspectionDate,
           controlNo: r.reportControlNumber,
           status: r.reportStatus ?? 'draft',
-          syncStatus: toDisplaySyncStatus(r.syncState),
+          syncStatus: reportSyncStatusWithAttachments(r.syncState, attachmentSyncStatesByReport.get(r.surveyId) ?? []),
         })),
       ];
 

@@ -17,7 +17,29 @@
     },
     "plugins": [
       "expo-secure-store",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "InspectPlus uses the camera to attach inspection photos.",
+          "photosPermission": "InspectPlus needs access to your photo library to attach existing photos.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "InspectPlus uses your location to geotag photos taken during an inspection."
+        }
+      ],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "InspectPlus needs access to your photos to save downloaded attachments.",
+          "savePhotosPermission": "InspectPlus saves downloaded attachments to your photo library.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ]
     ]
   }
 }
