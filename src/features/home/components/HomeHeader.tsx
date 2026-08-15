@@ -13,6 +13,7 @@ import { Colors } from '../../../constants/colors';
 import { Logo } from '../../../components/Logo';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { runManagedSync } from '../../../services/sync/syncOrchestrator';
+import { SyncOptionsModal, SyncDirection } from './SyncOptionsModal';
 
 interface HomeHeaderProps {
   // Hide the avatar/logout control on pages with no active session (e.g. login).
@@ -33,16 +34,22 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
 }) => {
   const { session, signOut } = useAuthContext();
   const [syncing, setSyncing] = useState(false);
+  const [syncModalVisible, setSyncModalVisible] = useState(false);
   const uid = (session as { user?: { id?: string } } | null)?.user?.id;
 
   // Manual trigger — goes through the same runManagedSync path as the
   // post-login sync, so a manual tap also picks up a user switch on a
   // shared device and notifies listeners (e.g. the home lists) the same way.
-  const handleSyncNow = async () => {
+  // The direction (pull only / push only / both) comes from SyncOptionsModal.
+  const handleSyncNow = async (direction: SyncDirection) => {
     if (syncing || !uid) return;
     setSyncing(true);
     try {
-      const result = await runManagedSync(uid);
+      const result = await runManagedSync(uid, {
+        skipPush: direction === 'pull',
+        skipPull: direction === 'push',
+      });
+      setSyncModalVisible(false);
       if (!result) {
         Alert.alert('Sync skipped', 'No internet connection right now.');
         return;
@@ -136,7 +143,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
         {/* Right: sync + avatar/logout buttons */}
         {showAccountButton && (
           <View style={styles.actions}>
-            <TouchableOpacity onPress={handleSyncNow} activeOpacity={0.8} disabled={syncing}>
+            <TouchableOpacity onPress={() => setSyncModalVisible(true)} activeOpacity={0.8} disabled={syncing}>
               <Reanimated.View style={[styles.avatarBtn, avatarStyle]}>
                 <Ionicons
                   name={syncing ? 'sync-circle-outline' : 'cloud-upload-outline'}
@@ -153,6 +160,13 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
           </View>
         )}
       </View>
+
+      <SyncOptionsModal
+        visible={syncModalVisible}
+        syncing={syncing}
+        onCancel={() => setSyncModalVisible(false)}
+        onSync={handleSyncNow}
+      />
     </LinearGradient>
   );
 };

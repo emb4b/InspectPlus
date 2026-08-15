@@ -45,25 +45,43 @@ export async function ensureSyncScopedToUser(userId: string): Promise<void> {
   await setLastSyncedUserId(userId);
 }
 
+export interface RunManagedSyncOptions {
+  // Skip pushing local changes to the server (pull-only sync). Also skips
+  // the attachment upload pipeline below, since that's what makes
+  // attachment rows push-eligible in the first place — running it while
+  // skipping the push would upload files without ever syncing the metadata
+  // that references them.
+  skipPush?: boolean;
+  // Skip pulling remote changes from the server (push-only sync).
+  skipPull?: boolean;
+}
+
 // Shared entry point for every sync trigger (login, the manual "Sync Now"
 // button, and any future automatic trigger) so the user-switch check above
 // always runs first and every trigger notifies listeners the same way.
 // Returns null without syncing if the device is offline.
-export async function runManagedSync(userId: string): Promise<RunSyncResult | null> {
+export async function runManagedSync(
+  userId: string,
+  options: RunManagedSyncOptions = {}
+): Promise<RunSyncResult | null> {
   if (!(await checkOnline())) {
     return null;
   }
 
+  const { skipPush = false, skipPull = false } = options;
+
   await ensureSyncScopedToUser(userId);
 
   try {
-    // Attachments' binary files upload to Storage on their own pipeline,
-    // separate from the metadata push below — a row only becomes
-    // push-eligible once its file has actually landed (see
-    // watermelonAdapter.ts's getPendingRecords), so this must run first for
-    // a newly-captured photo to sync at all in this pass.
-    await uploadPendingAttachments();
-    return await syncClient.runFullSync();
+    if (!skipPush) {
+      // Attachments' binary files upload to Storage on their own pipeline,
+      // separate from the metadata push below — a row only becomes
+      // push-eligible once its file has actually landed (see
+      // watermelonAdapter.ts's getPendingRecords), so this must run first for
+      // a newly-captured photo to sync at all in this pass.
+      await uploadPendingAttachments();
+    }
+    return await syncClient.runFullSync({ skipPush, skipPull });
   } finally {
     notifySyncDataChanged();
   }
