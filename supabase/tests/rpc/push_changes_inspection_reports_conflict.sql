@@ -1,5 +1,5 @@
 begin;
-select plan(1);
+select plan(2);
 
 insert into public.user_accounts (
   uid, first_name, last_name, username, password_hash, role, region, province,
@@ -72,7 +72,7 @@ select public.push_changes(
       "deleted": []
     }
   }'::jsonb
-);
+) as push_result \gset
 
 select is(
   (
@@ -82,6 +82,12 @@ select is(
   ),
   'CTRL-NEW',
   'stale inspection_report update is ignored'
+);
+
+select is(
+  :'push_result'::jsonb -> 'conflicts' -> 'inspection_reports',
+  '["rep-conflict-001"]'::jsonb,
+  'push_changes reports the rejected row_id in conflicts.inspection_reports'
 );
 
 select * from finish();

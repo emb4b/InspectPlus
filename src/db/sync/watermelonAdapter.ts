@@ -123,6 +123,20 @@ async function upsertMany(entity: SyncEntityName, records: LocalSyncRecord[]): P
       const existing = await findById(entity, id);
 
       if (existing) {
+        // A row still pending_create/pending_update has a local edit that
+        // hasn't been confirmed applied server-side yet (either not pushed
+        // this cycle, or pushed and rejected by push_changes's last-write-
+        // wins guard — see markLocalChangesAsSynced). Overwriting it here
+        // with whatever pull just returned would silently destroy that
+        // edit; leaving it untouched keeps it queued for the next push
+        // instead. Only a row already confirmed 'synced' (or not present
+        // locally at all — see the create branch below) is safe to apply
+        // incoming pulled data to.
+        const currentSyncState = (existing as unknown as { syncState: string }).syncState;
+        if (currentSyncState === 'pending_create' || currentSyncState === 'pending_update') {
+          continue;
+        }
+
         await existing.update((r: unknown) => {
           const target = r as Record<string, unknown>;
           for (const [key, value] of Object.entries(record)) {
@@ -232,16 +246,28 @@ export async function clearSyncedRecords(): Promise<void> {
 // 'synced', using the primary key values already present on the pushed DTOs
 // (the WatermelonDB row id always matches the entity's own primary key —
 // see rec._raw.id assignments at record-creation sites).
-export async function markLocalChangesAsSynced(payload: PushChangesPayload): Promise<void> {
+//
+// conflicts (from PushChangesResponse) names the ids push_changes actually
+// rejected via its last-write-wins guard, despite the RPC call as a whole
+// returning {status:'ok'} — those must be excluded here. Marking a rejected
+// row 'synced' anyway is what let the pull that follows in the same sync
+// run silently overwrite it (see upsertMany's pending-state guard); leaving
+// it as pending_update instead keeps the local edit queued for a future
+// push instead of losing it.
+export async function markLocalChangesAsSynced(
+  payload: PushChangesPayload,
+  conflicts?: Partial<Record<SyncEntityName, string[]>>
+): Promise<void> {
   await database.write(async () => {
     for (const entity of Object.keys(payload) as SyncEntityName[]) {
       const entityChanges = (payload as Record<string, { created: object[]; updated: object[] } | undefined>)[entity];
       if (!entityChanges) continue;
 
       const primaryKey = syncSchema[entity].primaryKey;
-      const ids = [...entityChanges.created, ...entityChanges.updated].map(dto =>
-        String((dto as Record<string, unknown>)[primaryKey])
-      );
+      const conflictedIds = new Set(conflicts?.[entity] ?? []);
+      const ids = [...entityChanges.created, ...entityChanges.updated]
+        .map(dto => String((dto as Record<string, unknown>)[primaryKey]))
+        .filter(id => !conflictedIds.has(id));
 
       for (const id of ids) {
         const existing = await findById(entity, id);

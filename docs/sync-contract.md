@@ -582,9 +582,21 @@ An incoming update is applied only if its `updated_at` is newer than or equal to
 If the client pushes a stale update:
 - the backend ignores it
 - the stored row remains unchanged
+- the row's primary key is reported back in the response under `conflicts.<entity>` (see below) — the RPC call as a whole still returns `"status": "ok"`, since other rows in the same batch may have applied successfully
+
+### Response shape
+```json
+{
+  "status": "ok",
+  "conflicts": {
+    "establishments": ["est-001"]
+  }
+}
+```
+`conflicts` is omitted entirely when there were none — present only for entities that actually had a rejected row, per the additive-only rule (an older client that only checks `status` sees no difference).
 
 ### Client requirement
-The client must preserve and send the correct `updated_at` value for updated rows.
+The client must preserve and send the correct `updated_at` value for updated rows. It must also **not** mark a row returned in `conflicts` as locally synced — doing so (and then letting the following pull silently overwrite that row, since pull-applied data is normally trusted unconditionally) is what let a rejected edit disappear with no error anywhere in the flow. Leaving a conflicted row `pending_update` keeps it queued for a future push instead. See `markLocalChangesAsSynced` and `upsertMany`'s pending-state guard in `watermelonAdapter.ts`.
 
 ---
 

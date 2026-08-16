@@ -25,7 +25,14 @@ export interface SyncServiceDependencies {
   };
   collectPushChanges: () => Promise<PushChangesPayload>;
   applyPulledChanges: (changes: PullChangesResponse['changes']) => Promise<void>;
-  markLocalChangesAsSynced?: (payload: PushChangesPayload) => Promise<void>;
+  // conflicts are the ids push_changes reported as rejected by the
+  // last-write-wins guard (see PushChangesResponse) — these must NOT be
+  // marked synced, so they stay queued and survive the pull that follows
+  // in the same sync run instead of being silently overwritten.
+  markLocalChangesAsSynced?: (
+    payload: PushChangesPayload,
+    conflicts?: PushChangesResponse['conflicts']
+  ) => Promise<void>;
 }
 
 export interface RunSyncOptions {
@@ -82,7 +89,7 @@ export function createSyncService(deps: SyncServiceDependencies) {
     const pushResponse = await pushChanges(supabase, payload, { signal });
 
     if (markLocalChangesAsSynced) {
-      await markLocalChangesAsSynced(payload);
+      await markLocalChangesAsSynced(payload, pushResponse.conflicts);
     }
 
     return {

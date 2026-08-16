@@ -45,6 +45,12 @@ export interface PushChangesPayload {
 
 export interface PushChangesResponse {
   status: 'ok';
+  // Primary keys of "updated" rows the server declined to apply because a
+  // newer version already existed server-side (the last-write-wins guard —
+  // see docs/sync-contract.md's Conflict Handling). Present only when
+  // non-empty. markLocalChangesAsSynced must not mark these as synced —
+  // see watermelonAdapter.ts.
+  conflicts?: Partial<Record<SyncEntityName, string[]>>;
 }
 
 // ── Shared JSONB shapes ───────────────────────────────────────────────────
