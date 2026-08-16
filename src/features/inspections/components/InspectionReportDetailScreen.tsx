@@ -134,6 +134,7 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
   return (
     <View style={styles.flex}>
       <InspectionReportHeader
+        reportId={reportId}
         establishmentName={report.establishmentSnapshot.name}
         establishmentLocation={location}
         reportType={report.reportType}

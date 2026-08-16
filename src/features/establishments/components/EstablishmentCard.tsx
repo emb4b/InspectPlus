@@ -10,6 +10,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-na
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { REPORT_TYPES, ReportTypeKey } from '../../../constants/reportTypes';
+import { confirmResolveConflict } from '../../../services/sync/syncConflictResolution';
 import type { EstablishmentDTO, ComplianceTag } from '../types';
 
 interface EstablishmentCardProps {
@@ -173,10 +174,13 @@ export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
                 </View>
               )}
               {item.syncStatus === 'conflict' && (
-                <View style={styles.syncRow}>
+                <TouchableOpacity
+                  style={styles.syncRow}
+                  onPress={() => confirmResolveConflict('establishments', item.estabId, item.name)}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                   <Ionicons name="alert-circle-outline" size={10} color={Colors.conflict} />
                   <Text style={[styles.syncText, { color: Colors.conflict }]}>Sync conflict</Text>
-                </View>
+                </TouchableOpacity>
               )}
 
               {/* Compliance tags */}

@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, LayoutChangeEvent } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
+import { confirmResolveConflict } from '../../../services/sync/syncConflictResolution';
 import type { EstablishmentDTO } from '../types';
 
 interface EstablishmentHeaderCardProps {
@@ -68,10 +69,13 @@ export const EstablishmentHeaderCard: React.FC<EstablishmentHeaderCardProps> = (
             </View>
           )}
           {establishment.syncStatus === 'conflict' && (
-            <View style={styles.syncRow}>
+            <TouchableOpacity
+              style={styles.syncRow}
+              onPress={() => confirmResolveConflict('establishments', establishment.estabId, establishment.name)}
+              hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
               <Ionicons name="alert-circle-outline" size={10} color={Colors.conflict} />
               <Text style={[styles.syncText, { color: Colors.conflict }]}>Sync conflict</Text>
-            </View>
+            </TouchableOpacity>
           )}
         </View>
       </View>

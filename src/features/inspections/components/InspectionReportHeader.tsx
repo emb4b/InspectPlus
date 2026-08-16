@@ -13,6 +13,7 @@ import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { useInspectorName } from '../../../core/hooks/useInspectorName';
 import { canManageAllRecords } from '../../establishments/hooks/useEstablishment';
 import { getReportTypeMeta } from '../reportTypeMeta';
+import { confirmResolveConflict } from '../../../services/sync/syncConflictResolution';
 import { TwoRowTabs, TwoRowMainTabDef } from './TwoRowTabs';
 import type { SyncStatus } from '../../establishments/types';
 
@@ -33,6 +34,7 @@ function formatDate(iso: string): string {
 }
 
 interface InspectionReportHeaderProps {
+  reportId: string;
   establishmentName: string;
   establishmentLocation: string;
   reportType: string;
@@ -61,6 +63,7 @@ interface InspectionReportHeaderProps {
 }
 
 export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
+  reportId,
   establishmentName,
   establishmentLocation,
   reportType,
@@ -212,10 +215,13 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
               </View>
             )}
             {syncStatus === 'conflict' && (
-              <View style={styles.syncRow}>
+              <TouchableOpacity
+                style={styles.syncRow}
+                onPress={() => confirmResolveConflict('inspection_reports', reportId, establishmentName)}
+                hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                 <Ionicons name="alert-circle-outline" size={10} color={Colors.conflict} />
                 <Text style={[styles.syncText, { color: Colors.conflict }]}>Sync conflict</Text>
-              </View>
+              </TouchableOpacity>
             )}
           </View>
           <View style={styles.badgeGroup}>

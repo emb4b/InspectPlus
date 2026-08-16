@@ -5,6 +5,7 @@ import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-na
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { getReportUrgency } from '../../../utils/reportUrgency';
+import { confirmResolveConflict } from '../../../services/sync/syncConflictResolution';
 import type { AllReportItem } from '../hooks/useEstablishment';
 
 interface ReportListCardProps {
@@ -175,10 +176,17 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
                 </View>
               )}
               {item.syncStatus === 'conflict' && (
-                <View style={styles.syncRow}>
+                <TouchableOpacity
+                  style={styles.syncRow}
+                  onPress={() => confirmResolveConflict(
+                    item.kind === 'inspection' ? 'inspection_reports' : 'survey_reports',
+                    item.reportId,
+                    item.title
+                  )}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
                   <Ionicons name="alert-circle-outline" size={10} color={Colors.conflict} />
                   <Text style={[styles.syncText, { color: Colors.conflict }]}>Sync conflict</Text>
-                </View>
+                </TouchableOpacity>
               )}
 
               <View style={styles.dateRow}>

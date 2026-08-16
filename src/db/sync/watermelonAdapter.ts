@@ -6,6 +6,7 @@ import { PushChangesPayload } from '../../services/sync/syncTypes';
 import { LocalPendingRecords, LocalPushSourceAdapter } from './collectPushChanges';
 import { LocalEntitySyncAdapter } from './applyPulledChanges';
 import { buildEstablishmentSnapshotJson } from '../../features/inspections/establishmentPersistence';
+import { notifySyncDataChanged } from '../../services/sync/syncEvents';
 
 const PENDING_SYNC_STATES = ['pending_create', 'pending_update', 'pending_delete'];
 
@@ -126,14 +127,20 @@ async function upsertMany(entity: SyncEntityName, records: LocalSyncRecord[]): P
         // A row still pending_create/pending_update has a local edit that
         // hasn't been confirmed applied server-side yet (either not pushed
         // this cycle, or pushed and rejected by push_changes's last-write-
-        // wins guard — see markLocalChangesAsSynced). Overwriting it here
-        // with whatever pull just returned would silently destroy that
-        // edit; leaving it untouched keeps it queued for the next push
-        // instead. Only a row already confirmed 'synced' (or not present
-        // locally at all — see the create branch below) is safe to apply
-        // incoming pulled data to.
+        // wins guard). 'conflict' is that same rejection, already flagged
+        // for the user (see markLocalChangesAsSynced) — until they
+        // explicitly resolve it (resolveConflictKeepLocal), it must survive
+        // pulls the same way. Overwriting any of these with whatever pull
+        // just returned would silently destroy the local edit; leaving it
+        // untouched keeps it queued/flagged instead. Only a row already
+        // confirmed 'synced' (or not present locally at all — see the
+        // create branch below) is safe to apply incoming pulled data to.
         const currentSyncState = (existing as unknown as { syncState: string }).syncState;
-        if (currentSyncState === 'pending_create' || currentSyncState === 'pending_update') {
+        if (
+          currentSyncState === 'pending_create' ||
+          currentSyncState === 'pending_update' ||
+          currentSyncState === 'conflict'
+        ) {
           continue;
         }
 
@@ -249,11 +256,15 @@ export async function clearSyncedRecords(): Promise<void> {
 //
 // conflicts (from PushChangesResponse) names the ids push_changes actually
 // rejected via its last-write-wins guard, despite the RPC call as a whole
-// returning {status:'ok'} — those must be excluded here. Marking a rejected
-// row 'synced' anyway is what let the pull that follows in the same sync
-// run silently overwrite it (see upsertMany's pending-state guard); leaving
-// it as pending_update instead keeps the local edit queued for a future
-// push instead of losing it.
+// returning {status:'ok'}. Those get flagged 'conflict' instead of 'synced'
+// — a distinct state the UI already has a badge for (EstablishmentCard,
+// EstablishmentHeaderCard, ReportListCard, InspectionReportHeader all check
+// syncStatus === 'conflict'; toDisplaySyncStatus already mapped it, this is
+// what was missing to ever actually produce it). Marking a rejected row
+// 'synced' anyway is what let the pull that follows in the same sync run
+// silently overwrite it (see upsertMany's pending-state guard, which now
+// also protects 'conflict'); flagging it instead keeps the edit queued and
+// visible until the user resolves it via resolveConflictKeepLocal.
 export async function markLocalChangesAsSynced(
   payload: PushChangesPayload,
   conflicts?: Partial<Record<SyncEntityName, string[]>>
@@ -265,16 +276,22 @@ export async function markLocalChangesAsSynced(
 
       const primaryKey = syncSchema[entity].primaryKey;
       const conflictedIds = new Set(conflicts?.[entity] ?? []);
-      const ids = [...entityChanges.created, ...entityChanges.updated]
-        .map(dto => String((dto as Record<string, unknown>)[primaryKey]))
-        .filter(id => !conflictedIds.has(id));
+      const ids = [...entityChanges.created, ...entityChanges.updated].map(dto =>
+        String((dto as Record<string, unknown>)[primaryKey])
+      );
 
       for (const id of ids) {
         const existing = await findById(entity, id);
         if (!existing) continue;
 
+        const isConflicted = conflictedIds.has(id);
+
         await existing.update((r: unknown) => {
           const target = r as Record<string, unknown>;
+          if (isConflicted) {
+            target.syncState = 'conflict';
+            return;
+          }
           target.syncState = 'synced';
           // Re-baseline the last-synced snapshot to what was just pushed —
           // see resolveEstablishmentContentEdit.
@@ -285,4 +302,36 @@ export async function markLocalChangesAsSynced(
       }
     }
   });
+}
+
+// User-initiated resolution for a row flagged 'conflict': keep the local
+// version and force it to win the next push by re-stamping updatedAt to
+// now (the last-write-wins guard only ever compares timestamps — this is
+// what makes the retry legitimately newer instead of losing the same race
+// again). "Local changes only" by design: this never fetches or looks at
+// the other device's version, it just re-queues what's already here.
+// Entities without an updatedAtField (the compliance_* tables) can't
+// conflict in the first place — push_changes has no timestamp guard for
+// them — so this is only ever called for establishments/inspection_reports
+// today, the two entities the conflict badge is wired up for.
+export async function resolveConflictKeepLocal(entity: SyncEntityName, id: string): Promise<void> {
+  const entitySchema = syncSchema[entity];
+  const localUpdatedAtField = entitySchema.updatedAtField
+    ? entitySchema.fields[entitySchema.updatedAtField]
+    : undefined;
+
+  await database.write(async () => {
+    const existing = await findById(entity, id);
+    if (!existing) return;
+
+    await existing.update((r: unknown) => {
+      const target = r as Record<string, unknown>;
+      target.syncState = 'pending_update';
+      if (localUpdatedAtField) {
+        target[localUpdatedAtField] = new Date().toISOString();
+      }
+    });
+  });
+
+  notifySyncDataChanged();
 }
