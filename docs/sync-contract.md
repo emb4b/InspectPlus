@@ -588,6 +588,36 @@ The client must preserve and send the correct `updated_at` value for updated row
 
 ---
 
+## Backward Compatibility Rules
+
+InspectPlus is developed continuously while already deployed to field
+inspectors, so an installed app can be several versions behind whatever the
+backend currently does. `push_changes`/`pull_changes` are redefined in place
+by migrations — there is no RPC versioning — so every schema/RPC change must
+be safe for an older, already-installed client to call, not just for the
+latest one.
+
+### Rule
+- New columns must be nullable or have a default — never introduce a new
+  required field an already-installed client won't send.
+- New JSON keys must be optional on read — a client on an older schema
+  simply won't populate them.
+- Never repurpose, rename, or remove a field/column an installed client may
+  still reference; add a new one and migrate readers instead.
+- Changing what an RPC (`push_changes`/`pull_changes`) *requires* from its
+  caller is a breaking change even if the SQL migration itself "just adds a
+  column" — the payload shape sent by already-installed clients is fixed at
+  build time.
+
+### When a change can't be made additively
+If a change genuinely can't be made backward-compatible, raise
+`app_config.min_supported_app_version` so older clients fail loudly (a
+blocked sync with a clear "please update" message) instead of silently
+producing bad data. This is deliberately the floor for *sync only* — the app
+itself must stay usable offline on an unsupported version.
+
+---
+
 ## Deletion Rules
 
 ## Soft delete

@@ -1,5 +1,6 @@
 import { clearSyncedRecords } from '../../db/sync/watermelonAdapter';
 import { checkOnline } from '../../utils/network';
+import { supabase } from '../supabase/client';
 import { syncClient } from './syncClient';
 import { RunSyncResult } from './syncService';
 import {
@@ -8,6 +9,7 @@ import {
   resetSyncMetadata,
 } from './syncState';
 import { notifySyncDataChanged } from './syncEvents';
+import { assertAppVersionSupported } from './appVersionGate';
 import { uploadPendingAttachments } from '../../features/attachments/attachmentUploadQueue';
 
 // The pull watermark (lastPulledAt) is a single incremental cursor: "we
@@ -67,6 +69,8 @@ export async function runManagedSync(
   if (!(await checkOnline())) {
     return null;
   }
+
+  await assertAppVersionSupported(supabase);
 
   const { skipPush = false, skipPull = false } = options;
 

@@ -6,6 +6,8 @@ import { authService } from '../../services/supabase/auth';
 import { supabase } from '../../services/supabase/client';
 import { checkOnline } from '../../utils/network';
 import { runManagedSync } from '../../services/sync/syncOrchestrator';
+import { UpdateRequiredError } from '../../services/sync/appVersionGate';
+import { notifyUpdateRequired } from '../../services/sync/syncEvents';
 
 // If neither the local short-cache nor Supabase's own session check has
 // resolved within this window, stop waiting and show the login screen.
@@ -224,6 +226,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         const uid = (result.session as { user?: { id?: string } }).user?.id;
         if (uid) {
           runManagedSync(uid).catch(err => {
+            if (err instanceof UpdateRequiredError) {
+              notifyUpdateRequired(err.minVersion);
+              return;
+            }
             console.warn('[AuthProvider] Post-login sync failed:', err);
           });
         }

@@ -16,3 +16,20 @@ export function subscribeToSyncDataChanged(listener: Listener): () => void {
 export function notifySyncDataChanged(): void {
   listeners.forEach(listener => listener());
 }
+
+// Separate pub/sub for "sync is blocked because this app version is no
+// longer supported" — distinct from notifySyncDataChanged since nothing
+// actually changed and listeners need the minVersion to show a useful
+// message, not just a refetch signal.
+type UpdateRequiredListener = (minVersion: string) => void;
+
+const updateRequiredListeners = new Set<UpdateRequiredListener>();
+
+export function subscribeToUpdateRequired(listener: UpdateRequiredListener): () => void {
+  updateRequiredListeners.add(listener);
+  return () => updateRequiredListeners.delete(listener);
+}
+
+export function notifyUpdateRequired(minVersion: string): void {
+  updateRequiredListeners.forEach(listener => listener(minVersion));
+}

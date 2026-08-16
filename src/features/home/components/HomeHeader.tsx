@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Image, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import Reanimated, {
   Extrapolation,
@@ -13,6 +13,8 @@ import { Colors } from '../../../constants/colors';
 import { Logo } from '../../../components/Logo';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { runManagedSync } from '../../../services/sync/syncOrchestrator';
+import { UpdateRequiredError } from '../../../services/sync/appVersionGate';
+import { subscribeToUpdateRequired } from '../../../services/sync/syncEvents';
 import { SyncOptionsModal, SyncDirection } from './SyncOptionsModal';
 
 interface HomeHeaderProps {
@@ -59,12 +61,32 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
         `Pushed: ${result.pushed ? 'yes' : 'no changes'}\nPulled: ${result.pulled ? 'yes' : 'no'}`
       );
     } catch (err) {
+      if (err instanceof UpdateRequiredError) {
+        Alert.alert(
+          'Update required',
+          `This app version is no longer supported for sync. Please update to at least version ${err.minVersion}.`
+        );
+        return;
+      }
       console.error('[HomeHeader] Sync failed:', err);
       Alert.alert('Sync failed', err instanceof Error ? err.message : 'Something went wrong while syncing.');
     } finally {
       setSyncing(false);
     }
   };
+
+  // Surfaces the same failure when it happens from the post-login sync
+  // (AuthProvider), which runs in the background and has no UI of its own
+  // to report through — mirrors how other screens use
+  // subscribeToSyncDataChanged for their own refetch-on-sync behavior.
+  useEffect(() => {
+    return subscribeToUpdateRequired(minVersion => {
+      Alert.alert(
+        'Update required',
+        `This app version is no longer supported for sync. Please update to at least version ${minVersion}.`
+      );
+    });
+  }, []);
 
   const handleLogout = async () => {
     try {
