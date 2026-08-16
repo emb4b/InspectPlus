@@ -132,6 +132,17 @@ android {
     }
 }
 
+// Default output is "app-release.apk"/"app-debug.apk" (from the module
+// name) — renamed here so the file testers actually receive reads as
+// "inspectplus.apk" instead. Each build type still lands in its own
+// outputs/apk/<type>/ folder, so debug and release never collide on disk
+// despite sharing this same filename.
+android.applicationVariants.all { variant ->
+    variant.outputs.all { output ->
+        outputFileName = "inspectplus.apk"
+    }
+}
+
 // Apply static values from `gradle.properties` to the `android.packagingOptions`
 // Accepts values in comma delimited lists, example:
 // android.packagingOptions.pickFirsts=/LICENSE,**/picasa.ini
