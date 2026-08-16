@@ -248,7 +248,7 @@ handled entirely by Supabase Auth (`auth.users`), not by this column.
 - not deletable through the client; `establishments.inspector_uid` and other FKs reference `user_accounts(uid)` with `on delete restrict`
 
 ### Related table: `inspector_municipalities`
-Holds the specific municipalities/cities within an inspector's `province` that they're responsible for. This narrows the UI (e.g. filtering) but is **not** an access-control boundary — jurisdiction visibility is still province-wide only, per the RLS policies on `establishments` and the report tables.
+Holds the specific municipalities/cities within an inspector's `province` that they're responsible for. **Read** visibility stays province-wide only (unchanged) — but **write** access (`INSERT`/`UPDATE`/`DELETE`) to `establishments`, `inspection_reports`, `purpose_of_inspection`, and the four `compliance_*` tables is scoped by both province *and* municipality: an inspector can push a change to (or delete) a record only if it's assigned to one of their `inspector_municipalities` rows within their own province. An inspector can be assigned several municipalities within their one province. Owner-only write access (the original creating inspector) and the Developer-role bypass both still work unchanged — the jurisdiction check is an additional permissive policy, not a replacement.
 
 - Primary key: (`inspector_uid`, `municipality`), `inspector_uid` → `user_accounts.uid` with `on delete cascade`
 - `SELECT` only is granted to `authenticated`; RLS restricts rows to `inspector_uid = auth.uid()`
