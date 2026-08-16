@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { Session } from '@supabase/supabase-js';
 import { supabase } from './client';
 import { checkOnline } from '../../utils/network';
 import { hashString } from '../../utils/crypto';
@@ -47,7 +48,7 @@ interface CachedCredential {
   credHash: string;
   // This user's own Supabase session, so offline sign-in can restore the
   // right one even when they're not the last person who used the device.
-  session: object;
+  session: Session;
   // When this credential was last refreshed by a successful online
   // sign-in — the 1-week offline window is measured from here, per user.
   ts: number;
@@ -168,7 +169,7 @@ async function signInOnline(
       municipalities: resolvedMunicipalities,
       role: resolvedRole,
       credHash,
-      session: data.session as object,
+      session: data.session as Session,
       ts: now,
     }),
   ]);
@@ -220,6 +221,25 @@ async function signInOffline(
       'Session not found. ' +
       'Please connect to the internet to log in.',
     );
+  }
+
+  // Restore this inspector's session into the live Supabase client itself —
+  // not just SecureStore/React state. Without this, the client keeps using
+  // whichever session it already had (the previous inspector's, or none),
+  // so every request made after an offline account switch — sync included —
+  // would silently go out under the wrong identity while the UI shows the
+  // newly switched-to inspector. setSession only updates local client state
+  // synchronously; if the cached access_token has expired (likely, given
+  // the up-to-a-week offline window) supabase-js will attempt to refresh it
+  // via the refresh_token, which needs network and can fail here — that's
+  // fine, autoRefreshToken (see client.ts) retries once connectivity
+  // returns, and the offline UI/data-entry flow doesn't depend on it.
+  const { error: setSessionError } = await supabase.auth.setSession({
+    access_token: match.session.access_token,
+    refresh_token: match.session.refresh_token,
+  });
+  if (setSessionError) {
+    console.warn('[Auth] Could not restore live session on offline sign-in (will retry once online):', setSessionError.message);
   }
 
   // This inspector becomes the device's active session — the short-cache
