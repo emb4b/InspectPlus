@@ -598,7 +598,7 @@ Expected: PASS, 2 tests. (Everything violating is allowlisted; nothing else viol
 - [ ] **Step 5: Prove the guard actually catches drift**
 
 ```bash
-printf '\nconst DRIFT = { fontSize: 13 };\n' >> src/components/Card.tsx 2>/dev/null || printf 'const DRIFT = { fontSize: 13 };\n' > src/components/__driftprobe.tsx
+printf 'const DRIFT = { fontSize: 13 };\n' > src/components/__driftprobe.tsx
 npx jest src/design/__tests__/driftGuard.test.ts
 ```
 
@@ -1384,9 +1384,10 @@ export const INSPECTION_TYPE_LABELS: Record<string, string> = Object.fromEntries
 
 - [ ] **Step 4: Use the shared map in `src/features/establishments/components/ReportListCard.tsx`**
 
-Delete the local `REPORT_ICONS` constant (lines 23-29) and add the import:
+Delete the local `REPORT_ICONS` constant (lines 23-29), add the import, and move the `Colors` import off the shim (Global Constraints: a file this plan modifies leaves `src/constants/colors`):
 
 ```ts
+import { Colors } from '../../../design/colors';
 import { REPORT_TYPE_DISPLAY, ReportDataKey } from '../../../constants/reportTypeDisplay';
 ```
 
@@ -1621,7 +1622,7 @@ describe('SpeedDial', () => {
     const r = render();
     openDial(r);
 
-    const handler = (BackHandler.addEventListener as jest.Mock).mock.calls.at(-1)?.[1];
+    const handler = backSpy.mock.calls.at(-1)?.[1] as () => boolean;
     let consumed!: boolean;
     act(() => { consumed = handler(); });
 
@@ -1642,12 +1643,24 @@ describe('SpeedDial', () => {
 
 - [ ] **Step 2: Add a BackHandler spy to the test file**
 
-`react-native`'s Jest preset does not spy `BackHandler.addEventListener` by default. Add this immediately below the `expo-router` mock:
+Spy on the imported object rather than mocking `react-native/Libraries/Utilities/BackHandler` — that internal path is a private RN implementation detail that moves between versions. Add to the `describe` block, above the existing `beforeEach`:
 
 ```tsx
-jest.mock('react-native/Libraries/Utilities/BackHandler', () => ({
-  addEventListener: jest.fn(() => ({ remove: jest.fn() })),
-}));
+  let backSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    backSpy = jest.spyOn(BackHandler, 'addEventListener').mockReturnValue({ remove: jest.fn() } as never);
+  });
+
+  afterEach(() => {
+    backSpy.mockRestore();
+  });
+```
+
+and change the hardware-back test to read its handler from the spy:
+
+```tsx
+    const handler = backSpy.mock.calls.at(-1)?.[1] as () => boolean;
 ```
 
 - [ ] **Step 3: Run the test to verify it fails**
@@ -1894,12 +1907,15 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 **Files:**
 - Create: `src/features/home/context/FabVisibilityContext.tsx`
+- Create: `src/features/home/fabRoute.ts`
 - Modify: `src/app/(app)/_layout.tsx`
-- Test: `src/app/(app)/fabRoute.test.ts`
+- Test: `src/features/home/fabRoute.test.ts`
 
 **Interfaces:**
 - Consumes: `SpeedDial`.
-- Produces: `FabVisibilityProvider`, `useFabHidden(): boolean`, `useSetFabHidden(hidden: boolean): void`, and `isFabRoute(pathname: string): boolean` (exported from `_layout.tsx` for its test).
+- Produces: `FabVisibilityProvider`, `useFabHidden(): boolean`, `useSetFabHidden(hidden: boolean): void`, and `isFabRoute(pathname: string): boolean` from `src/features/home/fabRoute.ts`.
+
+`isFabRoute` lives in its own module rather than in `_layout.tsx`: importing the layout would drag expo-router's `Stack`, `SafeAreaView`, `HomeHeader`, `AuthProvider`, the Supabase client and the sync orchestrator into a unit test for one pure string predicate.
 
 **Visibility rule (from the design):** visible on `/home` and `/establishment/[id]`; hidden on `/inspection/*`, `/survey/*`, `/report/new`, and `/establishment/edit`, where it would collide with the screen's own footer actions. A screen can also hide it imperatively via `useSetFabHidden` — Task 17 uses that for the Export tab's selection bar.
 
@@ -1954,10 +1970,27 @@ export function useSetFabHidden(hidden: boolean): void {
 }
 ```
 
-- [ ] **Step 2: Write the failing test at `src/app/(app)/fabRoute.test.ts`**
+- [ ] **Step 2: Write `src/features/home/fabRoute.ts`**
 
 ```ts
-import { isFabRoute } from './_layout';
+// Browsing screens get the create-report FAB; form screens don't, because it
+// would sit on top of their own bottom action bars. Matched against the
+// resolved path, not the route pattern — /establishment/edit is a form, every
+// other /establishment/<id> is a detail screen.
+//
+// Its own module rather than living in the layout: this is a pure predicate,
+// and importing the layout to test it would pull in the router, the auth
+// provider and the sync orchestrator.
+export function isFabRoute(pathname: string): boolean {
+  if (pathname === '/home') return true;
+  return /^\/establishment\/(?!edit$)[^/]+$/.test(pathname);
+}
+```
+
+- [ ] **Step 3: Write the failing test at `src/features/home/fabRoute.test.ts`**
+
+```ts
+import { isFabRoute } from './fabRoute';
 
 describe('isFabRoute', () => {
   it('shows the FAB on home', () => {
@@ -1981,12 +2014,12 @@ describe('isFabRoute', () => {
 });
 ```
 
-- [ ] **Step 3: Run the test to verify it fails**
+- [ ] **Step 4: Run the test**
 
-Run: `npx jest "src/app/(app)/fabRoute.test.ts"`
-Expected: FAIL — `isFabRoute` is not exported.
+Run: `npx jest src/features/home/fabRoute.test.ts`
+Expected: PASS, 4 tests.
 
-- [ ] **Step 4: Update `src/app/(app)/_layout.tsx`**
+- [ ] **Step 5: Update `src/app/(app)/_layout.tsx`**
 
 Replace the file's contents with:
 
@@ -2002,15 +2035,7 @@ import { SpeedDial } from '../../features/home/components/SpeedDial';
 import { HeaderScrollProvider, useHeaderScroll } from '../../features/home/context/HeaderScrollContext';
 import { ScreenFooterProvider, useActiveScreenFooter } from '../../features/home/context/ScreenFooterContext';
 import { FabVisibilityProvider, useFabHidden } from '../../features/home/context/FabVisibilityContext';
-
-// Browsing screens get the create-report FAB; form screens don't, because it
-// would sit on top of their own bottom action bars. Matched against the
-// resolved path, not the route pattern — /establishment/edit is a form, every
-// other /establishment/<id> is a detail screen.
-export function isFabRoute(pathname: string): boolean {
-  if (pathname === '/home') return true;
-  return /^\/establishment\/(?!edit$)[^/]+$/.test(pathname);
-}
+import { isFabRoute } from '../../features/home/fabRoute';
 
 // Header/footer chrome that reacts to the active route — split out so it can
 // read scroll-collapse state from the provider below.
@@ -2070,11 +2095,6 @@ const styles = StyleSheet.create({
 });
 ```
 
-- [ ] **Step 5: Run the test to verify it passes**
-
-Run: `npx jest "src/app/(app)/fabRoute.test.ts"`
-Expected: PASS, 4 tests.
-
 - [ ] **Step 6: Verify the whole suite, types, and lint**
 
 Run: `npm run typecheck && npm run lint && npm test`
@@ -2083,7 +2103,7 @@ Expected: all exit 0.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add "src/app/(app)/_layout.tsx" "src/app/(app)/fabRoute.test.ts" src/features/home/context/FabVisibilityContext.tsx
+git add "src/app/(app)/_layout.tsx" src/features/home/fabRoute.ts src/features/home/fabRoute.test.ts src/features/home/context/FabVisibilityContext.tsx
 git commit -m "feat(reports): mount the speed dial in the shared app chrome
 
 Visible on home and establishment detail, hidden on the form screens where
