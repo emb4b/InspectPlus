@@ -36,4 +36,13 @@ rootProject.name = 'InspectPlus'
 expoAutolinking.useExpoVersionCatalog()
 
 include ':app'
+
+// WatermelonDB's fast JSI SQLite adapter lives in a separate, optional
+// native module that its own autolinking config deliberately excludes
+// (native/android is autolinked; native/android-jsi is opt-in) — without
+// this, `jsi: true` in src/db/database.ts silently falls back to the slow
+// async bridge for every query, no matter how often the app is rebuilt.
+include ':watermelondb-jsi'
+project(':watermelondb-jsi').projectDir = new File(rootProject.projectDir, '../node_modules/@nozbe/watermelondb/native/android-jsi')
+
 includeBuild(expoAutolinking.reactNativeGradlePlugin)
