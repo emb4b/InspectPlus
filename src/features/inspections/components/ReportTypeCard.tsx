@@ -1,7 +1,6 @@
 import React from 'react';
 import {
   TouchableOpacity,
-  Text,
   StyleSheet,
   View,
 } from 'react-native';
@@ -9,6 +8,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import type { ReportType } from '../../../constants/reportTypes';
 import { useGuardedPress } from '../../../utils/useGuardedPress';
+import { AppText } from '../../../components/AppText';
 
 interface ReportTypeCardProps {
   item: ReportType;
@@ -42,12 +42,13 @@ export const ReportTypeCard: React.FC<ReportTypeCardProps> = ({ item }) => {
           <IconComponent name={item.iconName as any} size={ICON_SIZE} color={item.textColor} />
         )}
       </View>
-      <Text style={[styles.law, { color: item.textColor }]} numberOfLines={1}>
-        {item.law}
-      </Text>
-      <Text style={styles.title} numberOfLines={4} ellipsizeMode="tail">
-        {item.title}
-      </Text>
+      <AppText
+        variant="single"
+        text={item.law}
+        style={[styles.law, { color: item.textColor }]}
+        containerStyle={styles.lawContainer}
+      />
+      <AppText variant="multiline" text={item.title} style={styles.title} lines={4} />
     </TouchableOpacity>
   );
 };
@@ -71,8 +72,10 @@ const styles = StyleSheet.create({
   law: {
     fontSize: 15,
     fontWeight: '800',
-    marginBottom: 4,
     textAlign: 'center',
+  },
+  lawContainer: {
+    marginBottom: 4,
   },
   title: {
     fontSize: 12,

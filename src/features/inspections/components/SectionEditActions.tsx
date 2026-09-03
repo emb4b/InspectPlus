@@ -1,7 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../../constants/colors';
+import { View, StyleSheet } from 'react-native';
+import { Button } from '../../../components/Button';
 
 interface SectionEditActionsProps {
   editing: boolean;
@@ -31,25 +30,14 @@ export const SectionEditActions: React.FC<SectionEditActionsProps> = ({
     return null;
   }
   if (!editing) {
-    return (
-      <TouchableOpacity style={styles.editBtn} onPress={onStartEdit} activeOpacity={0.75}>
-        <Ionicons name="pencil" size={11} color={Colors.navy} />
-        <Text style={styles.editBtnText}>Edit</Text>
-      </TouchableOpacity>
-    );
+    return <Button label="Edit" icon="pencil" variant="outline" onPress={onStartEdit} />;
   }
   return (
     <View style={styles.row}>
-      <TouchableOpacity style={styles.cancelBtn} onPress={onCancel} activeOpacity={0.75} disabled={saving}>
-        <Text style={styles.cancelBtnText}>Cancel</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.saveBtn} onPress={onSave} activeOpacity={0.8} disabled={saving}>
-        {saving ? (
-          <ActivityIndicator size="small" color={Colors.textWhite} />
-        ) : (
-          <Text style={styles.saveBtnText}>Save</Text>
-        )}
-      </TouchableOpacity>
+      <Button label="Cancel" variant="subtle" onPress={onCancel} disabled={saving} />
+      {/* minWidth so swapping the label for the spinner doesn't resize the
+          button and shift Cancel sideways mid-save. */}
+      <Button label="Save" variant="success" onPress={onSave} loading={saving} style={styles.save} />
     </View>
   );
 };
@@ -59,44 +47,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  editBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 7,
-    borderWidth: 1.5,
-    borderColor: Colors.navy,
-    backgroundColor: Colors.white,
-  },
-  editBtnText: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: Colors.navy,
-  },
-  cancelBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 7,
-    backgroundColor: Colors.bgLight,
-  },
-  cancelBtnText: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-  },
-  saveBtn: {
-    minWidth: 52,
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 7,
-    backgroundColor: Colors.green,
-  },
-  saveBtnText: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: Colors.textWhite,
+  save: {
+    minWidth: 68,
   },
 });

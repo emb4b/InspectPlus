@@ -60,7 +60,7 @@ export const GeneralInformationTab: React.FC<GeneralInformationTabProps> = ({
             onChangeText={name => onChange({ ...value, name })}
             textCase="upper"
             required
-            readOnly
+            readOnly
             hint="Pre-filled from the establishment master record"
           />
         </View>

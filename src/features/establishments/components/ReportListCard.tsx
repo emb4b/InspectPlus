@@ -4,6 +4,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
+import { AppText } from '../../../components/AppText';
 import { getReportUrgency } from '../../../utils/reportUrgency';
 import { confirmResolveConflict } from '../../../services/sync/syncConflictResolution';
 import type { AllReportItem } from '../hooks/useEstablishment';
@@ -146,7 +147,7 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
             </View>
             <View style={styles.content}>
               <View style={styles.titleRow}>
-                <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
+                <AppText variant="marquee" text={item.title} style={styles.title} containerStyle={styles.titleContainer} />
                 {item.status && (
                   <View
                     style={[
@@ -165,7 +166,7 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
               </View>
               <View style={styles.metaRow}>
                 <Ionicons name="business-outline" size={10} color={Colors.textMuted} style={styles.metaIcon} />
-                <Text style={styles.estabName} numberOfLines={2}>{item.estabName}</Text>
+                <AppText variant="marquee" text={item.estabName} style={styles.estabName} containerStyle={styles.estabNameContainer} />
               </View>
 
               {/* Sync status indicator */}
@@ -303,10 +304,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   title: {
-    flex: 1,
     fontSize: 12.5,
     fontWeight: '700',
     color: Colors.textPrimary,
+  },
+  titleContainer: {
+    flex: 1,
   },
   statusBadge: {
     paddingHorizontal: 8,
@@ -335,6 +338,8 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: '600',
     color: Colors.textSecondary,
+  },
+  estabNameContainer: {
     flexShrink: 1,
   },
   syncRow: {

@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, LayoutChangeEvent } from 'rea
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Colors } from '../../../constants/colors';
+import { AppText } from '../../../components/AppText';
 import { getReportTypeMeta } from '../reportTypeMeta';
 import { TwoRowTabs, TwoRowMainTabDef } from './TwoRowTabs';
 
@@ -50,16 +51,20 @@ export const ReportFormHeader: React.FC<ReportFormHeaderProps> = ({
         <Text style={styles.backText}>Back</Text>
       </TouchableOpacity>
 
-      <View style={styles.card}>
+      {/* Hidden until the title block's height is measured, so the icon
+          appears at its final size instead of visibly popping from the 34
+          default to the measured size once layout settles — see
+          EstablishmentHeaderCard for the same treatment. */}
+      <View style={[styles.card, titleBlockHeight === null && styles.cardMeasuring]}>
         <View style={[styles.iconWrap, { width: iconSize, height: iconSize }]}>
           <Ionicons name="document-text" size={iconGlyphSize} color={Colors.green} />
         </View>
         <View style={styles.titleInfo}>
           <View onLayout={handleTitleBlockLayout}>
-            <Text style={styles.name} numberOfLines={2}>{establishmentName}</Text>
+            <AppText variant="marquee" text={establishmentName} style={styles.name} />
             <View style={styles.locationRow}>
               <Ionicons name="location" size={11} color={Colors.green} style={styles.locationIcon} />
-              <Text style={styles.location} numberOfLines={2}>{establishmentLocation}</Text>
+              <AppText variant="marquee" text={establishmentLocation} style={styles.location} containerStyle={styles.locationContainer} />
             </View>
           </View>
         </View>
@@ -123,6 +128,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     elevation: 1,
   },
+  cardMeasuring: {
+    opacity: 0,
+  },
   iconWrap: {
     width: 34,
     height: 34,
@@ -153,9 +161,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   location: {
-    flex: 1,
     fontSize: 11,
     color: Colors.textMuted,
+  },
+  locationContainer: {
+    flex: 1,
   },
   badgeGroup: {
     flexDirection: 'column',

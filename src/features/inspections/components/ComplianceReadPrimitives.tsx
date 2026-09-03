@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Colors } from '../../../constants/colors';
+import { AppText } from '../../../components/AppText';
 import { FormSection, TextField } from '../../../components/form';
 import type { YnValue } from '../../../components/form';
 import type { ChecklistEntry, ConditionEntry } from '../hooks/useInspectionReport';
@@ -47,9 +48,13 @@ export const SimpleTable: React.FC<{ columns: { key: string; label: string }[]; 
       {rows.map((row, i) => (
         <View key={i} style={styles.tableRow}>
           {columns.map(col => (
-            <Text key={col.key} style={[styles.tableCell, styles.tableCellFlex]} numberOfLines={2}>
-              {formatValue(row[col.key])}
-            </Text>
+            <AppText
+              key={col.key}
+              variant="multiline"
+              text={formatValue(row[col.key])}
+              style={styles.tableCell}
+              containerStyle={styles.tableCellFlex}
+            />
           ))}
         </View>
       ))}
@@ -66,7 +71,12 @@ export const DetailCard: React.FC<{ title: string; fields: { label: string; valu
     {fields.map((f, i) => (
       <View key={i} style={styles.detailRow}>
         <Text style={styles.detailLabel}>{f.label}</Text>
-        <Text style={styles.detailValue} numberOfLines={2}>{formatValue(f.value)}</Text>
+        <AppText
+          variant="multiline"
+          text={formatValue(f.value)}
+          style={styles.detailValue}
+          containerStyle={styles.detailValueContainer}
+        />
       </View>
     ))}
   </View>
@@ -226,8 +236,10 @@ export const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '600',
     color: Colors.textPrimary,
-    flexShrink: 1,
     textAlign: 'right',
+  },
+  detailValueContainer: {
+    flexShrink: 1,
   },
   samplingCard: {
     backgroundColor: Colors.white,

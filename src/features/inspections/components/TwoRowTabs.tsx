@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { Colors } from '../../../constants/colors';
+import { AppText } from '../../../components/AppText';
 
 export interface TwoRowSubTabDef {
   key: string;
@@ -35,12 +36,12 @@ interface TwoRowTabsProps {
 // two), so the 3-tab menu other report kinds still use keeps its original
 // single-row look.
 export const TwoRowTabs: React.FC<TwoRowTabsProps> = ({ tabs, activeMain, onMainChange }) => {
-  const numRows = tabs.length > 4 ? 2 : 1;
-  const rowSize = Math.ceil(tabs.length / numRows);
-  const rows: TwoRowMainTabDef[][] = [];
-  for (let i = 0; i < tabs.length; i += rowSize) {
-    rows.push(tabs.slice(i, i + rowSize));
-  }
+  // The shorter row goes first: with 7 tabs that's 3 then 4, so the opening
+  // tabs get a third of the width each instead of a quarter.
+  const rows: TwoRowMainTabDef[][] =
+    tabs.length > 4
+      ? [tabs.slice(0, Math.floor(tabs.length / 2)), tabs.slice(Math.floor(tabs.length / 2))]
+      : [tabs];
 
   return (
     <View style={styles.container}>
@@ -58,9 +59,17 @@ export const TwoRowTabs: React.FC<TwoRowTabsProps> = ({ tabs, activeMain, onMain
                 ]}
                 activeOpacity={0.7}
                 onPress={() => onMainChange(tab.key)}>
-                <Text style={[styles.tabText, isActive && styles.tabTextActive]} numberOfLines={2}>
-                  {tab.label}
-                </Text>
+                {/* Three lines, not the default two: the 4-tab row is only a
+                    quarter of the width, and the longest labels here
+                    ("Water Supply and Wastewater Generation") need the third
+                    line to land intact. A clipped tab label can't be read in
+                    full anywhere else in the UI, so it has to fit here. */}
+                <AppText
+                  variant="multiline"
+                  lines={3}
+                  text={tab.label}
+                  style={[styles.tabText, isActive && styles.tabTextActive]}
+                />
               </TouchableOpacity>
             );
           })}

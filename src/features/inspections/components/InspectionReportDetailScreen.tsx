@@ -5,6 +5,7 @@ import type { KeyboardAwareScrollViewRef } from 'react-native-keyboard-controlle
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Colors } from '../../../constants/colors';
+import { formatEstablishmentLocation } from '../../../utils/establishmentLocation';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { useInspectionReport } from '../hooks/useInspectionReport';
 import { deleteInspectionReportRecord } from '../reportPersistence';
@@ -113,13 +114,15 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
     );
   }
 
-  const location = [
-    report.establishmentSnapshot.address_line,
-    report.establishmentSnapshot.city,
-    report.establishmentSnapshot.province,
-  ]
-    .filter(Boolean)
-    .join(', ');
+  // From the report's own snapshot rather than the live establishment, so a
+  // report keeps showing the address as it stood when it was filed. Snapshot
+  // keys are snake_case, hence the mapping into the shared formatter.
+  const location = formatEstablishmentLocation({
+    addressLine: report.establishmentSnapshot.address_line,
+    barangay: report.establishmentSnapshot.barangay,
+    city: report.establishmentSnapshot.city,
+    province: report.establishmentSnapshot.province,
+  });
 
   // Water reports get the full 1-6 section/subsection tab menu from the
   // report template; every other report kind keeps the original 3-tab

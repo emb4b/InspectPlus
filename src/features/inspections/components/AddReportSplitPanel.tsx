@@ -14,6 +14,7 @@ import type { KeyboardAwareScrollViewRef } from 'react-native-keyboard-controlle
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Colors } from '../../../constants/colors';
+import { formatEstablishmentLocation } from '../../../utils/establishmentLocation';
 import { REPORT_TYPES, ReportTypeKey } from '../../../constants/reportTypes';
 import { collections } from '../../../db/database';
 import {
@@ -22,6 +23,7 @@ import {
   EstablishmentReportItem,
 } from '../../establishments/hooks/useEstablishment';
 import { TextField, DateField, SelectField, focusInput } from '../../../components/form';
+import { AppText } from '../../../components/AppText';
 import { PurposeOfInspectionTab } from './PurposeOfInspectionTab';
 import {
   GeneralInfoFormState,
@@ -180,9 +182,7 @@ export const AddReportSplitPanel: React.FC<AddReportSplitPanelProps> = ({ estabI
     );
   }
 
-  const location = [establishment.addressLine, establishment.city, establishment.province]
-    .filter(Boolean)
-    .join(', ');
+  const location = formatEstablishmentLocation(establishment);
   const selectedMeta = selectedType ? REPORT_TYPES.find(t => t.key === selectedType) ?? null : null;
 
   return (
@@ -206,8 +206,16 @@ export const AddReportSplitPanel: React.FC<AddReportSplitPanelProps> = ({ estabI
             <Ionicons name="business" size={20} color={Colors.textWhite} />
           </View>
           <View style={styles.estabInfo}>
-            <Text style={styles.estabName} numberOfLines={1}>{establishment.name}</Text>
-            <Text style={styles.estabLocation} numberOfLines={1}>📍 {location}</Text>
+            <AppText variant="marquee" text={establishment.name} style={styles.estabName} />
+            <View style={styles.estabLocationRow}>
+              <Text style={styles.estabLocationPin}>📍</Text>
+              <AppText
+                variant="marquee"
+                text={location}
+                style={styles.estabLocation}
+                containerStyle={styles.estabLocationContainer}
+              />
+            </View>
           </View>
           <View style={styles.stepPill}>
             <Text style={styles.stepPillText}>Step {selectedType ? 2 : 1} of 2</Text>
@@ -241,11 +249,11 @@ export const AddReportSplitPanel: React.FC<AddReportSplitPanelProps> = ({ estabI
                       {IconAsset && <IconAsset width={26} height={26} opacity={enabled ? 1 : 0.4} />}
                     </View>
                     <View style={styles.typeTextWrap}>
-                      <Text
+                      <AppText
+                        variant="multiline"
+                        text={item.title}
                         style={[styles.typeTitle, !enabled && styles.typeTitleDisabled]}
-                        numberOfLines={2}>
-                        {item.title}
-                      </Text>
+                      />
                       <Text style={[styles.typeLaw, { color: enabled ? item.textColor : Colors.textLight }]}>
                         {item.law}
                       </Text>
@@ -519,7 +527,18 @@ const styles = StyleSheet.create({
   estabLocation: {
     fontSize: 11.5,
     color: Colors.textMuted,
+  },
+  estabLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     marginTop: 2,
+  },
+  estabLocationPin: {
+    fontSize: 11.5,
+  },
+  estabLocationContainer: {
+    flex: 1,
   },
   stepPill: {
     paddingHorizontal: 10,

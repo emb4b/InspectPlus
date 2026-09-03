@@ -454,6 +454,14 @@ export function useEstablishment(estabId: string | undefined): UseEstablishmentR
   const [tick, setTick] = useState(0);
   const { myUid, myProvince, myRole, ready } = useJurisdiction();
 
+  // Same rationale as useEstablishments' hasLoadedOnce: `ready`/myProvince/
+  // myRole can each flip shortly after mount as AuthProvider's session-first,
+  // province/role-backfilled-after bootstrap settles (see AuthProvider.tsx),
+  // re-running this effect. Without this guard that re-run flips `loading`
+  // back to true and flashes the full-screen spinner a second time for what
+  // the user experiences as a single screen visit.
+  const hasLoadedOnce = useRef(false);
+
   const refetch = useCallback(() => setTick(t => t + 1), []);
 
   useEffect(() => {
@@ -466,7 +474,7 @@ export function useEstablishment(estabId: string | undefined): UseEstablishmentR
         return;
       }
       try {
-        setLoading(true);
+        if (!hasLoadedOnce.current) setLoading(true);
         setError(null);
 
         const matches = await database.collections
@@ -490,7 +498,10 @@ export function useEstablishment(estabId: string | undefined): UseEstablishmentR
           console.error('[useEstablishment]', err);
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);
+          hasLoadedOnce.current = true;
+        }
       }
     }
 

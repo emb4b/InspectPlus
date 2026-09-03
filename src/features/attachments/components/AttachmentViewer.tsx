@@ -19,6 +19,7 @@ import Reanimated, { LinearTransition } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
+import { AppText } from '../../../components/AppText';
 import { getDisplayUri } from '../attachmentUploadQueue';
 import { downloadAttachmentToGallery, copyAttachmentDetails } from '../attachmentActions';
 import { formatDmsPair, formatStampDate } from '../geotagStamp';
@@ -212,7 +213,7 @@ export const AttachmentViewer: React.FC<AttachmentViewerProps> = ({
             <Ionicons name="chevron-down" size={24} color={Colors.white} />
           </TouchableOpacity>
           <View style={styles.titleWrap}>
-            <Text style={styles.title} numberOfLines={1}>{current.fileName}</Text>
+            <AppText variant="marquee" text={current.fileName} style={styles.title} />
             {items.length > 1 && (
               <Text style={styles.pageIndicator}>{activeIndex + 1} of {items.length}</Text>
             )}
@@ -303,7 +304,7 @@ export const AttachmentViewer: React.FC<AttachmentViewerProps> = ({
 
         {showDetails && (
           <Reanimated.View style={styles.detailsPanel} layout={LinearTransition.duration(220)}>
-            <Text style={styles.detailsTitle} numberOfLines={1}>{current.fileName}</Text>
+            <AppText variant="marquee" text={current.fileName} style={styles.detailsTitleText} containerStyle={styles.detailsTitle} />
             <Text style={styles.detailsRow}>Captured: {formatStampDate(new Date(current.capturedAt))}</Text>
             <Text style={styles.detailsRow}>Status: {displayUploadStatusLabel(current)}</Text>
             {hasGeo ? (
@@ -487,10 +488,12 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   detailsTitle: {
+    marginBottom: 8,
+  },
+  detailsTitleText: {
     fontSize: 13,
     fontWeight: '700',
     color: Colors.white,
-    marginBottom: 8,
   },
   detailsRow: {
     fontSize: 11.5,

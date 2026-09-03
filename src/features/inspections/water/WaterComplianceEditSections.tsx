@@ -93,6 +93,7 @@ export const WaterSourcesSection: React.FC<{
 
   return (
     <FormSection
+      icon="water-outline"
       title="A. Water Sources"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
@@ -145,6 +146,7 @@ export const WastewaterSourcesSection: React.FC<{
 
   return (
     <FormSection
+      icon="funnel-outline"
       title="B. Wastewater Sources"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
@@ -197,6 +199,7 @@ export const AbstractedWaterQualitySection: React.FC<{
 
   return (
     <FormSection
+      icon="flask-outline"
       title="C. Quality of Abstracted Water"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
@@ -238,7 +241,7 @@ export const AbstractedWaterQualitySection: React.FC<{
 // read-only "doesn't apply" remarks instead of editable content.
 
 export const WwtpUnavailableSection: React.FC<{ title: string }> = ({ title }) => (
-  <FormSection title={title}>
+  <FormSection icon="business-outline" title={title}>
     <Text style={sharedStyles.emptyText}>No WWTP on record for this establishment — this doesn't apply.</Text>
   </FormSection>
 );
@@ -259,6 +262,7 @@ export const TreatmentSystemTypeSection: React.FC<{
 
   return (
     <FormSection
+      icon="construct-outline"
       title="A. Type of Wastewater Treatment System"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
@@ -297,6 +301,7 @@ export const WwtpTypeSection: React.FC<{
 
   return (
     <FormSection
+      icon="business-outline"
       title="B. Type of WWTP"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
@@ -339,6 +344,7 @@ export const WwtpDetailsSection: React.FC<{
 
   return (
     <FormSection
+      icon="list-outline"
       title="C. WWTP Details"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
@@ -508,6 +514,7 @@ export const WwtpComponentsSection: React.FC<{
 
   return (
     <FormSection
+      icon="layers-outline"
       title="D. Components of the WWTP"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
@@ -627,6 +634,7 @@ export const WwtpConditionSection: React.FC<{
 
   return (
     <FormSection
+      icon="pulse-outline"
       title="E. Condition of the WWTP"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
@@ -710,6 +718,7 @@ export const SamplingPointsSection: React.FC<{
 
   return (
     <FormSection
+      icon="flask-outline"
       title="I. Water Quality Sampling"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
@@ -913,6 +922,7 @@ export const PreviousInspectionSection: React.FC<{
 
   return (
     <FormSection
+      icon="time-outline"
       title="II. Previous Inspection"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
@@ -1083,6 +1093,7 @@ export const SummaryOfFindingsSection: React.FC<{
 
   return (
     <FormSection
+      icon="clipboard-outline"
       title="III. Summary of Findings"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
@@ -1118,7 +1129,7 @@ export const SummaryOfFindingsSection: React.FC<{
 // establishmentHasDischargePermit in waterReportTabs.ts.
 
 export const DpConditionsUnavailableSection: React.FC = () => (
-  <FormSection title="IV. Compliance to DP Conditions">
+  <FormSection icon="checkbox-outline" title="IV. Compliance to DP Conditions">
     <Text style={sharedStyles.emptyText}>
       No discharge permit on record for this establishment — compliance to DP conditions doesn't apply.
     </Text>
@@ -1160,6 +1171,7 @@ export const DpConditionsSection: React.FC<{
 
   return (
     <FormSection
+      icon="checkbox-outline"
       title="IV. Compliance to DP Conditions"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
@@ -1277,6 +1289,7 @@ export const ObservationsSection: React.FC<{
 
   return (
     <FormSection
+      icon="clipboard-outline"
       title="V. Observations and Recommendations"
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />

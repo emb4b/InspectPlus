@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
+import { AppText } from '../AppText';
 
 interface SelectFieldProps {
   label: string;
@@ -61,9 +62,11 @@ export const SelectField: React.FC<SelectFieldProps> = ({
           Keyboard.dismiss();
           setOpen(true);
         }}>
-        <Text style={value ? styles.value : styles.placeholder} numberOfLines={1}>
-          {value || placeholder}
-        </Text>
+        {value ? (
+          <AppText variant="single" text={value} style={styles.value} containerStyle={styles.valueContainer} />
+        ) : (
+          <Text style={styles.placeholder} numberOfLines={1}>{placeholder}</Text>
+        )}
         <Ionicons name="chevron-down" size={16} color={Colors.textMuted} />
       </TouchableOpacity>
 
@@ -150,6 +153,8 @@ const styles = StyleSheet.create({
   value: {
     fontSize: 13,
     color: Colors.textPrimary,
+  },
+  valueContainer: {
     flex: 1,
   },
   placeholder: {

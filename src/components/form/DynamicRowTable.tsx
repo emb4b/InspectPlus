@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
 import { focusInput } from './focusInput';
+import { AppText } from '../AppText';
 
 export interface DynamicColumn {
   key: string;
@@ -114,9 +115,12 @@ export const DynamicRowTable: React.FC<DynamicRowTableProps> = ({
                       <TouchableOpacity
                         style={styles.selectCell}
                         onPress={() => setPickerFor({ rowIndex, column: col })}>
-                        <Text style={styles.selectCellText} numberOfLines={1}>
-                          {row[col.key] || col.placeholder || '—'}
-                        </Text>
+                        <AppText
+                          variant="single"
+                          text={row[col.key] || col.placeholder || '—'}
+                          style={styles.selectCellText}
+                          containerStyle={styles.selectCellTextContainer}
+                        />
                         <Ionicons name="chevron-down" size={12} color={Colors.textMuted} />
                       </TouchableOpacity>
                     ) : (
@@ -238,6 +242,8 @@ const styles = StyleSheet.create({
   selectCellText: {
     fontSize: 12,
     color: Colors.textPrimary,
+  },
+  selectCellTextContainer: {
     flex: 1,
   },
   removeBtn: {

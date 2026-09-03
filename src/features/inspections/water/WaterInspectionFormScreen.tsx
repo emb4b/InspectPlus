@@ -4,6 +4,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import type { KeyboardAwareScrollViewRef } from 'react-native-keyboard-controller';
 import { router } from 'expo-router';
 import { Colors } from '../../../constants/colors';
+import { formatEstablishmentLocation } from '../../../utils/establishmentLocation';
 import { database, collections } from '../../../db/database';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { generateId } from '../../../utils/crypto';
@@ -178,7 +179,7 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
     <View style={styles.flex}>
       <ReportFormHeader
         establishmentName={generalInfo.name || 'New Establishment'}
-        establishmentLocation={[generalInfo.addressLine, generalInfo.city, generalInfo.province].filter(Boolean).join(', ')}
+        establishmentLocation={formatEstablishmentLocation(generalInfo)}
         reportType={REPORT_TYPE}
         tabs={tabs}
         activeMain={activeMainTab.key}

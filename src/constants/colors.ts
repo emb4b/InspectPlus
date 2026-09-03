@@ -74,6 +74,12 @@ export const Colors = {
   synced: '#059669',
   pending: '#d97706',
   conflict: '#dc2626',
+  // Muted fills of the two states that need a chip background. The report
+  // type palettes (warning/hazwaste) happen to be the right hues, but they
+  // carry unrelated meaning — sync state gets its own so the two can't drift
+  // into each other.
+  pendingMuted: '#fef3c7',
+  conflictMuted: '#fee2e2',
 
   // Utility
   transparent: 'transparent',
