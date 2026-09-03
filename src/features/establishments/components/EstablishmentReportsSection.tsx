@@ -4,6 +4,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
+import { AppText } from '../../../components/AppText';
 import { getReportUrgency } from '../../../utils/reportUrgency';
 import type { EstablishmentReportItem } from '../hooks/useEstablishment';
 
@@ -118,7 +119,7 @@ const ReportRow: React.FC<{
               <Ionicons name={REPORT_ICONS[item.reportType] ?? 'document-outline'} size={17} color={Colors.water.text} />
             </View>
             <View style={styles.content}>
-              <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+              <AppText variant="marquee" text={item.title} style={styles.title} />
               <View style={styles.dateRow}>
                 <Ionicons name="calendar-outline" size={10} color={Colors.textMuted} />
                 <Text style={styles.date}>{formatDate(item.date)}</Text>

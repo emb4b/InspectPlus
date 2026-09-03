@@ -15,9 +15,11 @@ import type { KeyboardAwareScrollViewRef } from 'react-native-keyboard-controlle
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Colors } from '../../../constants/colors';
+import { formatEstablishmentLocation } from '../../../utils/establishmentLocation';
 import { database } from '../../../db/database';
 import { useEstablishment } from '../hooks/useEstablishment';
 import { FormSection, TextField, SelectField, DateField, DynamicRowTable, focusInput } from '../../../components/form';
+import { AppText } from '../../../components/AppText';
 import { PROVINCE_OPTIONS, getCityOptions, getBarangayOptions } from '../../../constants/provinces';
 import { maskFlexibleDate, isValidFlexibleDate, FLEXIBLE_DATE_HINT, FLEXIBLE_DATE_INVALID_HINT } from '../../../utils/flexibleDate';
 import { updateEstablishmentRecord } from '../../inspections/establishmentPersistence';
@@ -153,7 +155,7 @@ export const EditEstablishmentScreen: React.FC<EditEstablishmentScreenProps> = (
     );
   }
 
-  const location = [form.addressLine, form.city, form.province].filter(Boolean).join(', ');
+  const location = formatEstablishmentLocation(form);
   const isNonOperational = form.operatingStatus !== 'Operational';
 
   return (
@@ -177,8 +179,16 @@ export const EditEstablishmentScreen: React.FC<EditEstablishmentScreenProps> = (
             <Ionicons name="business" size={20} color={Colors.textWhite} />
           </View>
           <View style={styles.estabInfo}>
-            <Text style={styles.estabName} numberOfLines={1}>{form.name || 'Untitled Establishment'}</Text>
-            <Text style={styles.estabLocation} numberOfLines={1}>📍 {location}</Text>
+            <AppText variant="marquee" text={form.name || 'Untitled Establishment'} style={styles.estabName} />
+            <View style={styles.estabLocationRow}>
+              <Text style={styles.estabLocationPin}>📍</Text>
+              <AppText
+                variant="marquee"
+                text={location}
+                style={styles.estabLocation}
+                containerStyle={styles.estabLocationContainer}
+              />
+            </View>
           </View>
           <View style={styles.editBadge}>
             <Ionicons name="create-outline" size={11} color={Colors.warning.text} />
@@ -574,7 +584,18 @@ const styles = StyleSheet.create({
   estabLocation: {
     fontSize: 11.5,
     color: Colors.textMuted,
+  },
+  estabLocationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     marginTop: 2,
+  },
+  estabLocationPin: {
+    fontSize: 11.5,
+  },
+  estabLocationContainer: {
+    flex: 1,
   },
   editBadge: {
     flexDirection: 'row',

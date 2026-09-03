@@ -12,6 +12,8 @@ import Animated from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Colors } from '../../../constants/colors';
+import { formatEstablishmentLocation } from '../../../utils/establishmentLocation';
+import { AppText } from '../../../components/AppText';
 import { useEstablishments } from '../../establishments/hooks/useEstablishment';
 import type { EstablishmentDTO } from '../../establishments/types';
 import { useHeaderScroll } from '../../home/context/HeaderScrollContext';
@@ -100,10 +102,13 @@ export const EstablishmentPickerStep: React.FC<EstablishmentPickerStepProps> = (
                 <Ionicons name="business" size={18} color={Colors.textMuted} />
               </View>
               <View style={styles.itemInfo}>
-                <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
-                <Text style={styles.itemMeta} numberOfLines={1}>
-                  {item.addressLine}, {item.city}, {item.province}
-                </Text>
+                <AppText variant="marquee" text={item.name} style={styles.itemName} />
+                <AppText
+                  variant="marquee"
+                  text={formatEstablishmentLocation(item)}
+                  style={styles.itemMeta}
+                  containerStyle={styles.itemMetaContainer}
+                />
               </View>
               <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
             </TouchableOpacity>
@@ -227,6 +232,8 @@ const styles = StyleSheet.create({
   itemMeta: {
     fontSize: 11,
     color: Colors.textMuted,
+  },
+  itemMetaContainer: {
     marginTop: 2,
   },
 });

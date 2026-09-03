@@ -159,7 +159,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
     switch (subKey) {
       case 'waterSources':
         return (
-          <FormSection title="A. Water Sources">
+          <FormSection icon="water-outline" title="A. Water Sources">
             <DynamicRowTable
               columns={[
                 { key: 'source_type', label: 'Source Type', width: 140, type: 'select', options: WATER_SOURCE_TYPES },
@@ -176,7 +176,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
 
       case 'wastewaterSources':
         return (
-          <FormSection title="B. Wastewater Sources">
+          <FormSection icon="funnel-outline" title="B. Wastewater Sources">
             <DynamicRowTable
               columns={[
                 { key: 'use_type', label: 'Use Type', width: 130, type: 'select', options: WASTEWATER_USE_TYPES },
@@ -193,7 +193,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
 
       case 'abstractedWaterQuality':
         return (
-          <FormSection title="C. Quality of Abstracted Water">
+          <FormSection icon="flask-outline" title="C. Quality of Abstracted Water">
             <DynamicRowTable
               columns={[
                 { key: 'source', label: 'Source', width: 120, placeholder: 'e.g. Deep well' },
@@ -212,7 +212,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
 
       case 'treatmentSystemType':
         return (
-          <FormSection title="A. Type of Wastewater Treatment System">
+          <FormSection icon="construct-outline" title="A. Type of Wastewater Treatment System">
             <RadioGroup label="Has WWTP?" options={YES_NO} value={value.hasWwtp} onChange={v => set('hasWwtp', v as 'yes' | 'no')} />
             {value.hasWwtp === 'no' && (
               <Text style={styles.emptyText}>Subsections B-E will be marked as not applicable.</Text>
@@ -223,13 +223,13 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
       case 'wwtpType':
         if (value.hasWwtp === 'no') {
           return (
-            <FormSection title="B. Type of WWTP">
+            <FormSection icon="business-outline" title="B. Type of WWTP">
               <Text style={styles.emptyText}>No WWTP on record for this establishment — this doesn't apply.</Text>
             </FormSection>
           );
         }
         return (
-          <FormSection title="B. Type of WWTP">
+          <FormSection icon="business-outline" title="B. Type of WWTP">
             <SelectField label="WWTP Type" value={value.wwtpType} options={WWTP_TYPE_OPTIONS} onSelect={v => set('wwtpType', v)} />
           </FormSection>
         );
@@ -237,13 +237,13 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
       case 'wwtpDetails':
         if (value.hasWwtp === 'no') {
           return (
-            <FormSection title="C. WWTP Details">
+            <FormSection icon="list-outline" title="C. WWTP Details">
               <Text style={styles.emptyText}>No WWTP on record for this establishment — this doesn't apply.</Text>
             </FormSection>
           );
         }
         return (
-          <FormSection title="C. WWTP Details">
+          <FormSection icon="list-outline" title="C. WWTP Details">
             <Text style={styles.subTitle}>WWTP Details (per outlet)</Text>
             {value.wwtpDetails.map((d, i) => {
               const k = (field: string) => `wwtpDetail:${i}:${field}`;
@@ -355,13 +355,13 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
       case 'wwtpComponents':
         if (value.hasWwtp === 'no') {
           return (
-            <FormSection title="D. Components of the WWTP">
+            <FormSection icon="layers-outline" title="D. Components of the WWTP">
               <Text style={styles.emptyText}>No WWTP on record for this establishment — this doesn't apply.</Text>
             </FormSection>
           );
         }
         return (
-          <FormSection title="D. Components of the WWTP">
+          <FormSection icon="layers-outline" title="D. Components of the WWTP">
             <Text style={styles.subTitle}>WWTP Treatment Components (per outlet)</Text>
             {value.wwtpComponents.map((c, i) => {
               const k = (field: string) => `wwtpComponent:${i}:${field}`;
@@ -435,13 +435,13 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
       case 'wwtpCondition':
         if (value.hasWwtp === 'no') {
           return (
-            <FormSection title="E. Condition of the WWTP">
+            <FormSection icon="pulse-outline" title="E. Condition of the WWTP">
               <Text style={styles.emptyText}>No WWTP on record for this establishment — this doesn't apply.</Text>
             </FormSection>
           );
         }
         return (
-          <FormSection title="E. Condition of the WWTP">
+          <FormSection icon="pulse-outline" title="E. Condition of the WWTP">
             <View style={styles.row}>
               <SelectField label="WWTP Condition" value={value.wwtpCondition} options={WWTP_CONDITION_OPTIONS} onSelect={v => set('wwtpCondition', v)} />
               <RadioGroup
@@ -456,7 +456,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
 
       case 'samplingPoints':
         return (
-          <FormSection title="I. Water Quality Sampling">
+          <FormSection icon="flask-outline" title="I. Water Quality Sampling">
             {value.samplingPoints.map((pt, i) => {
               const k = (field: string) => `samplingPoint:${i}:${field}`;
               const pk = (pi: number, field: string) => `samplingParam:${i}:${pi}:${field}`;
@@ -604,7 +604,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
 
       case 'previousInspection':
         return (
-          <FormSection title="II. Previous Inspection">
+          <FormSection icon="time-outline" title="II. Previous Inspection">
             <View style={styles.row}>
               <DateField
                 label="Date of Sampling"
@@ -711,7 +711,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
 
       case 'summaryOfFindings':
         return (
-          <FormSection title="III. Summary of Findings">
+          <FormSection icon="clipboard-outline" title="III. Summary of Findings">
             <ChecklistTable
               items={DAO_2005_10_CHECKLIST}
               values={value.checklistDao200510}
@@ -727,7 +727,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
       case 'dpConditions':
         if (!hasDp) {
           return (
-            <FormSection title="IV. Compliance to DP Conditions">
+            <FormSection icon="checkbox-outline" title="IV. Compliance to DP Conditions">
               <Text style={styles.emptyText}>
                 No discharge permit on record for this establishment — compliance to DP conditions doesn't apply.
               </Text>
@@ -735,7 +735,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
           );
         }
         return (
-          <FormSection title="IV. Compliance to DP Conditions">
+          <FormSection icon="checkbox-outline" title="IV. Compliance to DP Conditions">
             {value.dpConditions.map((c, i) => {
               const isLast = i === value.dpConditions.length - 1;
               const k = (field: string) => `dp:${i}:${field}`;
@@ -789,7 +789,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
 
       case 'observations':
         return (
-          <FormSection title="V. Observations and Recommendations">
+          <FormSection icon="clipboard-outline" title="V. Observations and Recommendations">
             <TextField
               ref={setRef('observations')}
               label="Other Observations"

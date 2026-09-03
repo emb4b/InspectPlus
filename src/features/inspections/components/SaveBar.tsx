@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
+import { AppText } from '../../../components/AppText';
 
 interface SaveBarProps {
   establishmentName: string;
@@ -21,9 +22,15 @@ export const SaveBar: React.FC<SaveBarProps> = ({
   onSubmit,
 }) => (
   <View style={styles.bar}>
-    <Text style={styles.info} numberOfLines={1}>
-      Report for <Text style={styles.infoStrong}>{establishmentName}</Text> · {typeLabel}
-    </Text>
+    {/* Split into three pieces (rather than one numberOfLines Text) so a
+        long establishment name can marquee-scroll on its own while "Report
+        for" and "· {typeLabel}" stay put — see the marquee usage rule in
+        AppText's module comment. */}
+    <View style={styles.info}>
+      <Text style={styles.infoLabel}>Report for </Text>
+      <AppText variant="marquee" text={establishmentName} style={styles.infoStrong} containerStyle={styles.infoNameContainer} />
+      <Text style={styles.infoLabel}> · {typeLabel}</Text>
+    </View>
     <View style={styles.actions}>
       <TouchableOpacity style={styles.ghostBtn} onPress={onDiscard} disabled={saving} activeOpacity={0.7}>
         <Text style={styles.ghostText}>Discard</Text>
@@ -58,13 +65,21 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   info: {
-    fontSize: 11.5,
-    color: Colors.textMuted,
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
   },
+  infoLabel: {
+    fontSize: 11.5,
+    color: Colors.textMuted,
+  },
   infoStrong: {
+    fontSize: 11.5,
     color: Colors.navy,
     fontWeight: '700',
+  },
+  infoNameContainer: {
+    flex: 1,
   },
   actions: {
     flexDirection: 'row',

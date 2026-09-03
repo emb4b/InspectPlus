@@ -1,8 +1,10 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { FormSection, TextField } from '../../../components/form';
+import { AppText } from '../../../components/AppText';
+import { Button } from '../../../components/Button';
 import type { EstablishmentDTO, PermitSnapshotItem } from '../types';
 
 interface EstablishmentInfoSectionsProps {
@@ -19,21 +21,24 @@ const PermitCard: React.FC<{ permit: PermitSnapshotItem }> = ({ permit }) => (
   <View style={styles.permitCard}>
     <View style={styles.permitCardHeader}>
       <Ionicons name="document-text-outline" size={13} color={Colors.green} />
-      <Text style={styles.permitCardTitle} numberOfLines={1}>
-        {[permit.envi_law, permit.permit_type].filter(Boolean).join(' — ') || 'Permit'}
-      </Text>
+      <AppText
+        variant="marquee"
+        text={[permit.envi_law, permit.permit_type].filter(Boolean).join(' — ') || 'Permit'}
+        style={styles.permitCardTitle}
+        containerStyle={styles.permitCardTitleContainer}
+      />
     </View>
     <View style={styles.permitRow}>
       <Text style={styles.permitLabel}>Permit / Serial No.</Text>
-      <Text style={styles.permitValue} numberOfLines={1}>{permit.permit_serial || '—'}</Text>
+      <AppText variant="marquee" text={permit.permit_serial || '—'} style={styles.permitValue} containerStyle={styles.permitValueContainer} />
     </View>
     <View style={styles.permitRow}>
       <Text style={styles.permitLabel}>Date Issued</Text>
-      <Text style={styles.permitValue} numberOfLines={1}>{permit.issued_date || '—'}</Text>
+      <AppText variant="single" text={permit.issued_date || '—'} style={styles.permitValue} containerStyle={styles.permitValueContainer} />
     </View>
     <View style={styles.permitRow}>
       <Text style={styles.permitLabel}>Expiry Date</Text>
-      <Text style={styles.permitValue} numberOfLines={1}>{permit.expiry_date || '—'}</Text>
+      <AppText variant="single" text={permit.expiry_date || '—'} style={styles.permitValue} containerStyle={styles.permitValueContainer} />
     </View>
   </View>
 );
@@ -140,9 +145,12 @@ export const EstablishmentInfoSections: React.FC<EstablishmentInfoSectionsProps>
             </View>
             {establishment.productLines.map((line, i) => (
               <View key={i} style={styles.tableRow}>
-                <Text style={[styles.tableCell, styles.colProduct]} numberOfLines={1}>
-                  {line.product_line || '—'}
-                </Text>
+                <AppText
+                  variant="marquee"
+                  text={line.product_line || '—'}
+                  style={styles.tableCell}
+                  containerStyle={styles.colProduct}
+                />
                 <Text style={[styles.tableCell, styles.colRate]}>{line.ecc_production_rate || '—'}</Text>
                 <Text style={[styles.tableCell, styles.colRate]}>{line.actual_production_rate || '—'}</Text>
               </View>
@@ -156,10 +164,7 @@ export const EstablishmentInfoSections: React.FC<EstablishmentInfoSectionsProps>
         title="DENR Permits, Licenses & Clearances"
         headerRight={
           onUpdatePermits && (
-            <TouchableOpacity style={styles.updateBtn} onPress={onUpdatePermits} activeOpacity={0.75}>
-              <Ionicons name="pencil" size={11} color={Colors.textSecondary} />
-              <Text style={styles.updateBtnText}>Update Permits</Text>
-            </TouchableOpacity>
+            <Button label="Update Permits" icon="pencil" variant="outline" onPress={onUpdatePermits} />
           )
         }>
         {permits.length === 0 ? (
@@ -228,21 +233,6 @@ const styles = StyleSheet.create({
   colRate: {
     flex: 1,
   },
-  updateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 7,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  updateBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.textSecondary,
-  },
   permitList: {
     gap: 12,
   },
@@ -263,6 +253,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.navy,
   },
+  permitCardTitleContainer: {
+    flexShrink: 1,
+  },
   permitRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -278,7 +271,9 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '600',
     color: Colors.textPrimary,
-    flexShrink: 1,
     textAlign: 'right',
+  },
+  permitValueContainer: {
+    flexShrink: 1,
   },
 });

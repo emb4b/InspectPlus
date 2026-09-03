@@ -1,4 +1,5 @@
 const { getDefaultConfig } = require('expo/metro-config');
+const exclusionList = require('metro-config/private/defaults/exclusionList').default;
 
 const config = getDefaultConfig(__dirname);
 
@@ -12,6 +13,13 @@ config.resolver = {
   ...resolver,
   assetExts: resolver.assetExts.filter(ext => ext !== 'svg'),
   sourceExts: [...resolver.sourceExts, 'svg'],
+  blockList: exclusionList([
+    /android\/build\/.*/,
+    /android\/app\/build\/.*/,
+    /android\/\.gradle\/.*/,
+    /ios\/build\/.*/,
+    /ios\/Pods\/.*/,
+  ]),
 };
 
 module.exports = config;

@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ActivityIndicator, Modal, StyleSheet, Ale
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { FormSection } from '../../../components/form';
+import { Button } from '../../../components/Button';
 import { useAttachments } from '../hooks/useAttachments';
 import { AttachmentThumbnail } from './AttachmentThumbnail';
 import { AttachmentViewer } from './AttachmentViewer';
@@ -115,14 +116,20 @@ export const AttachmentsSection: React.FC<AttachmentsSectionProps> = ({ parentTy
       ) : (
         canEdit && (
           <View style={styles.actionsRow}>
-            <TouchableOpacity style={styles.actionBtn} onPress={addFromCamera} activeOpacity={0.75} disabled={actionsDisabled}>
-              <Ionicons name="camera-outline" size={15} color={Colors.navy} />
-              <Text style={styles.actionBtnText}>Take Photo</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} onPress={addFromLibrary} activeOpacity={0.75} disabled={actionsDisabled}>
-              <Ionicons name="image-outline" size={15} color={Colors.navy} />
-              <Text style={styles.actionBtnText}>Choose from Library</Text>
-            </TouchableOpacity>
+            <Button
+              label="Take Photo"
+              icon="camera-outline"
+              variant="outline"
+              onPress={addFromCamera}
+              disabled={actionsDisabled}
+            />
+            <Button
+              label="Choose from Library"
+              icon="image-outline"
+              variant="outline"
+              onPress={addFromLibrary}
+              disabled={actionsDisabled}
+            />
             {busy && !stampStage && <ActivityIndicator size="small" color={Colors.navy} />}
           </View>
         )

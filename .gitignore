@@ -101,3 +101,8 @@ coverage/
 dist/
 build/
 .expo/
+
+# uiautomator UI hierarchy dumps — point-in-time debug artifacts that also
+# capture whatever inspection data was on screen when they were taken
+*-window.xml
+window_dump.xml

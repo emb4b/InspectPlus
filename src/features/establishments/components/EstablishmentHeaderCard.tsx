@@ -2,6 +2,9 @@ import React, { useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, LayoutChangeEvent } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
+import { formatEstablishmentLocation } from '../../../utils/establishmentLocation';
+import { AppText } from '../../../components/AppText';
+import { Button } from '../../../components/Button';
 import { confirmResolveConflict } from '../../../services/sync/syncConflictResolution';
 import type { EstablishmentDTO } from '../types';
 
@@ -15,10 +18,13 @@ interface EstablishmentHeaderCardProps {
   onEdit?: () => void;
 }
 
-const StatChip: React.FC<{ label: string; value: string }> = ({ label, value }) => (
+// Most of these stats (PSIC code, year, hours/days) are short by
+// construction — only "Nature" (free-text business description) can
+// genuinely run long, so it's the only one callers opt into marquee.
+const StatChip: React.FC<{ label: string; value: string; marquee?: boolean }> = ({ label, value, marquee }) => (
   <View style={styles.statChip}>
     <Text style={styles.statLabel}>{label}</Text>
-    <Text style={styles.statValue} numberOfLines={1}>{value}</Text>
+    <AppText variant={marquee ? 'marquee' : 'single'} text={value} style={styles.statValue} />
   </View>
 );
 
@@ -28,9 +34,7 @@ export const EstablishmentHeaderCard: React.FC<EstablishmentHeaderCardProps> = (
   onAddReport,
   onEdit,
 }) => {
-  const location = [establishment.addressLine, establishment.city, establishment.province]
-    .filter(Boolean)
-    .join(', ');
+  const location = formatEstablishmentLocation(establishment);
 
   // Icon box grows to match the combined height of the name + address (not
   // the sync row, which is conditional and would make the box size jump
@@ -50,16 +54,19 @@ export const EstablishmentHeaderCard: React.FC<EstablishmentHeaderCardProps> = (
 
   return (
     <View style={styles.card}>
-      <View style={styles.topRow}>
+      {/* Hidden until the title block's height is measured, so the icon
+          appears at its final size instead of visibly popping from the 40
+          default to the measured size once layout settles. */}
+      <View style={[styles.topRow, titleBlockHeight === null && styles.topRowMeasuring]}>
         <View style={[styles.iconWrap, { width: iconSize, height: iconSize }]}>
           <Ionicons name="business" size={iconGlyphSize} color={Colors.green} />
         </View>
         <View style={styles.titleInfo}>
           <View onLayout={handleTitleBlockLayout}>
-            <Text style={styles.name} numberOfLines={2}>{establishment.name}</Text>
+            <AppText variant="multiline" text={establishment.name} style={styles.name} />
             <View style={styles.locationRow}>
               <Ionicons name="location" size={11} color={Colors.green} style={styles.locationIcon} />
-              <Text style={styles.location} numberOfLines={1}>{location}</Text>
+              <AppText variant="marquee" text={location} style={styles.location} containerStyle={styles.locationContainer} />
             </View>
           </View>
           {establishment.syncStatus === 'pending' && (
@@ -81,23 +88,17 @@ export const EstablishmentHeaderCard: React.FC<EstablishmentHeaderCardProps> = (
       </View>
 
       <View style={styles.actions}>
-        <TouchableOpacity style={styles.btnAddReport} onPress={onAddReport} activeOpacity={0.8}>
-          <Ionicons name="add" size={14} color={Colors.textWhite} />
-          <Text style={styles.btnAddReportText}>Add Report</Text>
-        </TouchableOpacity>
-        {onEdit && (
-          <TouchableOpacity style={styles.btnEdit} onPress={onEdit} activeOpacity={0.75}>
-            <Ionicons name="pencil" size={11} color={Colors.textSecondary} />
-            <Text style={styles.btnEditText}>Edit</Text>
-          </TouchableOpacity>
-        )}
+        <Button label="Add Report" icon="add" variant="primary" size="md" onPress={onAddReport} fullWidth />
+        {/* Same variant as the Edit beside a section header — it's the same
+            action, so it gets the same button. */}
+        {onEdit && <Button label="Edit" icon="pencil" variant="outline" size="md" onPress={onEdit} />}
       </View>
 
       <View style={styles.divider} />
 
       <View style={styles.statGrid}>
         <View style={styles.statRow}>
-          <StatChip label="Nature" value={establishment.natureOfBusiness || '—'} />
+          <StatChip label="Nature" value={establishment.natureOfBusiness || '—'} marquee />
           <StatChip label="PSIC" value={establishment.psicCode || '—'} />
           <StatChip
             label="Est."
@@ -149,6 +150,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 10,
   },
+  topRowMeasuring: {
+    opacity: 0,
+  },
   iconWrap: {
     width: 40,
     height: 40,
@@ -181,6 +185,8 @@ const styles = StyleSheet.create({
   location: {
     fontSize: 11,
     color: Colors.textMuted,
+  },
+  locationContainer: {
     flex: 1,
   },
   syncRow: {
@@ -198,37 +204,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 6,
     marginTop: 12,
-  },
-  btnAddReport: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: Colors.navy,
-  },
-  btnAddReportText: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: Colors.textWhite,
-  },
-  btnEdit: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  btnEditText: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: Colors.textSecondary,
   },
   divider: {
     height: 1,

@@ -3,12 +3,15 @@ import { View, Text, TouchableOpacity, StyleSheet, LayoutChangeEvent } from 'rea
 import Reanimated, {
   Extrapolation,
   interpolate,
+  runOnJS,
   SharedValue,
+  useAnimatedReaction,
   useAnimatedStyle,
   useDerivedValue,
 } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
+import { AppText } from '../../../components/AppText';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { useInspectorName } from '../../../core/hooks/useInspectorName';
 import { canManageAllRecords } from '../../establishments/hooks/useEstablishment';
@@ -26,6 +29,9 @@ export const DEFAULT_REPORT_DETAIL_TABS: TwoRowMainTabDef[] = [
   { key: 'compliance', number: '3', label: 'Compliance Status' },
   { key: 'attachments', number: '4', label: 'Attachments' },
 ];
+
+// How far the leading icon shrinks once the header is fully collapsed.
+const COLLAPSED_ICON_SCALE = 0.7;
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -106,13 +112,6 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
   // first render, which is exactly what onLayout then measures and locks
   // in forever. Rendering unconstrained until the real measurement lands
   // avoids the constraint corrupting its own calibration.
-  const [locationHeight, setLocationHeight] = useState<number | null>(null);
-  const locationMeasured = useRef(false);
-  const handleLocationLayout = (e: LayoutChangeEvent) => {
-    if (locationMeasured.current) return;
-    locationMeasured.current = true;
-    setLocationHeight(e.nativeEvent.layout.height);
-  };
   const [metaBlockHeight, setMetaBlockHeight] = useState<number | null>(null);
   const metaBlockMeasured = useRef(false);
   const handleMetaBlockLayout = (e: LayoutChangeEvent) => {
@@ -136,16 +135,6 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
     setTitleBlockHeight(e.nativeEvent.layout.height);
   };
 
-  const iconAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: interpolate(progress.value, [0, 1], [1, 0.7], Extrapolation.CLAMP) }],
-  }));
-  const locationAnimatedStyle = useAnimatedStyle(() => {
-    if (locationHeight === null) return {};
-    return {
-      maxHeight: interpolate(progress.value, [0, 1], [locationHeight, 0], Extrapolation.CLAMP),
-      opacity: interpolate(progress.value, [0, 0.6, 1], [1, 0, 0], Extrapolation.CLAMP),
-    };
-  }, [locationHeight]);
   const metaAnimatedStyle = useAnimatedStyle(() => {
     if (metaBlockHeight === null) return {};
     return {
@@ -176,6 +165,41 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
   const iconSize = titleBlockHeight ?? 44;
   const iconGlyphSize = Math.round(iconSize * 0.5);
 
+  // Collapsing the icon with a transform alone only repainted it smaller —
+  // the box kept its expanded footprint, so the collapsed header carried a
+  // block of dead space under the glyph, the title fell out of alignment
+  // beside it, and that phantom height propped the whole card open. The
+  // box's own width/height animate here so the layout follows the paint,
+  // and the glyph scales inside it to stay centred and proportional.
+  const iconBoxStyle = useAnimatedStyle(() => {
+    const size = interpolate(
+      progress.value,
+      [0, 1],
+      [iconSize, iconSize * COLLAPSED_ICON_SCALE],
+      Extrapolation.CLAMP,
+    );
+    return { width: size, height: size };
+  }, [iconSize]);
+  const iconGlyphStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: interpolate(progress.value, [0, 1], [1, COLLAPSED_ICON_SCALE], Extrapolation.CLAMP) },
+    ],
+  }));
+
+  // The badges swap shape rather than shrink: expanded they're stacked text
+  // pills, collapsed they're two icons side by side. flexDirection can't be
+  // animated and the label can't be interpolated away, so this crosses a
+  // threshold into a different render instead. It's one setState per
+  // crossing, not per frame — the reaction only fires when the boolean
+  // itself flips.
+  const [badgesCollapsed, setBadgesCollapsed] = useState(false);
+  useAnimatedReaction(
+    () => progress.value > 0.5,
+    (isCollapsed, wasCollapsed) => {
+      if (isCollapsed !== wasCollapsed) runOnJS(setBadgesCollapsed)(isCollapsed);
+    },
+  );
+
   return (
     <View style={styles.container}>
       <View style={styles.topBar}>
@@ -192,29 +216,46 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
       </View>
 
       <View style={styles.card}>
-        <View style={styles.topRow}>
-          <Reanimated.View style={[styles.iconWrap, { width: iconSize, height: iconSize }, iconAnimatedStyle]}>
-            <Ionicons name="document-text" size={iconGlyphSize} color={Colors.green} />
+        {/* Hidden until the title block's height is measured, so the icon
+            appears at its final size instead of visibly popping from the 44
+            default to the measured size once layout settles — see
+            EstablishmentHeaderCard for the same treatment. */}
+        <View style={[styles.topRow, titleBlockHeight === null && styles.topRowMeasuring]}>
+          <Reanimated.View style={[styles.iconWrap, iconBoxStyle]}>
+            <Reanimated.View style={iconGlyphStyle}>
+              <Ionicons name="document-text" size={iconGlyphSize} color={Colors.green} />
+            </Reanimated.View>
           </Reanimated.View>
           <View style={styles.titleInfo}>
             <View onLayout={handleTitleBlockLayout}>
-              <Text style={styles.name} numberOfLines={2}>{establishmentName}</Text>
-              <Reanimated.View
-                style={[styles.locationWrap, locationAnimatedStyle]}
-                onLayout={handleLocationLayout}>
-                <View style={styles.locationRow}>
-                  <Ionicons name="location" size={11} color={Colors.green} style={styles.locationIcon} />
-                  <Text style={styles.location} numberOfLines={2}>{establishmentLocation}</Text>
-                </View>
-              </Reanimated.View>
+              <AppText variant="marquee" text={establishmentName} style={styles.name} />
+              {/* The address stays through the collapse. It's the one piece
+                  of context that says *which* site this report is for, so
+                  losing it on scroll made the collapsed header ambiguous —
+                  unlike the meta chips below, which repeat information the
+                  form itself carries. */}
+              <View style={styles.locationRow}>
+                <Ionicons name="location" size={11} color={Colors.green} style={styles.locationIcon} />
+                <AppText
+                  variant="marquee"
+                  text={establishmentLocation}
+                  style={styles.location}
+                  containerStyle={styles.locationContainer}
+                />
+              </View>
             </View>
-            {syncStatus === 'pending' && (
+            {/* Spelled out while there's room. Collapsed, this moves into the
+                badge group as a chip instead of staying a third line in a
+                column that has already shrunk to two — otherwise the
+                collapsed header's height would depend on sync state and jump
+                the moment a report finished syncing. */}
+            {!badgesCollapsed && syncStatus === 'pending' && (
               <View style={styles.syncRow}>
                 <Ionicons name="cloud-upload-outline" size={10} color={Colors.pending} />
                 <Text style={styles.syncText}>Pending sync</Text>
               </View>
             )}
-            {syncStatus === 'conflict' && (
+            {!badgesCollapsed && syncStatus === 'conflict' && (
               <TouchableOpacity
                 style={styles.syncRow}
                 onPress={() => confirmResolveConflict('inspection_reports', reportId, establishmentName)}
@@ -224,31 +265,93 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
               </TouchableOpacity>
             )}
           </View>
-          <View style={styles.badgeGroup}>
+          <View style={[styles.badgeGroup, badgesCollapsed && styles.badgeGroupInline]}>
             {/* The law citation (e.g. "R.A. 9275") stands in for the full report
                 type name here. Stacked top-to-bottom rather than side by side —
                 a row of both pills was wide enough to squeeze the name/address
                 column into truncating; stacked, badgeGroup only needs to be as
-                wide as the wider single pill. */}
-            <View style={[styles.pill, { backgroundColor: typeMeta.bgColor }]}>
-              {IconAsset && <IconAsset width={11} height={11} />}
-              <Text style={[styles.pillText, { color: typeMeta.textColor }]} numberOfLines={1}>
-                {typeMeta.law || typeMeta.label}
-              </Text>
-            </View>
-            <View
-              style={[
-                styles.statusBadge,
-                { backgroundColor: isSubmitted ? Colors.greenMuted : Colors.warning.badgeBg },
-              ]}>
-              <Text
-                style={[
-                  styles.statusBadgeText,
-                  { color: isSubmitted ? Colors.green : Colors.warning.text },
-                ]}>
-                {isSubmitted ? 'Submitted' : 'Draft'}
-              </Text>
-            </View>
+                wide as the wider single pill.
+
+                Collapsed, both drop their labels and sit inline as icons: the
+                pair then costs one line instead of two, which is what let the
+                header actually compact down once the icon box stopped
+                reserving its expanded footprint. The labels they lose are
+                re-attached as accessibility names, since an icon alone still
+                has to announce which law and which status it stands for. */}
+            {badgesCollapsed ? (
+              <>
+                <View
+                  style={[styles.badgeIcon, { backgroundColor: typeMeta.bgColor }]}
+                  accessibilityLabel={typeMeta.law || typeMeta.label}>
+                  {IconAsset && <IconAsset width={14} height={14} />}
+                </View>
+                <View
+                  style={[
+                    styles.badgeIcon,
+                    { backgroundColor: isSubmitted ? Colors.greenMuted : Colors.warning.badgeBg },
+                  ]}
+                  accessibilityLabel={isSubmitted ? 'Submitted' : 'Draft'}>
+                  <Ionicons
+                    name={isSubmitted ? 'checkmark-circle' : 'create-outline'}
+                    size={14}
+                    color={isSubmitted ? Colors.green : Colors.warning.text}
+                  />
+                </View>
+                {syncStatus === 'pending' && (
+                  <View
+                    style={[styles.badgeIcon, { backgroundColor: Colors.pendingMuted }]}
+                    accessibilityLabel="Pending sync">
+                    <Ionicons name="cloud-upload-outline" size={14} color={Colors.pending} />
+                  </View>
+                )}
+                {/* Still the tap target that opens the resolve dialog, so it
+                    keeps a button role and a label that says what tapping
+                    does — and hitSlop to bring a 28dp chip up to the 48dp
+                    Android minimum, same as the shared Button. */}
+                {syncStatus === 'conflict' && (
+                  <TouchableOpacity
+                    style={[styles.badgeIcon, { backgroundColor: Colors.conflictMuted }]}
+                    onPress={() => confirmResolveConflict('inspection_reports', reportId, establishmentName)}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    activeOpacity={0.75}
+                    accessibilityRole="button"
+                    accessibilityLabel="Sync conflict, tap to resolve">
+                    <Ionicons name="alert-circle-outline" size={14} color={Colors.conflict} />
+                  </TouchableOpacity>
+                )}
+              </>
+            ) : (
+              <>
+                <View style={[styles.pill, { backgroundColor: typeMeta.bgColor }]}>
+                  {IconAsset && <IconAsset width={11} height={11} />}
+                  <Text style={[styles.pillText, { color: typeMeta.textColor }]} numberOfLines={1}>
+                    {typeMeta.law || typeMeta.label}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    styles.statusBadge,
+                    { backgroundColor: isSubmitted ? Colors.greenMuted : Colors.warning.badgeBg },
+                  ]}>
+                  {/* Same glyph the collapsed chip uses, so the badge reads as
+                      the same thing in both states rather than as two
+                      unrelated markers. Also means status isn't carried by
+                      colour alone. */}
+                  <Ionicons
+                    name={isSubmitted ? 'checkmark-circle' : 'create-outline'}
+                    size={11}
+                    color={isSubmitted ? Colors.green : Colors.warning.text}
+                  />
+                  <Text
+                    style={[
+                      styles.statusBadgeText,
+                      { color: isSubmitted ? Colors.green : Colors.warning.text },
+                    ]}>
+                    {isSubmitted ? 'Submitted' : 'Draft'}
+                  </Text>
+                </View>
+              </>
+            )}
           </View>
         </View>
 
@@ -347,6 +450,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: 10,
   },
+  topRowMeasuring: {
+    opacity: 0,
+  },
   iconWrap: {
     width: 44,
     height: 44,
@@ -365,11 +471,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: Colors.textPrimary,
   },
-  // Not part of the collapsing block below — the address collapses away,
-  // but the name above it never does.
-  locationWrap: {
-    overflow: 'hidden',
-  },
   metaWrap: {
     overflow: 'hidden',
   },
@@ -380,6 +481,19 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: 6,
     flexShrink: 0,
+  },
+  badgeGroupInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  // Square-ish chip sized to the same 4dp rhythm as everything else, big
+  // enough that the glyph inside stays legible without its label.
+  badgeIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   pill: {
     flexShrink: 0,
@@ -408,9 +522,11 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   location: {
-    flex: 1,
     fontSize: 11,
     color: Colors.textMuted,
+  },
+  locationContainer: {
+    flex: 1,
   },
   syncRow: {
     flexDirection: 'row',
@@ -424,6 +540,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 20,

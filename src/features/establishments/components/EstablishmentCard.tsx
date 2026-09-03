@@ -9,6 +9,8 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
+import { formatEstablishmentLocation } from '../../../utils/establishmentLocation';
+import { AppText } from '../../../components/AppText';
 import { REPORT_TYPES, ReportTypeKey } from '../../../constants/reportTypes';
 import { confirmResolveConflict } from '../../../services/sync/syncConflictResolution';
 import type { EstablishmentDTO, ComplianceTag } from '../types';
@@ -158,12 +160,17 @@ export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
 
             {/* Content */}
             <View style={styles.content}>
-              <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
+              <AppText variant="marquee" text={item.name} style={styles.name} containerStyle={styles.nameContainer} />
 
               {/* Location */}
               <View style={styles.locationRow}>
                 <Ionicons name="location" size={10} color="#e74c3c" />
-                <Text style={styles.location}>{item.addressLine}, {item.city}, {item.province}</Text>
+                <AppText
+                  variant="marquee"
+                  text={formatEstablishmentLocation(item)}
+                  style={styles.location}
+                  containerStyle={styles.locationContainer}
+                />
               </View>
 
               {/* Sync status indicator */}
@@ -293,6 +300,8 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: '700',
     color: Colors.textPrimary,
+  },
+  nameContainer: {
     marginBottom: 3,
   },
   locationRow: {
@@ -304,6 +313,8 @@ const styles = StyleSheet.create({
   location: {
     fontSize: 10,
     color: Colors.textMuted,
+  },
+  locationContainer: {
     flex: 1,
   },
   syncRow: {

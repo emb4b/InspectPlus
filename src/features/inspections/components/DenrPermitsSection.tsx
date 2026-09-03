@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { database, collections } from '../../../db/database';
 import { FormSection, TextField, DateField, focusInput } from '../../../components/form';
+import { AppText } from '../../../components/AppText';
 import { SectionEditActions } from './SectionEditActions';
 import { useEditableSection } from '../hooks/useEditableSection';
 import type { PermitSnapshotItem } from '../../../services/sync/syncTypes';
@@ -32,21 +33,24 @@ const ReadOnlyPermitCard = React.memo(function ReadOnlyPermitCard({ permit }: { 
     <View style={styles.permitCard}>
       <View style={styles.permitCardHeader}>
         <Ionicons name="document-text-outline" size={13} color={Colors.green} />
-        <Text style={styles.permitCardTitle} numberOfLines={1}>
-          {[permit.envi_law, permit.permit_type].filter(Boolean).join(' — ') || 'Permit'}
-        </Text>
+        <AppText
+          variant="marquee"
+          text={[permit.envi_law, permit.permit_type].filter(Boolean).join(' — ') || 'Permit'}
+          style={styles.permitCardTitle}
+          containerStyle={styles.permitCardTitleContainer}
+        />
       </View>
       <View style={styles.permitRow}>
         <Text style={styles.permitLabel}>Permit / Serial No.</Text>
-        <Text style={styles.permitValue} numberOfLines={1}>{permit.permit_serial || '—'}</Text>
+        <AppText variant="marquee" text={permit.permit_serial || '—'} style={styles.permitValue} containerStyle={styles.permitValueContainer} />
       </View>
       <View style={styles.permitRow}>
         <Text style={styles.permitLabel}>Date Issued</Text>
-        <Text style={styles.permitValue} numberOfLines={1}>{permit.issued_date || '—'}</Text>
+        <AppText variant="single" text={permit.issued_date || '—'} style={styles.permitValue} containerStyle={styles.permitValueContainer} />
       </View>
       <View style={styles.permitRow}>
         <Text style={styles.permitLabel}>Expiry Date</Text>
-        <Text style={styles.permitValue} numberOfLines={1}>{permit.expiry_date || '—'}</Text>
+        <AppText variant="single" text={permit.expiry_date || '—'} style={styles.permitValue} containerStyle={styles.permitValueContainer} />
       </View>
     </View>
   );
@@ -255,6 +259,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.navy,
   },
+  permitCardTitleContainer: {
+    flexShrink: 1,
+  },
   permitRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -270,8 +277,10 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '600',
     color: Colors.textPrimary,
-    flexShrink: 1,
     textAlign: 'right',
+  },
+  permitValueContainer: {
+    flexShrink: 1,
   },
   addBtn: {
     flexDirection: 'row',
