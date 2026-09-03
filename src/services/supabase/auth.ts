@@ -1,5 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
-import { Session } from '@supabase/supabase-js';
+import { Session, isAuthRetryableFetchError } from '@supabase/supabase-js';
 import { supabase } from './client';
 import { checkOnline } from '../../utils/network';
 import { hashString } from '../../utils/crypto';
@@ -36,6 +36,17 @@ const CRED_USERS_KEY    = 'inspectplus.cred.users';
 // can be tuned without a code change — see src/core/config/env.ts.
 const SHORT_CACHE_MS    = ENV.shortCacheMs;
 const CREDENTIAL_WINDOW = ENV.credentialWindowMs;
+// Bounds the username-resolution RPC and the post-login profile/municipality
+// lookups below — none of these hit fetchWithAuthTimeout's /auth/v1/-only
+// timeout (see client.ts), so without this a slow/dead backend can stall
+// login for tens of seconds even while the device itself is online.
+const PROFILE_QUERY_TIMEOUT_MS = 5000;
+// Caps how long offline sign-in will wait on restoring the live Supabase
+// client's session (see signInOffline) before proceeding without it. Kept
+// separate from PROFILE_QUERY_TIMEOUT_MS because it doesn't abort the
+// underlying request — GoTrueClient's own refresh-retry loop keeps running
+// in the background regardless — it only bounds how long we block on it.
+const SESSION_RESTORE_WAIT_MS = 5000;
 
 // ── Types ───────────────────────────────────────────────────
 interface CachedCredential {
@@ -59,11 +70,46 @@ function buildCredentialHash(email: string, password: string) {
   return hashString(`${email}:${password}:inspectplus`);
 }
 
+function timeoutSignal(ms: number): AbortSignal {
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), ms);
+  return controller.signal;
+}
+
+// Thrown when an online sign-in step fails because the backend couldn't be
+// reached (dead server, DNS failure, timed-out request) rather than because
+// the credentials are actually invalid. authService.signIn catches this
+// (alongside supabase-js's own AuthRetryableFetchError) to fall back to this
+// device's cached offline credentials instead of surfacing a misleading
+// error to the user.
+class AuthConnectivityError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'AuthConnectivityError';
+  }
+}
+
+function isConnectivityError(err: unknown): boolean {
+  return err instanceof AuthConnectivityError || isAuthRetryableFetchError(err);
+}
+
 async function resolveEmail(emailOrUsername: string): Promise<string> {
   if (emailOrUsername.includes('@')) return emailOrUsername;
   const { data, error } = await supabase
-    .rpc('get_email_by_username', { p_username: emailOrUsername });
-  if (error || !data) throw new Error('Username not found.');
+    .rpc('get_email_by_username', { p_username: emailOrUsername })
+    .abortSignal(timeoutSignal(PROFILE_QUERY_TIMEOUT_MS));
+  // `error` here means the RPC request itself failed (network/timeout/server
+  // error) — it does NOT mean the username doesn't exist; that's `!data`
+  // with no error. Conflating the two used to surface a dead backend as
+  // "Username not found.", and the offline-credential fallback never got a
+  // chance to run because this threw a generic Error instead of a
+  // connectivity one.
+  if (error) {
+    throw new AuthConnectivityError(
+      `Could not verify username — request failed: ${error.message}`,
+    );
+  }
+  if (!data) throw new Error('Username not found.');
   return data as string;
 }
 
@@ -83,14 +129,23 @@ async function writeCachedUsers(users: CachedCredential[]): Promise<void> {
   await SecureStore.setItemAsync(CRED_USERS_KEY, JSON.stringify(users));
 }
 
+function isCredentialExpired(user: CachedCredential): boolean {
+  return Date.now() - user.ts >= CREDENTIAL_WINDOW;
+}
+
 // Adds this inspector's credential to the device's offline store, or
 // refreshes it (new hash, session, and 1-week window) if they were already
 // cached from a previous online sign-in — every other cached inspector on
-// this device keeps their own entry untouched.
+// this device keeps their own entry untouched. Also sweeps out any OTHER
+// cached inspector whose 1-week window has already lapsed: a successful
+// online sign-in is a convenient, frequent point to free that storage
+// rather than leaving expired sessions/password hashes sitting on the
+// device indefinitely until someone happens to try them offline (see
+// isCredentialExpired's other call site in signInOffline).
 async function upsertCachedUser(entry: CachedCredential): Promise<void> {
   const users = await readCachedUsers();
   const next = users.filter(
-    u => u.email.toLowerCase() !== entry.email.toLowerCase(),
+    u => u.email.toLowerCase() !== entry.email.toLowerCase() && !isCredentialExpired(u),
   );
   next.push(entry);
   await writeCachedUsers(next);
@@ -124,11 +179,24 @@ async function signInOnline(
   let resolvedMunicipalities: string[] = [];
   let resolvedRole = '';
   if (data.user) {
-    const { data: profile, error: profileError } = await supabase
-      .from('user_accounts')
-      .select('username, first_name, middle_name, last_name, province, role')
-      .eq('uid', data.user.id)
-      .single();
+    // Independent queries keyed off the same uid — run them together and
+    // bound each with its own timeout, instead of two sequential unbounded
+    // requests stacking on top of the login critical path.
+    const [profileResult, municipalityResult] = await Promise.all([
+      supabase
+        .from('user_accounts')
+        .select('username, first_name, middle_name, last_name, province, role')
+        .eq('uid', data.user.id)
+        .abortSignal(timeoutSignal(PROFILE_QUERY_TIMEOUT_MS))
+        .single(),
+      supabase
+        .from('inspector_municipalities')
+        .select('municipality')
+        .eq('inspector_uid', data.user.id)
+        .abortSignal(timeoutSignal(PROFILE_QUERY_TIMEOUT_MS)),
+    ]);
+
+    const { data: profile, error: profileError } = profileResult;
     if (profileError) {
       console.log('[Auth] Could not resolve username for offline cache:', profileError.message);
     } else {
@@ -140,10 +208,7 @@ async function signInOnline(
       resolvedRole = profile?.role ?? '';
     }
 
-    const { data: municipalityRows, error: municipalityError } = await supabase
-      .from('inspector_municipalities')
-      .select('municipality')
-      .eq('inspector_uid', data.user.id);
+    const { data: municipalityRows, error: municipalityError } = municipalityResult;
     if (municipalityError) {
       console.log('[Auth] Could not resolve municipality assignments for offline cache:', municipalityError.message);
     } else {
@@ -206,7 +271,14 @@ async function signInOffline(
     );
   }
 
-  if (Date.now() - match.ts >= CREDENTIAL_WINDOW) {
+  if (isCredentialExpired(match)) {
+    // The 1-week offline window is a hard cutoff, not just a login gate —
+    // once it lapses, drop this inspector's cached session/refresh tokens
+    // and password hash from the device entirely (and sweep any other
+    // expired peer found in the same pass) rather than leaving them
+    // allocated on the device indefinitely. A fresh online sign-in
+    // re-establishes a new window and re-caches everything from scratch.
+    await writeCachedUsers(users.filter(u => !isCredentialExpired(u)));
     throw new Error(
       'Offline access has expired. ' +
       'Please connect to the internet to log in.',
@@ -228,18 +300,47 @@ async function signInOffline(
   // whichever session it already had (the previous inspector's, or none),
   // so every request made after an offline account switch — sync included —
   // would silently go out under the wrong identity while the UI shows the
-  // newly switched-to inspector. setSession only updates local client state
-  // synchronously; if the cached access_token has expired (likely, given
-  // the up-to-a-week offline window) supabase-js will attempt to refresh it
-  // via the refresh_token, which needs network and can fail here — that's
-  // fine, autoRefreshToken (see client.ts) retries once connectivity
-  // returns, and the offline UI/data-entry flow doesn't depend on it.
-  const { error: setSessionError } = await supabase.auth.setSession({
-    access_token: match.session.access_token,
-    refresh_token: match.session.refresh_token,
-  });
-  if (setSessionError) {
-    console.warn('[Auth] Could not restore live session on offline sign-in (will retry once online):', setSessionError.message);
+  // newly switched-to inspector. That's also why this is awaited (bounded,
+  // below) rather than fully fire-and-forget: the post-login sync kicked off
+  // right after signIn() resolves needs the live client's session already
+  // pointed at the right user.
+  //
+  // If the cached access_token has expired (likely, given the up-to-a-week
+  // offline window), setSession() triggers GoTrueClient's internal
+  // refresh-token request — and if that has no server to talk to,
+  // GoTrueClient retries it with exponential backoff for up to
+  // AUTO_REFRESH_TICK_DURATION_MS (30s in supabase-js) before giving up.
+  // Waiting on that unconditionally used to stall offline sign-in for up to
+  // ~30s on a dead backend, which defeats the entire point of the offline
+  // path. So we only wait up to SESSION_RESTORE_WAIT_MS: on a reachable
+  // server this still finishes well within that (a healthy refresh is
+  // fast), and on a dead one we stop blocking and let it keep retrying in
+  // the background — autoRefreshToken (see client.ts) picks it up again
+  // once connectivity actually returns.
+  const setSessionPromise = supabase.auth
+    .setSession({
+      access_token: match.session.access_token,
+      refresh_token: match.session.refresh_token,
+    })
+    .then(({ error: setSessionError }) => {
+      if (setSessionError) {
+        console.warn('[Auth] Could not restore live session on offline sign-in (will retry once online):', setSessionError.message);
+      }
+    })
+    .catch(err => {
+      console.warn('[Auth] Could not restore live session on offline sign-in (will retry once online):', err instanceof Error ? err.message : err);
+    });
+
+  const timedOut = await Promise.race([
+    setSessionPromise.then(() => false),
+    new Promise<true>(resolve => setTimeout(() => resolve(true), SESSION_RESTORE_WAIT_MS)),
+  ]);
+  if (timedOut) {
+    console.warn(
+      `[Auth] Live session restore did not finish within ${SESSION_RESTORE_WAIT_MS}ms ` +
+      '(backend likely unreachable) — continuing offline sign-in without waiting further; ' +
+      'it keeps retrying in the background.',
+    );
   }
 
   // This inspector becomes the device's active session — the short-cache
@@ -269,9 +370,23 @@ async function signInOffline(
 export const authService = {
   async signIn(emailOrUsername: string, password: string) {
     const online = await checkOnline();
-    return online
-      ? signInOnline(emailOrUsername, password)
-      : signInOffline(emailOrUsername, password);
+    if (!online) return signInOffline(emailOrUsername, password);
+
+    try {
+      return await signInOnline(emailOrUsername, password);
+    } catch (err) {
+      if (!isConnectivityError(err)) throw err;
+      // checkOnline() only sees device-level connectivity (NetInfo) — it
+      // can't tell the backend itself is down until we actually try it. Fall
+      // back to this device's cached offline credentials, if any, rather
+      // than surfacing the network failure as a misleading "not found" or
+      // auth error to a user who has already signed in here before.
+      console.log(
+        '[Auth] Online sign-in failed due to connectivity, falling back to offline credentials:',
+        (err as Error).message,
+      );
+      return signInOffline(emailOrUsername, password);
+    }
   },
 
   async getShortCacheSession() {
@@ -368,7 +483,7 @@ export const authService = {
   async hasActiveCredentialWindow(): Promise<boolean> {
     try {
       const users = await readCachedUsers();
-      return users.some(u => Date.now() - u.ts < CREDENTIAL_WINDOW);
+      return users.some(u => !isCredentialExpired(u));
     } catch {
       return false;
     }
