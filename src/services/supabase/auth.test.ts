@@ -1,10 +1,16 @@
 import { AuthRetryableFetchError } from '@supabase/supabase-js';
+import * as SecureStore from 'expo-secure-store';
+import { checkOnline } from '../../utils/network';
+import { supabase } from './client';
+import { authService } from './auth';
 
 // ── Mocks ───────────────────────────────────────────────────
 // Each factory below is self-contained (no references to outer `const`s) —
-// jest.mock() calls (and the imports they gate) are hoisted above any other
-// top-level statement in this file, so a factory that closed over an outer
-// variable would see it before its initializer ever ran.
+// babel-plugin-jest-hoist lifts every jest.mock() call above the imports
+// at the top of this file, so a factory that closed over an outer variable
+// would see it before its initializer ever ran. That hoisting is also why
+// the four mocked modules can be imported first and still resolve to these
+// factories rather than the real implementations.
 jest.mock('expo-secure-store', () => {
   const store = new Map<string, string>();
   return {
@@ -39,11 +45,6 @@ jest.mock('./client', () => ({
     from: jest.fn(),
   },
 }));
-
-import * as SecureStore from 'expo-secure-store';
-import { checkOnline } from '../../utils/network';
-import { supabase } from './client';
-import { authService } from './auth';
 
 const secureStoreState = (SecureStore as unknown as { __store: Map<string, string> }).__store;
 const mockCheckOnline = checkOnline as jest.Mock;
