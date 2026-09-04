@@ -2,6 +2,10 @@ import React from 'react';
 import TestRenderer from 'react-test-renderer';
 import { View } from 'react-native';
 import { Card } from './Card';
+import { Colors } from '../design/colors';
+import { Elevation } from '../design/elevation';
+import { Radius } from '../design/radius';
+import { Spacing } from '../design/spacing';
 
 type Renderer = TestRenderer.ReactTestRenderer;
 
@@ -11,49 +15,72 @@ const render = (element: React.ReactElement) => {
   return r;
 };
 
-// In jest-expo, View is rendered but may not be easily findable by type.
-// Find the card by looking for a View with backgroundColor set.
+// Flatten a StyleProp (single object or array) into a single resolved style object.
+const flattenStyle = (style: any): any => {
+  if (!style) return {};
+  if (Array.isArray(style)) {
+    return style.reduce((acc, s) => ({ ...acc, ...(s || {}) }), {});
+  }
+  return style;
+};
+
+// Locate the Card view by its resolved base styles: backgroundColor === Colors.white
+// AND borderRadius === Radius.lg. These properties are unique to the Card primitive.
+// Throw a clear error if zero or more than one match is found.
 const findCardView = (r: Renderer) => {
   const views = r.root.findAll((n) => {
     return (n.type as any)?.name === 'View' || n.type === View;
   });
 
-  const cardView = views.find((n) => {
-    const style = n.props.style;
-    if (!style) return false;
-    // Look for the base card styles (backgroundColor, borderWidth, etc.)
-    if (Array.isArray(style)) {
-      return style.some((s) => s && typeof s === 'object' && 'backgroundColor' in s);
-    }
-    return style && typeof style === 'object' && 'backgroundColor' in style;
+  const matches = views.filter((n) => {
+    const flattened = flattenStyle(n.props.style);
+    return flattened.backgroundColor === Colors.white && flattened.borderRadius === Radius.lg;
   });
 
-  if (!cardView) throw new Error('No Card View found');
-  return cardView;
+  if (matches.length === 0) {
+    throw new Error('No Card View found: expected a View with backgroundColor === Colors.white and borderRadius === Radius.lg');
+  }
+  if (matches.length > 1) {
+    throw new Error(`Expected 1 Card View but found ${matches.length}; the locator is not sufficiently specific`);
+  }
+
+  return matches[0];
 };
 
 describe('Card', () => {
   it('renders with base styles', () => {
     const r = render(<Card testID="test-card" />);
     const cardView = findCardView(r);
-    expect(cardView).toBeDefined();
+    const flattened = flattenStyle(cardView.props.style);
+
+    // Assert base style tokens are resolved correctly.
+    expect(flattened.backgroundColor).toBe(Colors.white);
+    expect(flattened.borderRadius).toBe(Radius.lg);
+    expect(flattened.borderColor).toBe(Colors.border);
+    expect(flattened.borderWidth).toBe(1);
+
+    // Assert every field of Elevation.raised is present with its exact value.
+    Object.entries(Elevation.raised).forEach(([key, value]) => {
+      expect(flattened[key]).toEqual(value);
+    });
   });
 
   it('applies padding when padded=true (default)', () => {
     const r = render(<Card testID="test-card" />);
     const cardView = findCardView(r);
-    const style = Array.isArray(cardView.props.style) ? cardView.props.style : [cardView.props.style];
-    const hasLgPadding = style.some((s) => s && s.padding !== undefined);
-    expect(hasLgPadding).toBe(true);
+    const flattened = flattenStyle(cardView.props.style);
+
+    // With padded=true (the default), assert padding === Spacing.lg.
+    expect(flattened.padding).toBe(Spacing.lg);
   });
 
   it('does not apply padding when padded=false', () => {
     const r = render(<Card testID="test-card" padded={false} />);
     const cardView = findCardView(r);
-    const style = Array.isArray(cardView.props.style) ? cardView.props.style : [cardView.props.style];
-    // When padded=false, the padding style should not be present (or should be undefined)
-    const hasPadding = style.some((s) => s && s.padding !== undefined);
-    expect(hasPadding).toBe(false);
+    const flattened = flattenStyle(cardView.props.style);
+
+    // With padded=false, the padding key should not be present.
+    expect(flattened.padding).toBeUndefined();
   });
 
   it('renders children', () => {
@@ -70,8 +97,9 @@ describe('Card', () => {
     const customStyle = { opacity: 0.5 };
     const r = render(<Card style={customStyle} />);
     const cardView = findCardView(r);
-    const style = Array.isArray(cardView.props.style) ? cardView.props.style : [cardView.props.style];
-    const hasOpacity = style.some((s) => s && s.opacity === 0.5);
-    expect(hasOpacity).toBe(true);
+    const flattened = flattenStyle(cardView.props.style);
+
+    // Assert that the custom style prop is applied and resolves to its intended value.
+    expect(flattened.opacity).toBe(0.5);
   });
 });
