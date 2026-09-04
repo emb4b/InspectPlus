@@ -11,7 +11,6 @@ import { Spacing } from '../../design/spacing';
 import { Type } from '../../design/typography';
 import { useAuthContext } from '../../core/providers/AuthProvider';
 import { HomeTabs, HomeTab } from '../../features/home/components/HomeTabs';
-import { EmptyState } from '../../components/EmptyState';
 import {
   ManageEstablishmentsTab,
   ManageEstablishmentsTabHandle,
@@ -20,6 +19,7 @@ import {
   ManageReportsTab,
   ManageReportsTabHandle,
 } from '../../features/establishments/components/ManageReportsTab';
+import { ExportReportsTab } from '../../features/establishments/components/ExportReportsTab';
 import { subscribeToSyncDataChanged } from '../../services/sync/syncEvents';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -77,13 +77,13 @@ export default function HomeScreen() {
       case 'manageEstablishments':
         return <ManageEstablishmentsTab ref={manageEstablishmentsRef} />;
       case 'exportReports':
-        // Replaced by ExportReportsTab in the following task.
-        return <EmptyState icon="download-outline" message="Export is coming next." />;
+        return <ExportReportsTab />;
     }
   };
 
-  // Pull-to-refresh reloads the active tab's data. The export tab is static,
-  // so the gesture just settles back for it.
+  // Pull-to-refresh reloads the active tab's data. ExportReportsTab isn't a
+  // forwardRef with a refresh() handle like the other two tabs — it re-fetches
+  // on its own mount instead — so the gesture just settles back for it there.
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {

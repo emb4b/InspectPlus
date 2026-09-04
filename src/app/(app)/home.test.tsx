@@ -2,6 +2,16 @@ import React from 'react';
 import { Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import HomeScreen from './home';
+// Imported at the top (not after the jest.mock() calls below) because
+// babel-plugin-jest-hoist hoists every jest.mock() call above ordinary
+// top-level imports regardless of source position — same rationale documented
+// in ExportReportsTab.test.tsx. Importing the mocked references here lets the
+// tests below prove *which* component instance home.tsx renders per tab via
+// findByType, rather than only pattern-matching serialized text.
+import { ManageEstablishmentsTab } from '../../features/establishments/components/ManageEstablishmentsTab';
+import { ManageReportsTab } from '../../features/establishments/components/ManageReportsTab';
+import { ExportReportsTab } from '../../features/establishments/components/ExportReportsTab';
+import { EmptyState } from '../../components/EmptyState';
 
 type Renderer = TestRenderer.ReactTestRenderer;
 
@@ -29,6 +39,18 @@ jest.mock('../../features/establishments/components/ManageEstablishmentsTab', ()
 
 jest.mock('../../features/establishments/components/ManageReportsTab', () => ({
   ManageReportsTab: function ManageReportsTab() {
+    return null;
+  },
+}));
+
+// ExportReportsTab pulls in useReportBrowser -> useAllReports -> WatermelonDB
+// (a real SQLiteAdapter at import time), plus ReportFilterSheet's keyboard
+// controller native module — none of which run under plain Jest. Same
+// isolation rationale as the two mocks above; ExportReportsTab's own render
+// behavior is covered by ExportReportsTab.test.tsx. Standing in for it here
+// only proves home.tsx wires the real component into the Export case.
+jest.mock('../../features/establishments/components/ExportReportsTab', () => ({
+  ExportReportsTab: function ExportReportsTab() {
     return null;
   },
 }));
@@ -62,9 +84,60 @@ const findActiveTabLabel = (r: Renderer) =>
     n => n.props?.accessibilityRole === 'tab' && n.props?.accessibilityState?.selected === true,
   ).findByType(Text).props.children;
 
+// Same locator convention as HomeTabs.test.tsx's own findTab: `.find()`
+// throws on zero or multiple matches, and anchoring on `onPress` (not just
+// accessibilityRole) skips past the Pressable HomeTabs' TouchableOpacity
+// wraps internally, which forwards accessibilityRole onto itself too.
+const findTab = (r: Renderer, label: string) =>
+  r.root.find(
+    n =>
+      n.props?.accessibilityRole === 'tab' &&
+      typeof n.props?.onPress === 'function' &&
+      n.findAllByType(Text).some(t => t.props.children === label),
+  );
+
+const switchTab = (r: Renderer, label: string) => {
+  act(() => { findTab(r, label).props.onPress(); });
+};
+
 describe('HomeScreen', () => {
   it('opens on Manage Reports by default, not the retired Create tab', () => {
     const r = render();
     expect(findActiveTabLabel(r)).toBe('Manage Reports');
+  });
+
+  it('renders the real ManageReportsTab component by default', () => {
+    const r = render();
+    // Throws on zero or multiple matches, proving exactly one instance of
+    // the actual imported component (not a lookalike) is mounted.
+    expect(() => r.root.findByType(ManageReportsTab)).not.toThrow();
+    expect(r.root.findAllByType(ManageEstablishmentsTab)).toHaveLength(0);
+    expect(r.root.findAllByType(ExportReportsTab)).toHaveLength(0);
+  });
+
+  it('renders the real ManageEstablishmentsTab when that tab is selected', () => {
+    const r = render();
+    switchTab(r, 'Manage\nEstablishments');
+    expect(findActiveTabLabel(r)).toBe('Manage\nEstablishments');
+    expect(() => r.root.findByType(ManageEstablishmentsTab)).not.toThrow();
+    expect(r.root.findAllByType(ManageReportsTab)).toHaveLength(0);
+    expect(r.root.findAllByType(ExportReportsTab)).toHaveLength(0);
+  });
+
+  it('renders the real ExportReportsTab when the Export tab is selected, not a placeholder', () => {
+    const r = render();
+    switchTab(r, 'Export Inspection\nReports');
+    expect(findActiveTabLabel(r)).toBe('Export Inspection\nReports');
+
+    // Proves home.tsx now mounts the actual ExportReportsTab component built
+    // in the prior task, not a stand-in reimplementation.
+    expect(() => r.root.findByType(ExportReportsTab)).not.toThrow();
+    expect(r.root.findAllByType(ManageReportsTab)).toHaveLength(0);
+    expect(r.root.findAllByType(ManageEstablishmentsTab)).toHaveLength(0);
+
+    // The retired interim placeholder ("Export is coming next.") rendered an
+    // EmptyState directly from home.tsx. Now that the real tab is wired in,
+    // home.tsx itself must never construct an EmptyState element again.
+    expect(r.root.findAllByType(EmptyState)).toHaveLength(0);
   });
 });
