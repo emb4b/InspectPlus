@@ -3,7 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../../constants/colors';
+import { Colors } from '../../../design/colors';
+import { REPORT_TYPE_DISPLAY, ReportDataKey } from '../../../constants/reportTypeDisplay';
 import { AppText } from '../../../components/AppText';
 import { getReportUrgency } from '../../../utils/reportUrgency';
 import { confirmResolveConflict } from '../../../services/sync/syncConflictResolution';
@@ -19,14 +20,6 @@ interface ReportListCardProps {
   onEdit: (item: AllReportItem) => void;
   onDelete: (item: AllReportItem) => void;
 }
-
-const REPORT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  air_monitoring: 'partly-sunny-outline',
-  water_monitoring: 'water-outline',
-  hazardous_waste: 'warning-outline',
-  eia: 'globe-outline',
-  survey: 'leaf-outline',
-};
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -59,6 +52,10 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
   // report detail screen — see InspectionReportDetailScreen's canEdit), and
   // only while still a draft owned by this inspector, or a Developer account.
   const showEdit = item.kind === 'inspection' && !isSubmitted && isOwnerOrManager;
+
+  // An unrecognized type still renders — a report written by a newer app
+  // version shouldn't produce a blank row on an older one.
+  const display = REPORT_TYPE_DISPLAY[item.reportType as ReportDataKey];
 
   const visibleActionCount = (showEdit ? 1 : 0) + (showDelete ? 1 : 0);
   const revealWidth = ACTION_WIDTH * visibleActionCount;
@@ -142,8 +139,12 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
             ]}
             onPress={handleCardPress}
             activeOpacity={0.75}>
-            <View style={styles.iconWrap}>
-              <Ionicons name={REPORT_ICONS[item.reportType] ?? 'document-outline'} size={17} color={Colors.water.text} />
+            <View style={[styles.iconWrap, { backgroundColor: display?.bgColor ?? Colors.bgLight }]}>
+              <Ionicons
+                name={display?.icon ?? 'document-outline'}
+                size={17}
+                color={display?.textColor ?? Colors.textMuted}
+              />
             </View>
             <View style={styles.content}>
               <View style={styles.titleRow}>
@@ -288,7 +289,6 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 8,
-    backgroundColor: Colors.water.bg,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,

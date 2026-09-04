@@ -1,0 +1,58 @@
+import mockAsyncStorage from '@react-native-async-storage/async-storage/jest/async-storage-mock';
+import { INSPECTION_TYPE_LABELS } from './useEstablishment';
+import { REPORT_TYPE_DISPLAY, ReportDataKey } from '../../../constants/reportTypeDisplay';
+
+// useEstablishment.ts constructs a real WatermelonDB SQLiteAdapter at import
+// time (via db/database.ts), which needs the native JSI binding that isn't
+// present under plain Jest — see establishmentPersistence.test.ts for the
+// same rationale. Stub it out so importing this module for INSPECTION_TYPE_LABELS
+// doesn't drag in the native adapter. jest.mock calls are hoisted above
+// imports by babel-plugin-jest-hoist regardless of where they're written, so
+// this still applies before the import above actually resolves.
+jest.mock('../../../db/database', () => ({ database: {}, collections: {} }));
+
+// useEstablishment.ts also transitively imports inspectorNames.ts, which
+// persists a name cache via AsyncStorage — irrelevant to INSPECTION_TYPE_LABELS,
+// but jest-expo's preset doesn't mock this third-party package on its own
+// (see syncService.test.ts for the same pattern), so it needs the mock the
+// package itself ships for Jest.
+jest.mock('@react-native-async-storage/async-storage', () => mockAsyncStorage);
+
+// Both inspectorNames.ts and AuthProvider.tsx (via services/supabase/auth.ts)
+// transitively import services/supabase/client.ts, which calls
+// createClient(ENV.supabaseUrl, ...) at module load time — that throws
+// under Jest because EXPO_PUBLIC_SUPABASE_URL isn't populated in this
+// environment. None of it is exercised by INSPECTION_TYPE_LABELS, so stub
+// the client module out rather than touch env/jest config.
+jest.mock('../../../services/supabase/client', () => ({ supabase: {} }));
+
+describe('INSPECTION_TYPE_LABELS', () => {
+  it('is derived from REPORT_TYPE_DISPLAY: same keys, same labels', () => {
+    const expectedEntries = Object.fromEntries(
+      Object.entries(REPORT_TYPE_DISPLAY).map(([key, meta]) => [key, meta.label]),
+    );
+    expect(INSPECTION_TYPE_LABELS).toEqual(expectedEntries);
+  });
+
+  // Regression coverage for existing consumers (ManageReportsTab,
+  // InspectionReportDetailScreen, EstablishmentDetailScreen), which index
+  // this map with a raw stored reportType string and expect these exact,
+  // previously hand-maintained labels back. Assert the resolved values
+  // imported as symbols (REPORT_TYPE_DISPLAY[...].label), not restated
+  // string literals, so a drift in either place fails this test.
+  const ALL_DATA_KEYS: ReportDataKey[] = [
+    'air_monitoring',
+    'water_monitoring',
+    'hazardous_waste',
+    'eia',
+    'survey',
+  ];
+
+  it.each(ALL_DATA_KEYS)('%s label matches REPORT_TYPE_DISPLAY exactly', (key) => {
+    expect(INSPECTION_TYPE_LABELS[key]).toBe(REPORT_TYPE_DISPLAY[key].label);
+  });
+
+  it('has exactly the five recorded-report keys, no more and no fewer', () => {
+    expect(Object.keys(INSPECTION_TYPE_LABELS).sort()).toEqual([...ALL_DATA_KEYS].sort());
+  });
+});
