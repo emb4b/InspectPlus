@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useImperativeHandle, forwardRef } from 'react';
+import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react';
 import {
   View,
   Text,
@@ -6,33 +6,26 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Keyboard,
-  Modal,
   Alert,
   StyleSheet,
 } from 'react-native';
-import Animated, { useAnimatedStyle } from 'react-native-reanimated';
-import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Colors } from '../../../constants/colors';
-import { useGuardedPress } from '../../../utils/useGuardedPress';
+import { EmptyState } from '../../../components/EmptyState';
+import { Section } from '../../../components/Section';
+import { Colors } from '../../../design/colors';
+import { Radius } from '../../../design/radius';
+import { Spacing } from '../../../design/spacing';
+import { Type } from '../../../design/typography';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
-import { SelectField, DateField } from '../../../components/form';
-import { ReportListCard } from './ReportListCard';
+import { useGuardedPress } from '../../../utils/useGuardedPress';
 import { deleteInspectionReportRecord } from '../../inspections/reportPersistence';
-import {
-  useAllReports,
-  useEstablishmentFilterOptions,
-  AllReportItem,
-  ReportStatusFilter,
-  ReportFilters,
-  ReportSortOrder,
-  INSPECTION_TYPE_LABELS,
-  canManageAllRecords,
-} from '../hooks/useEstablishment';
+import { AllReportItem, ReportStatusFilter, canManageAllRecords } from '../hooks/useEstablishment';
+import { useReportBrowser } from '../hooks/useReportBrowser';
+import { ReportFilterSheet } from './ReportFilterSheet';
+import { ReportListCard } from './ReportListCard';
 
 const PAGE_SIZE = 5;
-const ALL_OPTION = 'All';
 
 const STATUS_FILTERS: { key: ReportStatusFilter; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -40,93 +33,47 @@ const STATUS_FILTERS: { key: ReportStatusFilter; label: string }[] = [
   { key: 'submitted', label: 'Submitted' },
 ];
 
-const REPORT_TYPE_OPTIONS = Object.entries(INSPECTION_TYPE_LABELS).map(([value, label]) => ({
-  value,
-  label,
-}));
-
-const SORT_OPTIONS: { key: ReportSortOrder; label: string }[] = [
-  { key: 'newest', label: 'Newest first' },
-  { key: 'oldest', label: 'Oldest first' },
-];
-
-// The date range fields below are plain TextInputs that can be typed into
-// directly (not just via the calendar picker), so the numeric keypad can pop
-// up while this sheet is open. RN's Modal doesn't resize for the keyboard on
-// its own — same issue NewEstablishmentModal solved — so the bottom-anchored
-// sheet needs to shift up manually or the keyboard covers the date row.
-const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
-
 export interface ManageReportsTabHandle {
   refresh: () => Promise<void>;
 }
 
 export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref) => {
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<ReportStatusFilter>('all');
   const [page, setPage] = useState(1);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [province, setProvince] = useState('');
-  const [city, setCity] = useState('');
-  const [reportType, setReportType] = useState('');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [sortOrder, setSortOrder] = useState<ReportSortOrder>('newest');
+  const browser = useReportBrowser();
+  const { reports, loading, error, refetch, activeFilterCount, state } = browser;
 
-  const { provinceOptions } = useEstablishmentFilterOptions();
-  // The inspector's own assigned municipalities — narrows the (already
-  // province-wide-visible) list further, it's not an access boundary.
   const { municipalities, session, role } = useAuthContext();
   const currentUid = (session as { user?: { id?: string } } | null)?.user?.id ?? '';
   const isDeveloper = canManageAllRecords(role ?? '');
 
-  const { height: keyboardHeight } = useReanimatedKeyboardAnimation();
-  const overlayAnimatedStyle = useAnimatedStyle(() => ({
-    // keyboardHeight.value is <= 0 (negative while shown), so negating it
-    // gives the padding needed to push the flex-end-anchored sheet up above
-    // the keyboard instead of letting the keyboard cover it.
-    paddingBottom: -keyboardHeight.value,
-  }));
+  // Search, status, and every filter sheet field reset pagination back to
+  // page 1 — SORT ORDER deliberately does not (matching the pre-extraction
+  // behavior, where only the sort SelectField's onSelect skipped the
+  // setPage(1) call the other five fields all made). `state` bundles
+  // sortOrder in with everything else (ReportFilterSheet needs it there to
+  // render the current sort label), so this effect can't just depend on the
+  // whole `state` object the way the other reset-on-change fields would
+  // suggest — that would fire on a sort-only change too. Depending on the
+  // individual fields below, sortOrder deliberately omitted, keeps the
+  // asymmetry intact.
+  useEffect(() => {
+    setPage(1);
+  }, [state.search, state.statusFilter, state.province, state.city, state.reportType, state.dateFrom, state.dateTo]);
 
-  // Stable reference so the filter object only changes when a filter value
-  // actually changes — a fresh object literal on every render would
-  // re-trigger the data-fetching effect in useAllReports on a loop.
-  const filters: ReportFilters = useMemo(
-    () => ({ province, city, reportType, dateFrom, dateTo, sortOrder }),
-    [province, city, reportType, dateFrom, dateTo, sortOrder],
-  );
-  const activeFilterCount = [province, city, reportType, dateFrom, dateTo].filter(Boolean).length;
-
-  const { reports, loading, error, refetch } = useAllReports(search, statusFilter, filters);
+  // clearFilters resets to page 1 unconditionally, even when no filter was
+  // actually active (so nothing above changed and the effect wouldn't have
+  // fired) — matching the original clearFilters, which called setPage(1)
+  // itself on every press rather than relying on a value actually changing.
+  const handleClearFilters = useCallback(() => {
+    browser.clearFilters();
+    setPage(1);
+  }, [browser]);
 
   useImperativeHandle(ref, () => ({ refresh: refetch }), [refetch]);
 
   const totalPages = Math.max(1, Math.ceil(reports.length / PAGE_SIZE));
   const paginated = reports.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const handleSearch = useCallback((text: string) => {
-    setSearch(text);
-    setPage(1);
-  }, []);
-
-  const handleFilterChange = useCallback((key: ReportStatusFilter) => {
-    setStatusFilter(key);
-    setPage(1);
-  }, []);
-
-  const clearFilters = useCallback(() => {
-    setProvince('');
-    setCity('');
-    setReportType('');
-    setDateFrom('');
-    setDateTo('');
-    setSortOrder('newest');
-    setPage(1);
-  }, []);
-
-  const selectedReportTypeLabel =
-    REPORT_TYPE_OPTIONS.find(o => o.value === reportType)?.label ?? ALL_OPTION;
-  const selectedSortLabel = SORT_OPTIONS.find(o => o.key === sortOrder)?.label ?? SORT_OPTIONS[0].label;
 
   const handleOpen = useGuardedPress((item: AllReportItem) => {
     if (item.kind === 'inspection') {
@@ -136,32 +83,34 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
     }
   });
 
-  // Only inspection reports are deletable here (survey reports aren't in
-  // scope for this feature) — ReportListCard already hides the delete
-  // button for survey rows and for reports owned by another inspector.
-  const handleDelete = useCallback((item: AllReportItem) => {
-    if (item.kind !== 'inspection' || !(item.inspectorUid === currentUid || isDeveloper)) return;
-    Alert.alert(
-      'Delete report?',
-      `This ${INSPECTION_TYPE_LABELS[item.reportType] ?? item.reportType} report for "${item.estabName}" will be removed.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteInspectionReportRecord(item.reportId);
-              refetch();
-            } catch (err) {
-              console.error('[ManageReportsTab] Failed to delete report:', err);
-              Alert.alert('Delete failed', err instanceof Error ? err.message : 'Something went wrong.');
-            }
+  // Only inspection reports are deletable here, and only by their owner or a
+  // Developer account — ReportListCard already hides the button otherwise.
+  const handleDelete = useCallback(
+    (item: AllReportItem) => {
+      if (item.kind !== 'inspection' || !(item.inspectorUid === currentUid || isDeveloper)) return;
+      Alert.alert(
+        'Delete report?',
+        `This report for "${item.estabName}" will be removed.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await deleteInspectionReportRecord(item.reportId);
+                refetch();
+              } catch (err) {
+                console.error('[ManageReportsTab] Failed to delete report:', err);
+                Alert.alert('Delete failed', err instanceof Error ? err.message : 'Something went wrong.');
+              }
+            },
           },
-        },
-      ],
-    );
-  }, [currentUid, isDeveloper, refetch]);
+        ],
+      );
+    },
+    [currentUid, isDeveloper, refetch],
+  );
 
   if (loading) {
     return (
@@ -177,7 +126,12 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
       <View style={styles.centeredState}>
         <Ionicons name="alert-circle-outline" size={40} color={Colors.conflict} />
         <Text style={styles.stateText}>{error}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={refetch} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={styles.retryBtn}
+          onPress={refetch}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading reports">
           <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
       </View>
@@ -186,7 +140,6 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
 
   return (
     <View style={styles.container}>
-      {/* Search + filter trigger */}
       <View style={styles.searchRow}>
         <View style={styles.searchWrap}>
           <Ionicons name="search-outline" size={14} color={Colors.textMuted} />
@@ -194,15 +147,19 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
             style={styles.searchInput}
             placeholder="Search by establishment name..."
             placeholderTextColor={Colors.textMuted}
-            value={search}
-            onChangeText={handleSearch}
+            value={state.search}
+            onChangeText={browser.setSearch}
             autoCorrect={false}
             autoCapitalize="none"
             returnKeyType="search"
             onSubmitEditing={() => Keyboard.dismiss()}
           />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => handleSearch('')} activeOpacity={0.7}>
+          {state.search.length > 0 && (
+            <TouchableOpacity
+              onPress={() => browser.setSearch('')}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search">
               <Ionicons name="close-circle" size={16} color={Colors.textMuted} />
             </TouchableOpacity>
           )}
@@ -210,7 +167,9 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
         <TouchableOpacity
           style={[styles.filterBtn, activeFilterCount > 0 && styles.filterBtnActive]}
           onPress={() => setFiltersOpen(true)}
-          activeOpacity={0.75}>
+          activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel="Filter reports">
           <Ionicons
             name="options-outline"
             size={18}
@@ -224,16 +183,17 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
         </TouchableOpacity>
       </View>
 
-      {/* Status filter chips */}
       <View style={styles.filterRow}>
         {STATUS_FILTERS.map(f => {
-          const isActive = statusFilter === f.key;
+          const isActive = state.statusFilter === f.key;
           return (
             <TouchableOpacity
               key={f.key}
               style={[styles.filterChip, isActive && styles.filterChipActive]}
-              onPress={() => handleFilterChange(f.key)}
-              activeOpacity={0.75}>
+              onPress={() => browser.setStatusFilter(f.key)}
+              activeOpacity={0.75}
+              accessibilityRole="button"
+              accessibilityLabel={`Show ${f.label.toLowerCase()} reports`}>
               <Text style={[styles.filterChipText, isActive && styles.filterChipTextActive]}>
                 {f.label}
               </Text>
@@ -242,22 +202,17 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
         })}
       </View>
 
-      {/* Section label + count */}
-      <View style={styles.sectionRow}>
-        <Text style={styles.sectionLabel}>REPORTS</Text>
-        <Text style={styles.sectionCount}>{reports.length} total</Text>
-      </View>
+      <Section title="REPORTS" right={<Text style={styles.sectionCount}>{reports.length} total</Text>} />
 
-      {/* List */}
       {paginated.length === 0 ? (
-        <View style={styles.centeredState}>
-          <Ionicons name="document-outline" size={40} color={Colors.border} />
-          <Text style={styles.stateText}>
-            {search || statusFilter !== 'all' || activeFilterCount > 0
+        <EmptyState
+          icon="document-outline"
+          message={
+            state.search || state.statusFilter !== 'all' || activeFilterCount > 0
               ? 'No reports match your filters.'
-              : 'No reports yet.'}
-          </Text>
-        </View>
+              : 'No reports yet.'
+          }
+        />
       ) : (
         paginated.map(item => (
           <ReportListCard
@@ -272,31 +227,29 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
         ))
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <View style={styles.pager}>
           <TouchableOpacity
             onPress={() => setPage(p => Math.max(1, p - 1))}
             disabled={page === 1}
-            activeOpacity={0.7}>
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Previous page">
             <View style={styles.pageArrow}>
-              <Ionicons
-                name="chevron-back"
-                size={13}
-                color={page === 1 ? Colors.textLight : Colors.textMuted}
-              />
-              <Text style={[styles.pageArrowText, page === 1 && styles.pageDisabled]}>
-                Previous
-              </Text>
+              <Ionicons name="chevron-back" size={13} color={page === 1 ? Colors.textLight : Colors.textMuted} />
+              <Text style={[styles.pageArrowText, page === 1 && styles.pageDisabled]}>Previous</Text>
             </View>
           </TouchableOpacity>
 
           {Array.from({ length: Math.min(totalPages, 4) }, (_, i) => i + 1).map(p => (
-            <TouchableOpacity key={p} onPress={() => setPage(p)} activeOpacity={0.7}>
+            <TouchableOpacity
+              key={p}
+              onPress={() => setPage(p)}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`Go to page ${p}`}>
               <View style={[styles.pageNum, p === page && styles.pageNumActive]}>
-                <Text style={[styles.pageNumText, p === page && styles.pageNumTextActive]}>
-                  {p}
-                </Text>
+                <Text style={[styles.pageNumText, p === page && styles.pageNumTextActive]}>{p}</Text>
               </View>
             </TouchableOpacity>
           ))}
@@ -304,7 +257,11 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
           {totalPages > 4 && (
             <>
               <Text style={styles.pageDots}>…</Text>
-              <TouchableOpacity onPress={() => setPage(totalPages)} activeOpacity={0.7}>
+              <TouchableOpacity
+                onPress={() => setPage(totalPages)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel={`Go to page ${totalPages}`}>
                 <View style={[styles.pageNum, page === totalPages && styles.pageNumActive]}>
                   <Text style={[styles.pageNumText, page === totalPages && styles.pageNumTextActive]}>
                     {totalPages}
@@ -317,11 +274,11 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
           <TouchableOpacity
             onPress={() => setPage(p => Math.min(totalPages, p + 1))}
             disabled={page === totalPages}
-            activeOpacity={0.7}>
+            activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="Next page">
             <View style={styles.pageArrow}>
-              <Text style={[styles.pageArrowText, page === totalPages && styles.pageDisabled]}>
-                Next
-              </Text>
+              <Text style={[styles.pageArrowText, page === totalPages && styles.pageDisabled]}>Next</Text>
               <Ionicons
                 name="chevron-forward"
                 size={13}
@@ -332,91 +289,12 @@ export const ManageReportsTab = forwardRef<ManageReportsTabHandle>((_props, ref)
         </View>
       )}
 
-      {/* Filter sheet */}
-      <Modal
+      <ReportFilterSheet
         visible={filtersOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setFiltersOpen(false)}>
-        <AnimatedTouchableOpacity
-          style={[styles.overlay, overlayAnimatedStyle]}
-          activeOpacity={1}
-          onPress={() => {
-            // With both the sheet and keyboard open, a tap outside the
-            // sheet should only dismiss the keyboard — closing the sheet
-            // too would be a second, unrequested action from one tap.
-            // Closing the sheet is reserved for when it's the only thing
-            // open.
-            if (Keyboard.isVisible()) {
-              Keyboard.dismiss();
-            } else {
-              setFiltersOpen(false);
-            }
-          }}>
-          <TouchableOpacity activeOpacity={1} style={styles.sheet} onPress={() => {}}>
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Filter reports</Text>
-              <TouchableOpacity onPress={() => setFiltersOpen(false)}>
-                <Ionicons name="close" size={20} color={Colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-
-            <SelectField
-              label="Region"
-              value={province || ALL_OPTION}
-              options={[ALL_OPTION, ...provinceOptions]}
-              onSelect={v => {
-                setProvince(v === ALL_OPTION ? '' : v);
-                setPage(1);
-              }}
-              style={styles.filterField}
-            />
-
-            {municipalities.length > 0 && (
-              <SelectField
-                label="Municipality"
-                value={city || ALL_OPTION}
-                options={[ALL_OPTION, ...municipalities]}
-                onSelect={v => {
-                  setCity(v === ALL_OPTION ? '' : v);
-                  setPage(1);
-                }}
-                style={styles.filterField}
-              />
-            )}
-
-            <SelectField
-              label="Inspection report type"
-              value={selectedReportTypeLabel}
-              options={[ALL_OPTION, ...REPORT_TYPE_OPTIONS.map(o => o.label)]}
-              onSelect={v => {
-                setReportType(v === ALL_OPTION ? '' : REPORT_TYPE_OPTIONS.find(o => o.label === v)?.value ?? '');
-                setPage(1);
-              }}
-              style={styles.filterField}
-            />
-
-            <View style={styles.dateRow}>
-              <DateField label="From" value={dateFrom} onChange={v => { setDateFrom(v); setPage(1); }} style={styles.dateField} />
-              <DateField label="To" value={dateTo} onChange={v => { setDateTo(v); setPage(1); }} style={styles.dateField} />
-            </View>
-
-            <SelectField
-              label="Sort by date"
-              value={selectedSortLabel}
-              options={SORT_OPTIONS.map(o => o.label)}
-              onSelect={v => {
-                setSortOrder(SORT_OPTIONS.find(o => o.label === v)?.key ?? 'newest');
-              }}
-              style={styles.filterField}
-            />
-
-            <TouchableOpacity style={styles.clearBtn} onPress={clearFilters} activeOpacity={0.75}>
-              <Text style={styles.clearBtnText}>Clear all filters</Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </AnimatedTouchableOpacity>
-      </Modal>
+        onClose={() => setFiltersOpen(false)}
+        browser={{ ...browser, clearFilters: handleClearFilters }}
+        municipalities={municipalities}
+      />
     </View>
   );
 });
@@ -425,60 +303,62 @@ ManageReportsTab.displayName = 'ManageReportsTab';
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
-    paddingBottom: 32,
+    padding: Spacing.lg,
+    paddingBottom: Spacing.xxl,
   },
   centeredState: {
     alignItems: 'center',
-    paddingTop: 48,
-    gap: 10,
+    paddingTop: Spacing.xxxl,
+    gap: Spacing.sm,
   },
   stateText: {
-    fontSize: 13,
+    fontSize: Type.bodySm.fontSize,
+    lineHeight: Type.bodySm.lineHeight,
     color: Colors.textMuted,
     textAlign: 'center',
   },
   retryBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.sm,
     backgroundColor: Colors.navy,
-    borderRadius: 8,
-    marginTop: 4,
+    borderRadius: Radius.md,
+    marginTop: Spacing.xs,
   },
   retryText: {
-    fontSize: 12,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     fontWeight: '700',
     color: Colors.textWhite,
   },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
   },
   searchWrap: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 24,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 8,
+    backgroundColor: Colors.bgLight,
+    borderRadius: Radius.pill,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    gap: Spacing.sm,
   },
   searchInput: {
     flex: 1,
-    fontSize: 13,
+    fontSize: Type.bodySm.fontSize,
     color: Colors.textPrimary,
     paddingVertical: 0,
   },
   filterBtn: {
     width: 38,
     height: 38,
-    borderRadius: 19,
+    borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: Colors.bgLight,
   },
   filterBtnActive: {
     backgroundColor: Colors.navy,
@@ -489,79 +369,26 @@ const styles = StyleSheet.create({
     right: -2,
     minWidth: 16,
     height: 16,
-    borderRadius: 8,
-    paddingHorizontal: 3,
-    backgroundColor: '#e74c3c',
+    borderRadius: Radius.pill,
+    paddingHorizontal: Spacing.xxs,
+    backgroundColor: Colors.conflict,
     alignItems: 'center',
     justifyContent: 'center',
   },
   filterBadgeText: {
-    fontSize: 9,
+    fontSize: Type.caption.fontSize,
     fontWeight: '700',
     color: Colors.textWhite,
   },
-  overlay: {
-    flex: 1,
-    backgroundColor: Colors.overlay,
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    backgroundColor: Colors.white,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 16,
-    maxHeight: '80%',
-  },
-  sheetHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  sheetTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.navy,
-  },
-  // SelectField's own `group` style sets `flex: 1` for when it's used
-  // side-by-side in a form row — stacked standalone here, that flex-basis-0
-  // sizing collapses the field to near-zero height (its column parent, the
-  // filter sheet, only has a maxHeight cap, not a definite height, so there's
-  // no resolvable "extra space" for it to grow into). Clearing it back to
-  // Yoga's default (content-sized) fixes the squished/overlapping layout.
-  filterField: {
-    flex: undefined,
-  },
-  dateRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  // Unlike filterField above, these two ARE meant to keep flex: 1 — they
-  // share a row (a definite-width flex container), so it correctly splits
-  // width 50/50 instead of collapsing height.
-  dateField: {
-    flex: 1,
-  },
-  clearBtn: {
-    alignSelf: 'center',
-    marginTop: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  clearBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: Colors.conflict,
-  },
   filterRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 14,
+    gap: Spacing.sm,
+    marginBottom: Spacing.lg,
   },
   filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.pill,
     backgroundColor: Colors.bgLight,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -571,45 +398,35 @@ const styles = StyleSheet.create({
     borderColor: Colors.navy,
   },
   filterChipText: {
-    fontSize: 11.5,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     fontWeight: '700',
     color: Colors.textMuted,
   },
   filterChipTextActive: {
     color: Colors.textWhite,
   },
-  sectionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  sectionLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-    color: Colors.textMuted,
-    fontFamily: 'monospace',
-  },
   sectionCount: {
-    fontSize: 10,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     color: Colors.textLight,
   },
   pager: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    marginTop: 16,
+    gap: Spacing.sm,
+    marginTop: Spacing.lg,
   },
   pageArrow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
-    paddingHorizontal: 4,
+    gap: Spacing.xxs,
+    paddingHorizontal: Spacing.xs,
   },
   pageArrowText: {
-    fontSize: 11,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     color: Colors.textMuted,
   },
   pageDisabled: {
@@ -618,7 +435,7 @@ const styles = StyleSheet.create({
   pageNum: {
     width: 26,
     height: 26,
-    borderRadius: 6,
+    borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.bgLight,
@@ -627,7 +444,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.navy,
   },
   pageNumText: {
-    fontSize: 11,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     fontWeight: '600',
     color: Colors.textMuted,
   },
@@ -635,7 +453,8 @@ const styles = StyleSheet.create({
     color: Colors.textWhite,
   },
   pageDots: {
-    fontSize: 11,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     color: Colors.textMuted,
   },
 });

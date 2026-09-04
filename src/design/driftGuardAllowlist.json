@@ -28,7 +28,6 @@
   "features/establishments/components/EstablishmentInfoSections.tsx",
   "features/establishments/components/EstablishmentReportsSection.tsx",
   "features/establishments/components/ManageEstablishmentsTab.tsx",
-  "features/establishments/components/ManageReportsTab.tsx",
   "features/establishments/components/ReportListCard.tsx",
   "features/home/components/HomeFooter.tsx",
   "features/home/components/HomeHeader.tsx",
