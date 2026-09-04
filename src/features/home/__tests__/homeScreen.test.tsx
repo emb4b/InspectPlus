@@ -1,29 +1,33 @@
 import React from 'react';
 import { RefreshControl, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
-import HomeScreen from './home';
+// Imported from its route path — a normal module import, not a file placed
+// inside src/app, so expo-router never treats this test file itself as a
+// route. See the module-scope jest.mock() calls below for why the test
+// itself must NOT live under src/app.
+import HomeScreen from '../../../app/(app)/home';
 // Imported at the top (not after the jest.mock() calls below) because
 // babel-plugin-jest-hoist hoists every jest.mock() call above ordinary
 // top-level imports regardless of source position — same rationale documented
 // in ExportReportsTab.test.tsx. Importing the mocked references here lets the
 // tests below prove *which* component instance home.tsx renders per tab via
 // findByType, rather than only pattern-matching serialized text.
-import { ManageEstablishmentsTab } from '../../features/establishments/components/ManageEstablishmentsTab';
-import { ManageReportsTab } from '../../features/establishments/components/ManageReportsTab';
-import { ExportReportsTab } from '../../features/establishments/components/ExportReportsTab';
-import { EmptyState } from '../../components/EmptyState';
+import { ManageEstablishmentsTab } from '../../establishments/components/ManageEstablishmentsTab';
+import { ManageReportsTab } from '../../establishments/components/ManageReportsTab';
+import { ExportReportsTab } from '../../establishments/components/ExportReportsTab';
+import { EmptyState } from '../../../components/EmptyState';
 // Mocked below to a jest.fn() so tests can inspect the callback home.tsx
 // registers with it — the same "import the mocked reference" approach as the
 // three tab components above.
-import { subscribeToSyncDataChanged } from '../../services/sync/syncEvents';
+import { subscribeToSyncDataChanged } from '../../../services/sync/syncEvents';
 
 type Renderer = TestRenderer.ReactTestRenderer;
 
-jest.mock('../../core/providers/AuthProvider', () => ({
+jest.mock('../../../core/providers/AuthProvider', () => ({
   useAuthContext: () => ({ fullName: 'Jane Inspector' }),
 }));
 
-jest.mock('../../services/sync/syncEvents', () => ({
+jest.mock('../../../services/sync/syncEvents', () => ({
   subscribeToSyncDataChanged: jest.fn(() => () => {}),
 }));
 
@@ -51,7 +55,7 @@ const mockExportReportsRefresh = jest.fn().mockResolvedValue(undefined);
 // referencing the top-level `React` import: the same out-of-scope rule above
 // applies to it too, and ExportReportsTab.test.tsx's FabVisibilityContext
 // mock already establishes this exact require-inside-the-factory pattern.
-jest.mock('../../features/establishments/components/ManageEstablishmentsTab', () => {
+jest.mock('../../establishments/components/ManageEstablishmentsTab', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- see comment above
   const ReactLib = require('react');
   return {
@@ -62,7 +66,7 @@ jest.mock('../../features/establishments/components/ManageEstablishmentsTab', ()
   };
 });
 
-jest.mock('../../features/establishments/components/ManageReportsTab', () => {
+jest.mock('../../establishments/components/ManageReportsTab', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- see comment above
   const ReactLib = require('react');
   return {
@@ -79,7 +83,7 @@ jest.mock('../../features/establishments/components/ManageReportsTab', () => {
 // isolation rationale as the two mocks above; ExportReportsTab's own render
 // behavior is covered by ExportReportsTab.test.tsx. Standing in for it here
 // only proves home.tsx wires the real component into the Export case.
-jest.mock('../../features/establishments/components/ExportReportsTab', () => {
+jest.mock('../../establishments/components/ExportReportsTab', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- see comment above
   const ReactLib = require('react');
   return {
