@@ -114,17 +114,48 @@ describe('Fab', () => {
     expect(touchable.props.accessibilityState.expanded).toBe(true);
   });
 
-  it('animates rotation when motion is not reduced', () => {
+  it('mounts closed with rotation 0', () => {
+    (useReducedMotion as jest.Mock).mockReturnValue(false);
+    (withTiming as jest.Mock).mockImplementation((target, config) => target);
+
+    render(<Fab open={false} onPress={() => {}} />);
+
+    // Assert that mounting closed calls withTiming(0).
+    expect(withTiming).toHaveBeenLastCalledWith(0, { duration: Duration.short });
+  });
+
+  it('animates rotation when transitioning from closed to open', () => {
     (useReducedMotion as jest.Mock).mockReturnValue(false);
     (withTiming as jest.Mock).mockImplementation((target, config) => target);
 
     const r = render(<Fab open={false} onPress={() => {}} />);
+
+    // Clear the mount call to isolate the transition.
+    (withTiming as jest.Mock).mockClear();
+
     act(() => {
       r.update(<Fab open={true} onPress={() => {}} />);
     });
 
-    // Assert that withTiming was called with the open rotation value.
-    expect(withTiming).toHaveBeenCalledWith(45, { duration: Duration.short });
+    // Assert that the transition to open calls withTiming(45).
+    expect(withTiming).toHaveBeenLastCalledWith(45, { duration: Duration.short });
+  });
+
+  it('animates rotation when transitioning from open to closed', () => {
+    (useReducedMotion as jest.Mock).mockReturnValue(false);
+    (withTiming as jest.Mock).mockImplementation((target, config) => target);
+
+    const r = render(<Fab open={true} onPress={() => {}} />);
+
+    // Clear the mount call to isolate the transition.
+    (withTiming as jest.Mock).mockClear();
+
+    act(() => {
+      r.update(<Fab open={false} onPress={() => {}} />);
+    });
+
+    // Assert that the transition to closed calls withTiming(0).
+    expect(withTiming).toHaveBeenLastCalledWith(0, { duration: Duration.short });
   });
 
   it('snaps rotation without animating when reduce-motion is on', () => {
