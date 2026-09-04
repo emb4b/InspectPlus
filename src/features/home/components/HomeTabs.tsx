@@ -1,25 +1,24 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
-import { Colors } from '../../../constants/colors';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Colors } from '../../../design/colors';
+import { Radius } from '../../../design/radius';
+import { Spacing } from '../../../design/spacing';
+import { Type } from '../../../design/typography';
 
-export type HomeTab = 'create' | 'manageEstablishments' | 'manageReports' | 'export';
+export type HomeTab = 'manageReports' | 'manageEstablishments' | 'exportReports';
 
 interface HomeTabsProps {
   activeTab: HomeTab;
   onTabChange: (tab: HomeTab) => void;
 }
 
+// Creating a report is no longer a tab — it lives in the speed dial FAB, so
+// it's reachable from the establishment screens too rather than only from
+// here. Manage Reports leads because it's where an inspector's own work is.
 const TABS: { key: HomeTab; label: string }[] = [
-  { key: 'create', label: 'Create New Report' },
-  { key: 'manageEstablishments', label: 'Manage\nEstablishments' },
   { key: 'manageReports', label: 'Manage Reports' },
-  // Import/Export Reports — disabled until the feature is ready.
-  // { key: 'export', label: 'Import/Export\nReports' },
+  { key: 'manageEstablishments', label: 'Manage\nEstablishments' },
+  { key: 'exportReports', label: 'Export Inspection\nReports' },
 ];
 
 export const HomeTabs: React.FC<HomeTabsProps> = ({ activeTab, onTabChange }) => {
@@ -32,12 +31,10 @@ export const HomeTabs: React.FC<HomeTabsProps> = ({ activeTab, onTabChange }) =>
             key={tab.key}
             style={styles.tab}
             onPress={() => onTabChange(tab.key)}
-            activeOpacity={0.7}>
-            <Text
-              style={[
-                styles.label,
-                isActive ? styles.labelActive : styles.labelInactive,
-              ]}>
+            activeOpacity={0.7}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: isActive }}>
+            <Text style={[styles.label, isActive ? styles.labelActive : styles.labelInactive]}>
               {tab.label}
             </Text>
             {isActive && <View style={styles.underline} />}
@@ -58,20 +55,19 @@ const styles = StyleSheet.create({
   tab: {
     flex: 1,
     alignItems: 'center',
-    paddingTop: 10,
-    paddingBottom: 0,
-    paddingHorizontal: 4,
+    paddingTop: Spacing.md,
+    paddingHorizontal: Spacing.xs,
     position: 'relative',
   },
   label: {
-    fontSize: 11.5,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     fontWeight: '500',
     textAlign: 'center',
-    lineHeight: 15,
-    paddingBottom: 8,
+    paddingBottom: Spacing.sm,
   },
   labelActive: {
-    color: '#5b4fcf',
+    color: Colors.accent,
     fontWeight: '700',
   },
   labelInactive: {
@@ -80,10 +76,10 @@ const styles = StyleSheet.create({
   underline: {
     position: 'absolute',
     bottom: 0,
-    left: 8,
-    right: 8,
+    left: Spacing.sm,
+    right: Spacing.sm,
     height: 2.5,
-    backgroundColor: '#5b4fcf',
-    borderRadius: 2,
+    backgroundColor: Colors.accent,
+    borderRadius: Radius.pill,
   },
 });

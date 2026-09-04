@@ -6,10 +6,12 @@ import {
   RefreshControl,
   StyleSheet,
 } from 'react-native';
-import { Colors } from '../../constants/colors';
+import { Colors } from '../../design/colors';
+import { Spacing } from '../../design/spacing';
+import { Type } from '../../design/typography';
 import { useAuthContext } from '../../core/providers/AuthProvider';
 import { HomeTabs, HomeTab } from '../../features/home/components/HomeTabs';
-import { CreateNewReportTab } from '../../features/inspections/components/CreateNewReportTab';
+import { EmptyState } from '../../components/EmptyState';
 import {
   ManageEstablishmentsTab,
   ManageEstablishmentsTabHandle,
@@ -39,21 +41,11 @@ function getFormattedTime(): string {
   });
 }
 
-// ── Import/Export placeholder ─────────────────────────────────────────────────
-// Disabled along with its menu entry in HomeTabs — feature isn't ready yet.
-//
-// const ImportExportTab: React.FC = () => (
-//   <View style={styles.placeholderWrap}>
-//     <Text style={styles.placeholderTitle}>Import / Export Reports</Text>
-//     <Text style={styles.placeholderSub}>This feature is coming soon.</Text>
-//   </View>
-// );
-
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const { fullName } = useAuthContext();
-  const [activeTab, setActiveTab] = useState<HomeTab>('create');
+  const [activeTab, setActiveTab] = useState<HomeTab>('manageReports');
   const [refreshing, setRefreshing] = useState(false);
   const manageEstablishmentsRef = useRef<ManageEstablishmentsTabHandle>(null);
   const manageReportsRef = useRef<ManageReportsTabHandle>(null);
@@ -80,19 +72,18 @@ export default function HomeScreen() {
 
   const renderTab = () => {
     switch (activeTab) {
-      case 'create':
-        return <CreateNewReportTab />;
-      case 'manageEstablishments':
-        return <ManageEstablishmentsTab ref={manageEstablishmentsRef} />;
       case 'manageReports':
         return <ManageReportsTab ref={manageReportsRef} />;
-      // case 'export':
-      //   return <ImportExportTab />;
+      case 'manageEstablishments':
+        return <ManageEstablishmentsTab ref={manageEstablishmentsRef} />;
+      case 'exportReports':
+        // Replaced by ExportReportsTab in the following task.
+        return <EmptyState icon="download-outline" message="Export is coming next." />;
     }
   };
 
-  // Pull-to-refresh reloads the active tab's data. The "create" and "export"
-  // tabs are static, so the gesture just settles back for those.
+  // Pull-to-refresh reloads the active tab's data. The export tab is static,
+  // so the gesture just settles back for it.
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -147,21 +138,23 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   welcomeWrap: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
     backgroundColor: Colors.white,
   },
   welcomeText: {
-    fontSize: 22,
+    fontSize: Type.display.fontSize,
+    lineHeight: Type.display.lineHeight,
     fontWeight: '800',
     color: Colors.navy,
     fontStyle: 'italic',
   },
   dateText: {
-    fontSize: 12,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     color: Colors.textMuted,
-    marginTop: 3,
+    marginTop: Spacing.xs,
   },
   scroll: {
     flex: 1,
@@ -169,22 +162,5 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-  },
-  placeholderWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 48,
-    gap: 10,
-  },
-  placeholderTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.textSecondary,
-  },
-  placeholderSub: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    textAlign: 'center',
   },
 });
