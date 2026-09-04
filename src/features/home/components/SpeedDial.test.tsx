@@ -86,6 +86,14 @@ describe('SpeedDial', () => {
     expect(r.root.findAll(n => n.props?.accessibilityLabel === REPORT_TYPES[0].title)).toHaveLength(0);
   });
 
+  it.each(REPORT_TYPES)('presses row for $title and navigates to its own route', (type) => {
+    const r = render();
+    openDial(r);
+    act(() => { byLabel(r, type.title).props.onPress(); });
+
+    expect(router.push).toHaveBeenCalledWith(type.route);
+  });
+
   it('closes on Android hardware back instead of letting it navigate away', () => {
     const r = render();
     openDial(r);
