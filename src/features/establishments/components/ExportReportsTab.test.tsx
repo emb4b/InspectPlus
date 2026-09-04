@@ -14,7 +14,7 @@ import { Skeleton } from '../../../components/Skeleton';
 // ManageReportsTab.test.tsx and ReportFilterSheet.test.tsx both import the
 // component under test at the top for exactly this reason, and eslint's
 // import/first rule requires it.
-import { ExportReportsTab } from './ExportReportsTab';
+import { ExportReportsTab, ExportReportsTabHandle } from './ExportReportsTab';
 import { ReportListCard } from './ReportListCard';
 
 // ExportReportsTab renders the real ReportListCard, which pulls in
@@ -155,6 +155,14 @@ type Renderer = TestRenderer.ReactTestRenderer;
 const render = () => {
   let r!: Renderer;
   act(() => { r = TestRenderer.create(<ExportReportsTab />); });
+  return r;
+};
+
+// Same shape as render() above, but attaches a ref so tests can reach the
+// imperative handle useImperativeHandle exposes.
+const renderWithRef = (ref: React.RefObject<ExportReportsTabHandle | null>): Renderer => {
+  let r!: Renderer;
+  act(() => { r = TestRenderer.create(<ExportReportsTab ref={ref} />); });
   return r;
 };
 
@@ -407,6 +415,29 @@ describe('ExportReportsTab', () => {
       const r = render();
       const empty = r.root.findByType(EmptyState);
       expect(empty.props.message).toBe('No reports match your filters.');
+    });
+  });
+
+  describe('the imperative refresh handle', () => {
+    // Home drives pull-to-refresh and the sync-data-changed subscription
+    // through this handle (see home.test.tsx) — this proves the handle
+    // itself exists and that calling refresh() actually reaches the
+    // browser's own refetch, not a no-op or a second, independent fetch.
+    it('exposes refresh() that calls the report browser refetch', async () => {
+      const mockRefetch = jest.fn().mockResolvedValue(undefined);
+      mockUseReportBrowser.mockImplementation(() => makeBrowserReturn({ refetch: mockRefetch }));
+
+      const ref = React.createRef<ExportReportsTabHandle>();
+      renderWithRef(ref);
+
+      expect(ref.current).not.toBeNull();
+      expect(mockRefetch).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await ref.current!.refresh();
+      });
+
+      expect(mockRefetch).toHaveBeenCalledTimes(1);
     });
   });
 });

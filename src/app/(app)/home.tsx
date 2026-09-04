@@ -19,7 +19,10 @@ import {
   ManageReportsTab,
   ManageReportsTabHandle,
 } from '../../features/establishments/components/ManageReportsTab';
-import { ExportReportsTab } from '../../features/establishments/components/ExportReportsTab';
+import {
+  ExportReportsTab,
+  ExportReportsTabHandle,
+} from '../../features/establishments/components/ExportReportsTab';
 import { subscribeToSyncDataChanged } from '../../services/sync/syncEvents';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -49,6 +52,7 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const manageEstablishmentsRef = useRef<ManageEstablishmentsTabHandle>(null);
   const manageReportsRef = useRef<ManageReportsTabHandle>(null);
+  const exportReportsRef = useRef<ExportReportsTabHandle>(null);
   const firstName = fullName?.trim().split(/\s+/)[0] ?? 'Inspector';
 
   // Ticks the header clock once a second — cheap enough given it's just one
@@ -61,12 +65,13 @@ export default function HomeScreen() {
 
   // A sync can complete while Home is already mounted and focused (the
   // manual "Sync Now" button, or the post-login sync landing right as this
-  // screen appears) — pull-to-refresh alone wouldn't pick that up, so both
-  // tabs also refetch whenever local data changes for any reason.
+  // screen appears) — pull-to-refresh alone wouldn't pick that up, so all
+  // three tabs also refetch whenever local data changes for any reason.
   useEffect(() => {
     return subscribeToSyncDataChanged(() => {
       manageEstablishmentsRef.current?.refresh();
       manageReportsRef.current?.refresh();
+      exportReportsRef.current?.refresh();
     });
   }, []);
 
@@ -77,13 +82,11 @@ export default function HomeScreen() {
       case 'manageEstablishments':
         return <ManageEstablishmentsTab ref={manageEstablishmentsRef} />;
       case 'exportReports':
-        return <ExportReportsTab />;
+        return <ExportReportsTab ref={exportReportsRef} />;
     }
   };
 
-  // Pull-to-refresh reloads the active tab's data. ExportReportsTab isn't a
-  // forwardRef with a refresh() handle like the other two tabs — it re-fetches
-  // on its own mount instead — so the gesture just settles back for it there.
+  // Pull-to-refresh reloads the active tab's data.
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -91,6 +94,8 @@ export default function HomeScreen() {
         await manageEstablishmentsRef.current?.refresh();
       } else if (activeTab === 'manageReports') {
         await manageReportsRef.current?.refresh();
+      } else if (activeTab === 'exportReports') {
+        await exportReportsRef.current?.refresh();
       }
     } finally {
       setRefreshing(false);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text } from 'react-native';
+import { RefreshControl, Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import HomeScreen from './home';
 // Imported at the top (not after the jest.mock() calls below) because
@@ -12,6 +12,10 @@ import { ManageEstablishmentsTab } from '../../features/establishments/component
 import { ManageReportsTab } from '../../features/establishments/components/ManageReportsTab';
 import { ExportReportsTab } from '../../features/establishments/components/ExportReportsTab';
 import { EmptyState } from '../../components/EmptyState';
+// Mocked below to a jest.fn() so tests can inspect the callback home.tsx
+// registers with it — the same "import the mocked reference" approach as the
+// three tab components above.
+import { subscribeToSyncDataChanged } from '../../services/sync/syncEvents';
 
 type Renderer = TestRenderer.ReactTestRenderer;
 
@@ -23,25 +27,51 @@ jest.mock('../../services/sync/syncEvents', () => ({
   subscribeToSyncDataChanged: jest.fn(() => () => {}),
 }));
 
+// Prefixed `mock` — babel-plugin-jest-hoist statically rejects any
+// out-of-scope identifier a hoisted jest.mock() factory closes over unless
+// its name starts with "mock" (case-insensitive), and each of these is read
+// from inside a factory below. One per tab, so pull-to-refresh and the sync
+// subscription tests can tell which tab's handle actually got called instead
+// of only proving *a* handle fired.
+const mockManageEstablishmentsRefresh = jest.fn().mockResolvedValue(undefined);
+const mockManageReportsRefresh = jest.fn().mockResolvedValue(undefined);
+const mockExportReportsRefresh = jest.fn().mockResolvedValue(undefined);
+
 // The real tab content components fetch live data through hooks that need a
 // signed-in session and a database — irrelevant to which tab opens by
 // default, so they're swapped for inert stand-ins here. HomeTabs itself is
 // left real: this test is about the value home.tsx feeds it as `activeTab`,
 // not the tab bar's own rendering, which HomeTabs.test.tsx already covers.
-jest.mock('../../features/establishments/components/ManageEstablishmentsTab', () => ({
-  // React 19 accepts `ref` as a plain prop on function components, so these
-  // stand-ins don't need forwardRef — home.tsx's ref just resolves to null,
-  // which is fine since nothing here calls .refresh().
-  ManageEstablishmentsTab: function ManageEstablishmentsTab() {
-    return null;
-  },
-}));
+//
+// Each stand-in is now a forwardRef exposing the same `refresh()` shape the
+// real components do (ManageReportsTabHandle / ManageEstablishmentsTabHandle
+// / ExportReportsTabHandle) — required to prove home.tsx's pull-to-refresh
+// and sync-subscription wiring actually reaches each tab's ref, not just that
+// *a* component renders. require('react') inside the factory rather than
+// referencing the top-level `React` import: the same out-of-scope rule above
+// applies to it too, and ExportReportsTab.test.tsx's FabVisibilityContext
+// mock already establishes this exact require-inside-the-factory pattern.
+jest.mock('../../features/establishments/components/ManageEstablishmentsTab', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- see comment above
+  const ReactLib = require('react');
+  return {
+    ManageEstablishmentsTab: ReactLib.forwardRef((_props: unknown, ref: unknown) => {
+      ReactLib.useImperativeHandle(ref, () => ({ refresh: mockManageEstablishmentsRefresh }));
+      return null;
+    }),
+  };
+});
 
-jest.mock('../../features/establishments/components/ManageReportsTab', () => ({
-  ManageReportsTab: function ManageReportsTab() {
-    return null;
-  },
-}));
+jest.mock('../../features/establishments/components/ManageReportsTab', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- see comment above
+  const ReactLib = require('react');
+  return {
+    ManageReportsTab: ReactLib.forwardRef((_props: unknown, ref: unknown) => {
+      ReactLib.useImperativeHandle(ref, () => ({ refresh: mockManageReportsRefresh }));
+      return null;
+    }),
+  };
+});
 
 // ExportReportsTab pulls in useReportBrowser -> useAllReports -> WatermelonDB
 // (a real SQLiteAdapter at import time), plus ReportFilterSheet's keyboard
@@ -49,11 +79,16 @@ jest.mock('../../features/establishments/components/ManageReportsTab', () => ({
 // isolation rationale as the two mocks above; ExportReportsTab's own render
 // behavior is covered by ExportReportsTab.test.tsx. Standing in for it here
 // only proves home.tsx wires the real component into the Export case.
-jest.mock('../../features/establishments/components/ExportReportsTab', () => ({
-  ExportReportsTab: function ExportReportsTab() {
-    return null;
-  },
-}));
+jest.mock('../../features/establishments/components/ExportReportsTab', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- see comment above
+  const ReactLib = require('react');
+  return {
+    ExportReportsTab: ReactLib.forwardRef((_props: unknown, ref: unknown) => {
+      ReactLib.useImperativeHandle(ref, () => ({ refresh: mockExportReportsRefresh }));
+      return null;
+    }),
+  };
+});
 
 // HomeScreen starts a `setInterval` to tick the header clock. Left running,
 // it fires again after the test (and its Jest environment) have already
@@ -100,6 +135,25 @@ const switchTab = (r: Renderer, label: string) => {
   act(() => { findTab(r, label).props.onPress(); });
 };
 
+// Exactly one RefreshControl exists in the tree (home.tsx renders it once,
+// wrapping the ScrollView) — `findByType` throws on zero or multiple matches
+// rather than silently resolving the wrong node, same convention as
+// findActiveTabLabel/findTab above. handleRefresh is async, so the resulting
+// promise is awaited inside act() to let its `finally` (setRefreshing(false))
+// settle before the test makes assertions.
+const triggerPullToRefresh = async (r: Renderer) => {
+  await act(async () => {
+    await r.root.findByType(RefreshControl).props.onRefresh();
+  });
+};
+
+beforeEach(() => {
+  mockManageEstablishmentsRefresh.mockClear();
+  mockManageReportsRefresh.mockClear();
+  mockExportReportsRefresh.mockClear();
+  (subscribeToSyncDataChanged as jest.Mock).mockClear();
+});
+
 describe('HomeScreen', () => {
   it('opens on Manage Reports by default, not the retired Create tab', () => {
     const r = render();
@@ -139,5 +193,67 @@ describe('HomeScreen', () => {
     // EmptyState directly from home.tsx. Now that the real tab is wired in,
     // home.tsx itself must never construct an EmptyState element again.
     expect(r.root.findAllByType(EmptyState)).toHaveLength(0);
+  });
+
+  describe('pull-to-refresh', () => {
+    it('refreshes Manage Reports via its handle when that tab is active (the default)', async () => {
+      const r = render();
+      await triggerPullToRefresh(r);
+
+      expect(mockManageReportsRefresh).toHaveBeenCalledTimes(1);
+      expect(mockManageEstablishmentsRefresh).not.toHaveBeenCalled();
+      expect(mockExportReportsRefresh).not.toHaveBeenCalled();
+    });
+
+    // The gap this task closes: ExportReportsTab used to sit outside
+    // handleRefresh entirely, so pulling to refresh while on it just spun and
+    // settled back without ever calling anything.
+    it('refreshes the Export tab via its handle when that tab is active, and does not call the other tabs handles', async () => {
+      const r = render();
+      switchTab(r, 'Export Inspection\nReports');
+
+      await triggerPullToRefresh(r);
+
+      expect(mockExportReportsRefresh).toHaveBeenCalledTimes(1);
+      expect(mockManageReportsRefresh).not.toHaveBeenCalled();
+      expect(mockManageEstablishmentsRefresh).not.toHaveBeenCalled();
+    });
+
+    it('refreshes Manage Establishments via its handle when that tab is active', async () => {
+      const r = render();
+      switchTab(r, 'Manage\nEstablishments');
+
+      await triggerPullToRefresh(r);
+
+      expect(mockManageEstablishmentsRefresh).toHaveBeenCalledTimes(1);
+      expect(mockManageReportsRefresh).not.toHaveBeenCalled();
+      expect(mockExportReportsRefresh).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('sync-data-changed subscription', () => {
+    // A background sync can complete while Home is open on any of the three
+    // tabs. Only the active tab is actually mounted (renderTab() is a
+    // switch), so only its ref is non-null — but the subscription callback
+    // unconditionally calls all three refs, and this asserts the Export
+    // tab's is now one of them (previously it was omitted entirely).
+    it('refreshes the Export tab when a sync completes while it is the active tab', () => {
+      const r = render();
+      switchTab(r, 'Export Inspection\nReports');
+
+      const syncCallback = (subscribeToSyncDataChanged as jest.Mock).mock.calls[0][0];
+      act(() => { syncCallback(); });
+
+      expect(mockExportReportsRefresh).toHaveBeenCalledTimes(1);
+    });
+
+    it('refreshes Manage Reports when a sync completes while it is the active tab (the default)', () => {
+      render();
+
+      const syncCallback = (subscribeToSyncDataChanged as jest.Mock).mock.calls[0][0];
+      act(() => { syncCallback(); });
+
+      expect(mockManageReportsRefresh).toHaveBeenCalledTimes(1);
+    });
   });
 });

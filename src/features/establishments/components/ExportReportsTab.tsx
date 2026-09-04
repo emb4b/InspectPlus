@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { forwardRef, useImperativeHandle, useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Keyboard, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Badge } from '../../../components/Badge';
@@ -21,7 +21,11 @@ import { ReportListCard } from './ReportListCard';
 
 const SKELETON_ROW_HEIGHT = 96;
 
-export const ExportReportsTab: React.FC = () => {
+export interface ExportReportsTabHandle {
+  refresh: () => Promise<void>;
+}
+
+export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref) => {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const browser = useReportBrowser();
@@ -59,6 +63,17 @@ export const ExportReportsTab: React.FC = () => {
   const toggleSelectAll = () => {
     setSelectedKeys(allSelected ? new Set() : new Set(reports.map(report => report.key)));
   };
+
+  // Mirrors ManageReportsTab's handle: Home drives this from pull-to-refresh
+  // and the sync-data-changed subscription. selectedKeys is deliberately left
+  // untouched here — selectedItems above is already derived from the live
+  // `reports` list, so a report that a refresh removes (deleted, or filtered
+  // out by a change synced elsewhere) silently drops out of the selection on
+  // its own, while everything still present stays picked. Clearing the whole
+  // selection on every refresh would punish the common case (an unrelated
+  // background sync landing while the inspector is mid-pick) far more than it
+  // protects against the rare one.
+  useImperativeHandle(ref, () => ({ refresh: refetch }), [refetch]);
 
   // Registered rather than rendered inline: this component mounts inside
   // HomeScreen's ScrollView, so an absolutely-positioned bar would anchor to
@@ -195,7 +210,9 @@ export const ExportReportsTab: React.FC = () => {
       />
     </View>
   );
-};
+});
+
+ExportReportsTab.displayName = 'ExportReportsTab';
 
 const styles = StyleSheet.create({
   container: {
