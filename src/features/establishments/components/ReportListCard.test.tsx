@@ -1,5 +1,6 @@
 import React from 'react';
-import { View } from 'react-native';
+import { View, TouchableOpacity } from 'react-native';
+import { GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import TestRenderer from 'react-test-renderer';
 import { ReportListCard } from './ReportListCard';
@@ -59,6 +60,68 @@ const findReportIcon = (r: Renderer) => {
   }
   return icons[0];
 };
+
+// react-native's own TouchableOpacity module (Libraries/Components/Touchable/
+// TouchableOpacity.js) is itself a thin wrapper that spreads every prop it
+// receives — onPress included — onto an inner, unexported class component of
+// the same displayName, so a props-only predicate (e.g. matching just
+// accessibilityLabel) double-matches: once on the outer wrapper fiber, once
+// on the inner one. Anchoring on `n.type === TouchableOpacity` (the same
+// module reference this file and ReportListCard.tsx both resolve to)
+// narrows a `find`/`findAll` to the outer fiber only, exactly one per
+// on-screen button — confirmed by rendering the card and logging every
+// matching node before writing these locators.
+const findCard = (r: Renderer, item: AllReportItem) =>
+  r.root.find(
+    (n) =>
+      n.type === TouchableOpacity &&
+      n.props?.accessibilityLabel === `${item.title} for ${item.estabName}`,
+  );
+
+const findEditButtons = (r: Renderer, item: AllReportItem) =>
+  r.root.findAll(
+    (n) => n.type === TouchableOpacity && n.props?.accessibilityLabel === `Edit ${item.title}`,
+  );
+
+const findDeleteButtons = (r: Renderer, item: AllReportItem) =>
+  r.root.findAll(
+    (n) => n.type === TouchableOpacity && n.props?.accessibilityLabel === `Delete ${item.title}`,
+  );
+
+// The card's single GestureDetector wraps the swipe-to-reveal pan gesture.
+// Gesture.Pan().enabled(x) stores the flag on the gesture's own `config`
+// object (handlers/gestures/gesture.js), so reading it here inspects the
+// actual recognizer state the native side would honor — not a stand-in like
+// button visibility, which selection mode also changes but which a broken
+// `.enabled()` call would not affect.
+const isPanGestureEnabled = (r: Renderer): boolean =>
+  (r.root.findByType(GestureDetector).props as { gesture: { config: { enabled: boolean } } }).gesture
+    .config.enabled;
+
+// Checkbox is a 22x22 View with a 4px border radius (CHECKBOX_SIZE /
+// Radius.xs in ReportListCard.tsx) — a shape no other View in the card
+// shares. Same throw-on-zero-or-multiple convention as findIconWrap.
+const findCheckboxes = (r: Renderer) => {
+  const views = r.root.findAll((n) => (n.type as any)?.name === 'View' || n.type === View);
+  return views.filter((n) => {
+    const flattened = flattenStyle(n.props.style);
+    return flattened.width === 22 && flattened.height === 22 && flattened.borderRadius === 4;
+  });
+};
+
+const findCheckbox = (r: Renderer) => {
+  const matches = findCheckboxes(r);
+  if (matches.length === 0) {
+    throw new Error('No checkbox View found: expected a View with width===22, height===22, borderRadius===4');
+  }
+  if (matches.length > 1) {
+    throw new Error(`Expected 1 checkbox View but found ${matches.length}; the locator is not sufficiently specific`);
+  }
+  return matches[0];
+};
+
+const findCheckmarkIcons = (r: Renderer) =>
+  r.root.findAllByType(Ionicons).filter((n) => n.props.name === 'checkmark' && n.props.size === 14);
 
 const baseItem: AllReportItem = {
   key: 'survey-1',
@@ -174,5 +237,259 @@ describe('ReportListCard report-type icon', () => {
     const icon = findReportIcon(r);
     expect(icon.props.name).toBe('document-outline');
     expect(icon.props.color).toBe(Colors.textMuted);
+  });
+});
+
+// An inspection report, in draft, owned by the viewer — this combination is
+// what makes both showEdit and showDelete true, which in turn is what makes
+// the swipe gesture enabled by default. Using it (rather than baseItem,
+// where neither action shows and the gesture is already off) is what lets
+// the selection-mode tests below prove selection mode is what turns the
+// gesture off, not that it was off already.
+const ownedDraftInspection: AllReportItem = {
+  ...baseItem,
+  key: 'inspection-1',
+  kind: 'inspection',
+  reportType: 'water_monitoring',
+  inspectorUid: 'uid-1',
+  status: 'draft',
+};
+
+describe('ReportListCard selection mode', () => {
+  it('renders no checkbox when not selectable', () => {
+    const r = render(
+      <ReportListCard item={ownedDraftInspection} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    expect(findCheckboxes(r)).toHaveLength(0);
+  });
+
+  it('renders a checkbox when selectable', () => {
+    const r = render(
+      <ReportListCard
+        item={ownedDraftInspection}
+        currentUid="uid-1"
+        canManageAll={false}
+        selectable
+        onPress={noop}
+        onEdit={noop}
+        onDelete={noop}
+        onToggleSelect={noop}
+      />,
+    );
+    expect(findCheckbox(r)).toBeDefined();
+  });
+
+  it('renders the checkbox unchecked, distinctly from the checked state, when selected is false', () => {
+    const r = render(
+      <ReportListCard
+        item={ownedDraftInspection}
+        currentUid="uid-1"
+        canManageAll={false}
+        selectable
+        selected={false}
+        onPress={noop}
+        onEdit={noop}
+        onDelete={noop}
+        onToggleSelect={noop}
+      />,
+    );
+    const checkboxStyle = flattenStyle(findCheckbox(r).props.style);
+    expect(checkboxStyle.backgroundColor).not.toBe(Colors.accent);
+    expect(findCheckmarkIcons(r)).toHaveLength(0);
+  });
+
+  it('renders the checkbox checked, distinctly from the unchecked state, when selected is true', () => {
+    const r = render(
+      <ReportListCard
+        item={ownedDraftInspection}
+        currentUid="uid-1"
+        canManageAll={false}
+        selectable
+        selected
+        onPress={noop}
+        onEdit={noop}
+        onDelete={noop}
+        onToggleSelect={noop}
+      />,
+    );
+    const checkboxStyle = flattenStyle(findCheckbox(r).props.style);
+    expect(checkboxStyle.backgroundColor).toBe(Colors.accent);
+    expect(findCheckmarkIcons(r)).toHaveLength(1);
+  });
+
+  it('opens the report on press when not selectable, and never touches onToggleSelect', () => {
+    const onPress = jest.fn();
+    const onToggleSelect = jest.fn();
+    const r = render(
+      <ReportListCard
+        item={ownedDraftInspection}
+        currentUid="uid-1"
+        canManageAll={false}
+        onPress={onPress}
+        onEdit={noop}
+        onDelete={noop}
+        onToggleSelect={onToggleSelect}
+      />,
+    );
+
+    TestRenderer.act(() => {
+      findCard(r, ownedDraftInspection).props.onPress();
+    });
+
+    expect(onPress).toHaveBeenCalledWith(ownedDraftInspection);
+    expect(onToggleSelect).not.toHaveBeenCalled();
+  });
+
+  it('toggles selection instead of opening the report when selectable, and never touches onPress', () => {
+    const onPress = jest.fn();
+    const onToggleSelect = jest.fn();
+    const r = render(
+      <ReportListCard
+        item={ownedDraftInspection}
+        currentUid="uid-1"
+        canManageAll={false}
+        selectable
+        onPress={onPress}
+        onEdit={noop}
+        onDelete={noop}
+        onToggleSelect={onToggleSelect}
+      />,
+    );
+
+    TestRenderer.act(() => {
+      findCard(r, ownedDraftInspection).props.onPress();
+    });
+
+    expect(onToggleSelect).toHaveBeenCalledWith(ownedDraftInspection);
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it('exposes accessibilityRole="button" and no accessibilityState when not selectable', () => {
+    const r = render(
+      <ReportListCard item={ownedDraftInspection} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    const card = findCard(r, ownedDraftInspection);
+    expect(card.props.accessibilityRole).toBe('button');
+    expect(card.props.accessibilityState).toBeUndefined();
+  });
+
+  it('exposes accessibilityRole="checkbox" and a checked accessibilityState reflecting `selected`', () => {
+    const r = render(
+      <ReportListCard
+        item={ownedDraftInspection}
+        currentUid="uid-1"
+        canManageAll={false}
+        selectable
+        selected
+        onPress={noop}
+        onEdit={noop}
+        onDelete={noop}
+        onToggleSelect={noop}
+      />,
+    );
+    const card = findCard(r, ownedDraftInspection);
+    expect(card.props.accessibilityRole).toBe('checkbox');
+    expect(card.props.accessibilityState).toEqual({ checked: true });
+  });
+
+  it('reflects selected=false in accessibilityState too, not just selected=true', () => {
+    const r = render(
+      <ReportListCard
+        item={ownedDraftInspection}
+        currentUid="uid-1"
+        canManageAll={false}
+        selectable
+        selected={false}
+        onPress={noop}
+        onEdit={noop}
+        onDelete={noop}
+        onToggleSelect={noop}
+      />,
+    );
+    expect(findCard(r, ownedDraftInspection).props.accessibilityState).toEqual({ checked: false });
+  });
+});
+
+describe('ReportListCard swipe gesture', () => {
+  it('is enabled outside selection mode when at least one swipe action is visible', () => {
+    // ownedDraftInspection has both showEdit and showDelete true, so this
+    // also doubles as the control for the "selectable turns it off" test
+    // below — same item, only `selectable` differs.
+    const r = render(
+      <ReportListCard item={ownedDraftInspection} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    expect(isPanGestureEnabled(r)).toBe(true);
+  });
+
+  it('is disabled in selection mode even though the same item would otherwise show swipe actions', () => {
+    const r = render(
+      <ReportListCard
+        item={ownedDraftInspection}
+        currentUid="uid-1"
+        canManageAll={false}
+        selectable
+        onPress={noop}
+        onEdit={noop}
+        onDelete={noop}
+        onToggleSelect={noop}
+      />,
+    );
+    expect(isPanGestureEnabled(r)).toBe(false);
+  });
+
+  it('stays disabled outside selection mode when no swipe action is visible (unchanged prior behavior)', () => {
+    // baseItem is a survey report, so both showEdit and showDelete are
+    // false regardless of ownership — this is the pre-existing "nothing to
+    // reveal" case that selection mode must not be needed to reproduce.
+    const r = render(
+      <ReportListCard item={baseItem} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    expect(isPanGestureEnabled(r)).toBe(false);
+  });
+});
+
+describe('ReportListCard Edit/Delete visibility (unchanged by this task)', () => {
+  it('shows both Edit and Delete for a draft inspection report owned by the viewer', () => {
+    const r = render(
+      <ReportListCard item={ownedDraftInspection} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    expect(findEditButtons(r, ownedDraftInspection)).toHaveLength(1);
+    expect(findDeleteButtons(r, ownedDraftInspection)).toHaveLength(1);
+  });
+
+  it('hides Edit but keeps Delete once an owned inspection report is submitted', () => {
+    const submitted: AllReportItem = { ...ownedDraftInspection, status: 'submitted' };
+    const r = render(
+      <ReportListCard item={submitted} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    expect(findEditButtons(r, submitted)).toHaveLength(0);
+    expect(findDeleteButtons(r, submitted)).toHaveLength(1);
+  });
+
+  it('hides both Edit and Delete for a draft inspection report the viewer does not own and cannot manage', () => {
+    const othersReport: AllReportItem = { ...ownedDraftInspection, inspectorUid: 'someone-else' };
+    const r = render(
+      <ReportListCard item={othersReport} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    expect(findEditButtons(r, othersReport)).toHaveLength(0);
+    expect(findDeleteButtons(r, othersReport)).toHaveLength(0);
+  });
+
+  it('shows both Edit and Delete for a report the viewer does not own when canManageAll is true (Developer account)', () => {
+    const othersReport: AllReportItem = { ...ownedDraftInspection, inspectorUid: 'someone-else' };
+    const r = render(
+      <ReportListCard item={othersReport} currentUid="uid-1" canManageAll onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    expect(findEditButtons(r, othersReport)).toHaveLength(1);
+    expect(findDeleteButtons(r, othersReport)).toHaveLength(1);
+  });
+
+  it('never shows Edit or Delete for a survey report, even when owned and manageable', () => {
+    const surveyReport: AllReportItem = { ...ownedDraftInspection, kind: 'survey' };
+    const r = render(
+      <ReportListCard item={surveyReport} currentUid="uid-1" canManageAll onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    expect(findEditButtons(r, surveyReport)).toHaveLength(0);
+    expect(findDeleteButtons(r, surveyReport)).toHaveLength(0);
   });
 });
