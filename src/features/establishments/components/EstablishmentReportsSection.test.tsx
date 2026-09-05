@@ -7,7 +7,7 @@ import { EstablishmentReportsSection } from './EstablishmentReportsSection';
 import { REPORT_TYPE_DISPLAY, ReportDataKey } from '../../../constants/reportTypeDisplay';
 import { Colors } from '../../../design/colors';
 import { Radius } from '../../../design/radius';
-import { Type } from '../../../design/typography';
+import { FONT_SCALING, Type } from '../../../design/typography';
 import type { EstablishmentReportItem } from '../hooks/useEstablishment';
 
 type Renderer = TestRenderer.ReactTestRenderer;
@@ -244,7 +244,7 @@ describe('EstablishmentReportsSection report row token resolution', () => {
     expect(dateStyle.lineHeight).toBe(Type.label.lineHeight);
   });
 
-  it('resolves the control number style from Type.caption with OS font scaling disabled', () => {
+  it('resolves the control number style from Type.label (matching the date) with OS font scaling disabled', () => {
     const r = render(
       <EstablishmentReportsSection
         reports={[baseItem]}
@@ -256,8 +256,14 @@ describe('EstablishmentReportsSection report row token resolution', () => {
       />,
     );
     const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === baseItem.controlNo);
-    expect(flattenStyle(controlNoText?.props.style).fontSize).toBe(Type.caption.fontSize);
-    expect(controlNoText?.props.allowFontScaling).toBe(false);
+    const controlNoStyle = flattenStyle(controlNoText?.props.style);
+    // The bug this task fixes: the control number used to resolve
+    // Type.caption (11/14) while the date beside it resolves Type.label
+    // (12/16) — two different sizes on one row don't share a baseline.
+    expect(controlNoStyle.fontSize).toBe(Type.label.fontSize);
+    expect(controlNoStyle.lineHeight).toBe(Type.label.lineHeight);
+    expect(controlNoStyle.fontFamily).toBe('monospace');
+    expect(controlNoText?.props.allowFontScaling).toBe(FONT_SCALING.tabular);
   });
 
   it("falls back to 'No control number yet' when controlNo is null", () => {
@@ -304,6 +310,83 @@ describe('EstablishmentReportsSection date + control number row', () => {
     expect(rowChildren).toContain(controlNoText);
   });
 
+  // The bug this task fixes: the date and control number now sit side by
+  // side on one row but used to resolve two different sizes/lineHeights
+  // (Type.label vs Type.caption), so they didn't share a baseline. Asserting
+  // a direct comparison between the two resolved values — rather than each
+  // pinned separately to a token — is what keeps this test failing if either
+  // side drifts back out of sync, independent of which token wins. Mirrors
+  // ReportListCard.test.tsx's equivalent assertion.
+  it("resolves the control number's fontSize and lineHeight to exactly match the date's, so they share a baseline", () => {
+    const r = render(
+      <EstablishmentReportsSection
+        reports={[baseItem]}
+        currentUid="uid-1"
+        canManageAll={false}
+        onAddReport={noop}
+        onOpenReport={noop}
+        onDeleteReport={noop}
+      />,
+    );
+    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === baseItem.controlNo);
+    const dateText = proseTexts(r).find((n) => flattenStyle(n.props.style).color === Colors.textMuted);
+    const dateStyle = flattenStyle(dateText?.props.style);
+    const controlNoStyle = flattenStyle(controlNoText?.props.style);
+
+    expect(controlNoStyle.fontSize).toBe(dateStyle.fontSize);
+    expect(controlNoStyle.lineHeight).toBe(dateStyle.lineHeight);
+
+    // Colour is what keeps the date reading as primary and the control
+    // number as secondary now that size no longer does that job — they must
+    // not have been flattened to the same colour along the way.
+    expect(controlNoStyle.color).not.toBe(dateStyle.color);
+    expect(dateStyle.color).toBe(Colors.textMuted);
+    expect(controlNoStyle.color).toBe(Colors.textLight);
+  });
+
+  // The second bug this task fixes: the control number had no icon of its
+  // own, unlike the date's calendar-outline. pricetag-outline is the same
+  // glyph InspectionReportHeader.tsx already uses for a control number
+  // elsewhere in the app.
+  it('renders a decorative pricetag-outline icon immediately before the control number text', () => {
+    const r = render(
+      <EstablishmentReportsSection
+        reports={[baseItem]}
+        currentUid="uid-1"
+        canManageAll={false}
+        onAddReport={noop}
+        onOpenReport={noop}
+        onDeleteReport={noop}
+      />,
+    );
+    const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
+    const pricetagIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'pricetag-outline');
+    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === baseItem.controlNo);
+    expect(pricetagIcon).toBeDefined();
+    expect(controlNoText).toBeDefined();
+
+    // Decorative: the control number text right beside it already carries
+    // the meaning, so this icon must stay out of the accessibility tree —
+    // same convention as Button.tsx's own icons.
+    expect(pricetagIcon?.props.importantForAccessibility).toBe('no');
+
+    // Matches the calendar icon's own size/color treatment so the two icons
+    // in this row read as one family.
+    expect(pricetagIcon?.props.size).toBe(calendarIcon?.props.size);
+    expect(pricetagIcon?.props.color).toBe(calendarIcon?.props.color);
+
+    // Immediately before the control number text, mirroring how the
+    // calendar icon precedes the date, within the shared date row.
+    const rowChildren = calendarIcon!.parent!.children;
+    const iconIndex = rowChildren.indexOf(pricetagIcon!);
+    const textIndex = rowChildren.indexOf(controlNoText!);
+    expect(iconIndex).toBeGreaterThanOrEqual(0);
+    expect(textIndex).toBe(iconIndex + 1);
+
+    // Never squeezed by a long control number sharing the row.
+    expect(flattenStyle(pricetagIcon?.props.style).flexShrink).toBe(0);
+  });
+
   it('never lets a long control number push the urgency badge out of the row or clip the date', () => {
     const longControlNo = 'CTRL-2026-0000001-EXTREMELY-LONG-CONTROL-NUMBER-VALUE';
     const item: EstablishmentReportItem = {
@@ -337,13 +420,17 @@ describe('EstablishmentReportsSection date + control number row', () => {
     expect(dateText).toBeDefined();
 
     // The control number is the element that shrinks/truncates (flex: 1,
-    // numberOfLines 1) — the date and badge are pinned (flexShrink: 0) so
-    // neither can be squeezed out by it.
+    // numberOfLines 1) — the date, its icon, and the badge are pinned
+    // (flexShrink: 0) so none of them can be squeezed out by it.
     const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === longControlNo);
     expect(flattenStyle(controlNoText?.props.style).flex).toBe(1);
     expect(controlNoText?.props.numberOfLines).toBe(1);
     expect(flattenStyle(dateText?.props.style).flexShrink).toBe(0);
     expect(flattenStyle(badge?.props.style).flexShrink).toBe(0);
+
+    const pricetagIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'pricetag-outline');
+    expect(pricetagIcon).toBeDefined();
+    expect(flattenStyle(pricetagIcon?.props.style).flexShrink).toBe(0);
   });
 });
 
