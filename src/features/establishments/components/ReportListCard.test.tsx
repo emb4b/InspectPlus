@@ -48,6 +48,35 @@ const proseTexts = (r: Renderer) => {
   return r.root.findAllByType(Text).filter((n) => !glyphs.has(n));
 };
 
+// This task made the control number resolve to Colors.textMuted too (it now
+// shares the date's exact style), so a bare color-based lookup for the date
+// text would double-match date + control number, on top of the calendar
+// icon's own glyph Text that proseTexts() already excludes. The control
+// number is already locatable unambiguously by its own text content
+// (item.controlNo), so excluding it here narrows the remaining color match
+// back down to exactly one. Throws if zero or more than one candidate
+// remains — same zero-or-multiple guard as findIconWrap/findReportIcon
+// below.
+const findDateText = (r: Renderer, excluding?: TestRenderer.ReactTestInstance) => {
+  const matches = proseTexts(r).filter(
+    (n) => flattenStyle(n.props.style).color === Colors.textMuted && n !== excluding,
+  );
+  if (matches.length === 0) {
+    throw new Error('No date Text found: expected a prose Text with color === Colors.textMuted');
+  }
+  if (matches.length > 1) {
+    throw new Error(`Expected 1 date Text but found ${matches.length}; the locator is not sufficiently specific`);
+  }
+  return matches[0];
+};
+
+// RN defaults allowFontScaling to true when the prop is omitted entirely, as
+// the date Text does — normalizing through this lets the control number's
+// explicit FONT_SCALING.content and the date's implicit default be compared
+// as equal.
+const resolvedAllowFontScaling = (n: TestRenderer.ReactTestInstance | undefined): boolean =>
+  (n?.props.allowFontScaling as boolean | undefined) ?? true;
+
 // Locate the report-icon wrap View by its resolved shape styles (width 38 /
 // height 38 / borderRadius 8 — unique to this element in ReportListCard).
 // Throws if zero or more than one match is found, per the Card/Badge
@@ -664,7 +693,7 @@ describe('ReportListCard date + control number row', () => {
     const rowChildren = calendarIcon!.parent!.children;
 
     const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === baseItem.controlNo);
-    const dateText = proseTexts(r).find((n) => flattenStyle(n.props.style).color === Colors.textMuted);
+    const dateText = findDateText(r, controlNoText);
 
     expect(dateText).toBeDefined();
     expect(controlNoText).toBeDefined();
@@ -672,43 +701,57 @@ describe('ReportListCard date + control number row', () => {
     expect(rowChildren).toContain(controlNoText);
   });
 
-  it('keeps the control number opted out of OS font scaling and now truncating to a single line', () => {
+  // This task's fix: the control number used to opt out of OS font scaling
+  // (FONT_SCALING.tabular) because it sat alone on its own line, where an
+  // over-long value would overflow. It now shares the date row, and
+  // numberOfLines={1}/ellipsizeMode="tail" (asserted below) make it truncate
+  // instead of overflow — the truncation is what protects the row now, so
+  // the control number no longer needs a scaling opt-out and instead scales
+  // with the OS font exactly like the date.
+  it('keeps the control number truncating to a single line, now scaling with the OS font exactly like the date', () => {
     const r = render(
       <ReportListCard item={baseItem} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
     );
     const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === baseItem.controlNo);
-    expect(controlNoText?.props.allowFontScaling).toBe(FONT_SCALING.tabular);
+    const dateText = findDateText(r, controlNoText);
     expect(controlNoText?.props.numberOfLines).toBe(1);
     expect(controlNoText?.props.ellipsizeMode).toBe('tail');
-    // Fixed-format identifier: the monospace family is semantic, not
-    // decorative, and must survive the typography fix below untouched.
-    expect(flattenStyle(controlNoText?.props.style).fontFamily).toBe('monospace');
+    // Compared against the date's own resolved value (not a separate token
+    // pin) so this keeps failing if either side drifts back out of sync.
+    expect(resolvedAllowFontScaling(controlNoText)).toBe(resolvedAllowFontScaling(dateText));
+    expect(resolvedAllowFontScaling(controlNoText)).toBe(true);
+    // Also pins the actual prop to the named policy token, confirming the
+    // source switched to FONT_SCALING.content specifically (not just some
+    // other truthy value that happens to match the date's default).
+    expect(controlNoText?.props.allowFontScaling).toBe(FONT_SCALING.content);
   });
 
   // The bug this task fixes: the date and control number now sit side by
   // side on one row but used to resolve two different sizes/lineHeights
-  // (Type.label vs Type.caption), so they didn't share a baseline. Asserting
-  // a direct comparison between the two resolved values — rather than each
-  // pinned separately to a token — is what keeps this test failing if either
-  // side drifts back out of sync, independent of which token wins.
-  it("resolves the control number's fontSize and lineHeight to exactly match the date's, so they share a baseline", () => {
+  // (Type.label vs Type.caption), and different colours/families on top of
+  // that. Asserting direct comparisons between the two resolved values —
+  // rather than each pinned separately to a token — is what keeps this test
+  // failing if either side drifts back out of sync, independent of which
+  // token wins.
+  it("resolves the control number's fontSize, lineHeight, color and font family to exactly match the date's", () => {
     const r = render(
       <ReportListCard item={baseItem} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
     );
     const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === baseItem.controlNo);
-    const dateText = proseTexts(r).find((n) => flattenStyle(n.props.style).color === Colors.textMuted);
+    const dateText = findDateText(r, controlNoText);
     const dateStyle = flattenStyle(dateText?.props.style);
     const controlNoStyle = flattenStyle(controlNoText?.props.style);
 
     expect(controlNoStyle.fontSize).toBe(dateStyle.fontSize);
     expect(controlNoStyle.lineHeight).toBe(dateStyle.lineHeight);
 
-    // Colour is what keeps the date reading as primary and the control
-    // number as secondary now that size no longer does that job — they must
-    // not have been flattened to the same colour along the way.
-    expect(controlNoStyle.color).not.toBe(dateStyle.color);
-    expect(dateStyle.color).toBe(Colors.textMuted);
-    expect(controlNoStyle.color).toBe(Colors.textLight);
+    // The two are meant to read as one style now that they share a row —
+    // colour and font family (no more 'monospace' override) both now match
+    // the date's exactly, instead of the date/control-number colour
+    // distinction the row used to carry.
+    expect(controlNoStyle.color).toBe(dateStyle.color);
+    expect(controlNoStyle.color).toBe(Colors.textMuted);
+    expect(controlNoStyle.fontFamily).toBe(dateStyle.fontFamily);
   });
 
   // The second bug this task fixes: the control number had no icon of its
@@ -767,15 +810,18 @@ describe('ReportListCard date + control number row', () => {
     expect(badge).toBeDefined();
     expect(proseTexts(r).some((n) => n.props.children === 'Overdue')).toBe(true);
 
-    // The date text is still present and untouched — it's the control
-    // number that gives way, not the date.
-    const dateText = proseTexts(r).find((n) => flattenStyle(n.props.style).color === Colors.textMuted);
-    expect(dateText).toBeDefined();
-
     // The control number is the element that shrinks/truncates (flex: 1,
     // numberOfLines 1) — the date, its icon, and the badge are pinned
     // (flexShrink: 0) so none of them can be squeezed out by it.
     const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === longControlNo);
+    expect(controlNoText).toBeDefined();
+
+    // The date text is still present and untouched — it's the control
+    // number that gives way, not the date. Located excluding the control
+    // number, since both now resolve to Colors.textMuted (this task's fix).
+    const dateText = findDateText(r, controlNoText);
+    expect(dateText).toBeDefined();
+
     expect(flattenStyle(controlNoText?.props.style).flex).toBe(1);
     expect(controlNoText?.props.numberOfLines).toBe(1);
     expect(flattenStyle(dateText?.props.style).flexShrink).toBe(0);

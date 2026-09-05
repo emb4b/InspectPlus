@@ -226,20 +226,26 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
                   style={styles.controlNoIcon}
                   importantForAccessibility="no"
                 />
-                {/* Fixed-format monospace: OS font scaling blows it past the
-                    row width, so it opts out per the FONT_SCALING policy —
-                    matches EstablishmentReportsSection's controlNo. Shares
-                    this row with the date; flexShrink+numberOfLines let it
-                    truncate first so a long control number can't clip the
-                    date or push an urgency badge off the row. Sized and
-                    line-heighted identically to the date (Type.label) so the
-                    two share one baseline now that they sit side by side;
-                    Colors.textLight (vs. the date's Colors.textMuted) is what
-                    keeps the date reading as primary and the control number
-                    as secondary. */}
+                {/* The control number now shares the date's exact style —
+                    size, line height, colour and font family — rather than
+                    merely matching size, because the two sit side by side on
+                    one row and are meant to read as one. FONT_SCALING.tabular
+                    (OS font scaling disabled) existed to protect this text
+                    when it sat alone on its own line with no truncation; it
+                    now carries numberOfLines={1}/ellipsizeMode="tail" below,
+                    so an over-long value truncates rather than overflowing —
+                    that's what protects the row now, so the scaling opt-out
+                    would only reintroduce a new inconsistency (the date
+                    growing under a large system font while this stayed
+                    fixed). It switches to FONT_SCALING.content, the same
+                    scaling behavior as the date. flexShrink (via flex: 1
+                    below) still makes this the element that truncates first,
+                    so a long control number still can't clip the date or
+                    push the urgency badge off the row — matches
+                    EstablishmentReportsSection's controlNo. */}
                 <Text
                   style={styles.controlNo}
-                  allowFontScaling={FONT_SCALING.tabular}
+                  allowFontScaling={FONT_SCALING.content}
                   numberOfLines={1}
                   ellipsizeMode="tail">
                   {item.controlNo || 'No control number yet'}
@@ -466,19 +472,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   controlNo: {
-    // Matches the date's Type.label size/lineHeight exactly so the two sit
-    // on a shared baseline now that they're side by side on one row — a
-    // mismatched size read fine when the control number was a subordinate
-    // line beneath the date, but not beside it. Colors.textLight (vs. the
-    // date's Colors.textMuted) is now what keeps the date leading and the
-    // control number secondary.
+    // Identical to the date's style below — size, line height, colour and
+    // font family — now that the two sit side by side on one row and are
+    // meant to read as one. There is no fontFamily override here (it used to
+    // be 'monospace'): dropping it leaves this on the same default family as
+    // the date, which is what "same font style" means for this row.
     fontSize: Type.label.fontSize,
     lineHeight: Type.label.lineHeight,
-    color: Colors.textLight,
-    fontFamily: 'monospace',
+    color: Colors.textMuted,
     // Shares the date row rather than sitting on its own line below it;
-    // it's the one that shrinks/truncates so a long value can't clip the
-    // date or shove the urgency badge off the row.
+    // it's the one that shrinks/truncates (together with numberOfLines and
+    // ellipsizeMode above) so a long value can't clip the date or shove the
+    // urgency badge off the row.
     flex: 1,
     minWidth: 0,
   },
