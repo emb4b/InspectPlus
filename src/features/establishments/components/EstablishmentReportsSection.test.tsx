@@ -115,19 +115,41 @@ const findDateText = (r: Renderer, excluding?: TestRenderer.ReactTestInstance) =
 const resolvedAllowFontScaling = (n: TestRenderer.ReactTestInstance | undefined): boolean =>
   (n?.props.allowFontScaling as boolean | undefined) ?? true;
 
+// Locates dateRow's own direct children via the calendar icon's parent —
+// throws on zero-or-multiple calendar icons so a structural change upstream
+// fails loudly here rather than silently returning the wrong row.
+const findDateRowChildren = (r: Renderer): TestRenderer.ReactTestInstance[] => {
+  const calendarIcons = r.root.findAllByType(Ionicons).filter((n) => n.props.name === 'calendar-outline');
+  if (calendarIcons.length === 0) {
+    throw new Error('No calendar-outline Ionicons found: expected exactly one in the date row');
+  }
+  if (calendarIcons.length > 1) {
+    throw new Error(`Expected 1 calendar-outline Ionicons but found ${calendarIcons.length}; the locator is not sufficiently specific`);
+  }
+  return calendarIcons[0].parent!.children as TestRenderer.ReactTestInstance[];
+};
+
 // The pricetag icon and the control-number text are glued together inside a
-// shared container (`controlNoGroup`) so the icon can't be stranded mid-row
-// once the group is pushed to the end of dateRow via its own
-// `marginLeft: 'auto'` — a style value unique to this one element in the
-// row. Same throw-on-zero-or-multiple convention as findIconWrap above.
+// shared container (`controlNoGroup`). This locates that container by two
+// properties that are stable across a change of *alignment technique* —
+// its structural position as a direct child of dateRow, and the fact that
+// it (uniquely, among dateRow's children) contains the pricetag icon —
+// rather than by the alignment mechanism itself (e.g. a specific style
+// value like marginLeft: 'auto' or flexGrow: 1). That mechanism is exactly
+// what this task changed once already (marginLeft: 'auto' -> flexGrow +
+// justifyContent), and a locator pinned to it would have silently stopped
+// finding anything the moment the mechanism changed again. Throws on
+// zero-or-multiple matches, same convention as findIconWrap above.
 const findControlNoGroup = (r: Renderer) => {
-  const views = r.root.findAll((n) => (n.type as any)?.name === 'View' || n.type === View);
-  const matches = views.filter((n) => flattenStyle(n.props.style).marginLeft === 'auto');
+  const rowChildren = findDateRowChildren(r);
+  const matches = rowChildren.filter((c) =>
+    c.findAllByType(Ionicons).some((n) => n.props.name === 'pricetag-outline'),
+  );
   if (matches.length === 0) {
-    throw new Error("No control-number group View found: expected a View with marginLeft === 'auto'");
+    throw new Error('No control-number group found among dateRow children: expected one containing the pricetag icon');
   }
   if (matches.length > 1) {
-    throw new Error(`Expected 1 control-number group View but found ${matches.length}; the locator is not sufficiently specific`);
+    throw new Error(`Expected 1 control-number group among dateRow children but found ${matches.length}; the locator is not sufficiently specific`);
   }
   return matches[0];
 };
@@ -562,8 +584,20 @@ describe('EstablishmentReportsSection date + control number row', () => {
 
   // The flip side of the long-control-number test above: a short value must
   // not fall back to sitting right after the date either — the group's
-  // marginLeft: 'auto' keeps it pinned to the end of the row regardless of
-  // how little space it actually needs.
+  // flexGrow: 1 + justifyContent: 'flex-end' keeps it pinned to the end of
+  // the row regardless of how little space it actually needs.
+  //
+  // IMPORTANT CAVEAT: react-test-renderer performs no Yoga/flexbox layout
+  // at all — flattenStyle() below only confirms the *styling contract*
+  // (which properties are declared and with what values), never that Yoga
+  // actually resolves them into the group sitting flush against the row's
+  // right edge on a real device. That gap is exactly what let the
+  // marginLeft: 'auto' version of this ship looking done — style-applied
+  // assertions passed while the on-device row was pixel-identical to no
+  // alignment at all. Confirming the group truly lands at the end of the
+  // row (with visible empty space between it and the date/badge for a
+  // short value like this one) requires a real device or simulator check,
+  // not this suite.
   it('keeps a short control number at the end of the row (right-aligned), not sitting immediately after the date', () => {
     const item: EstablishmentReportItem = {
       ...baseItem,
@@ -591,9 +625,16 @@ describe('EstablishmentReportsSection date + control number row', () => {
       .find((n) => flattenStyle(n.props.style).backgroundColor === Colors.hazwaste.badgeBg);
     const group = findControlNoGroup(r);
 
-    // The mechanism: marginLeft: 'auto' on the group is what pushes it to
-    // the row's end regardless of the control number's own width.
-    expect(flattenStyle(group.props.style).marginLeft).toBe('auto');
+    // The mechanism: the group grows to claim the row's remaining space
+    // (flexGrow: 1) and right-aligns its own children within that space
+    // (justifyContent: 'flex-end'), regardless of the control number's own
+    // width. Asserted as the pair that together express "end-aligned",
+    // rather than pinning a single property name — so a future swap of
+    // *which* flex properties accomplish this doesn't reflexively break
+    // this test the way the marginLeft: 'auto' pin did.
+    const groupStyle = flattenStyle(group.props.style);
+    expect(groupStyle.flexGrow).toBe(1);
+    expect(groupStyle.justifyContent).toBe('flex-end');
 
     expect(rowChildren[0]).toBe(calendarIcon);
     expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(badge!));

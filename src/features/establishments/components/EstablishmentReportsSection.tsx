@@ -158,14 +158,22 @@ const ReportRow: React.FC<{
                   </View>
                 )}
                 {/* The pricetag icon and control number travel together as
-                    one unit, pushed to the end of the row by marginLeft:
-                    'auto' on the group (below) rather than sitting right
-                    after the date — the date, its icon, and the urgency
-                    badge all stay put at the start via their own
-                    flexShrink: 0. dateRow's existing `gap` still guarantees
-                    a minimum separation from the badge even when the group
-                    is short enough that the auto margin alone would leave no
-                    gap. */}
+                    one unit, pushed to the end of the row by flexGrow: 1 +
+                    justifyContent: 'flex-end' on the group (below) rather
+                    than sitting right after the date — the date, its icon,
+                    and the urgency badge all stay put at the start via
+                    their own flexShrink: 0. dateRow's existing `gap` still
+                    guarantees a minimum separation from the badge even when
+                    the group is short enough that it wouldn't otherwise
+                    need the room. (An earlier version of this used
+                    marginLeft: 'auto' instead, which reads as "push me to
+                    the end" but silently no-ops in Yoga on some RN
+                    versions when the parent row also declares `gap` — the
+                    row rendered pixel-identical to no alignment at all,
+                    passing every unit test because they only asserted the
+                    style prop was applied, never that the group actually
+                    moved. flexGrow + justifyContent doesn't depend on that
+                    auto-margin/gap interaction at all.) */}
                 <View style={styles.controlNoGroup}>
                   {/* Decorative: the control number text right beside it
                       already carries the meaning, so it stays out of the
@@ -409,19 +417,24 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   // Glues the pricetag icon and control number text together as one unit
-  // and pushes that unit to the end of dateRow via marginLeft: 'auto' —
-  // dateRow deliberately keeps flexDirection: 'row' rather than
-  // justifyContent: 'space-between', which would also spread the date, icon
-  // and badge apart. flexShrink: 1 plus minWidth: 0 (rather than the
-  // default flexShrink: 0 every other dateRow child pins explicitly) let
-  // this group give way when a long control number would otherwise overflow
-  // the row, so controlNo's own flex: 1/numberOfLines still get a chance to
-  // truncate it instead of the row overflowing.
+  // and pushes that unit to the end of dateRow by growing to fill the row's
+  // remaining space (flexGrow: 1) and right-aligning its own children
+  // (justifyContent: 'flex-end') — dateRow deliberately keeps
+  // flexDirection: 'row' rather than justifyContent: 'space-between', which
+  // would also spread the date, icon and badge apart. flexShrink: 1 plus
+  // minWidth: 0 (rather than the default flexShrink: 0 every other dateRow
+  // child pins explicitly) let this group give way when a long control
+  // number would otherwise overflow the row, so controlNo's own flex: 1/
+  // numberOfLines still get a chance to truncate it instead of the row
+  // overflowing. The icon and text stay adjacent (only the `gap` above
+  // separates them) so flex-end carries them to the row's end together —
+  // the icon can't be stranded mid-row on its own.
   controlNoGroup: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: Spacing.xs,
-    marginLeft: 'auto',
+    flexGrow: 1,
     flexShrink: 1,
     minWidth: 0,
   },
