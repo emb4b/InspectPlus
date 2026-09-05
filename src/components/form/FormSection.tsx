@@ -1,7 +1,9 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../constants/colors';
+import { Colors } from '../../design/colors';
+import { Spacing } from '../../design/spacing';
+import { Type } from '../../design/typography';
 import { AppText } from '../AppText';
 
 interface FormSectionProps {
@@ -33,27 +35,37 @@ export const FormSection: React.FC<FormSectionProps> = ({ icon, title, headerRig
 
 const styles = StyleSheet.create({
   section: {
-    marginBottom: 28,
+    // Bare 28 sat off the 4dp rhythm, equidistant between xl (24) and xxl
+    // (32); resolved up to xxl since this is the block-separating margin
+    // between one whole form section and the next - the biggest
+    // block-separator role in this file, so it takes the larger candidate,
+    // same tie-break direction as ChecklistTable's own bare-10 `wrap`.
+    marginBottom: Spacing.xxl,
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: 7,
-    paddingBottom: 8,
-    marginBottom: 16,
+    // Bare 7 sat off the 4dp rhythm, nearer to sm (8) than xs (4).
+    gap: Spacing.sm,
+    paddingBottom: Spacing.sm,
+    marginBottom: Spacing.lg,
     borderBottomWidth: 2,
     borderBottomColor: Colors.border,
   },
   titleLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    // Same bare-7 resolution as titleRow above - this is the icon-to-title
+    // gap, but 7 is decisively nearer sm (8) than xs (4), not a tie, so the
+    // icon/text convention doesn't override it.
+    gap: Spacing.sm,
     flex: 1,
     minWidth: 0,
   },
   title: {
-    fontSize: 15,
+    fontSize: Type.subheading.fontSize,
+    lineHeight: Type.subheading.lineHeight,
     fontWeight: '700',
     color: Colors.navy,
   },

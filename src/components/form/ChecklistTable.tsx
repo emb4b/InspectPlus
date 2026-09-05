@@ -1,6 +1,9 @@
 import React, { useRef } from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
-import { Colors } from '../../constants/colors';
+import { Colors } from '../../design/colors';
+import { Radius } from '../../design/radius';
+import { Spacing } from '../../design/spacing';
+import { Type } from '../../design/typography';
 import { YesNoNAToggle, YnValue } from './YesNoNAToggle';
 import { focusInput } from './focusInput';
 
@@ -58,10 +61,19 @@ export const ChecklistTable: React.FC<ChecklistTableProps> = ({ items, values, o
 
 const styles = StyleSheet.create({
   wrap: {
-    marginBottom: 10,
+    // Bare 10 sat off the 4dp rhythm and between two tokens (sm=8, md=12).
+    // This margin separates the whole table from whatever follows it, the
+    // same role EstablishmentCard's rowWrap and Section's header margin
+    // play at Spacing.md — resolved here the same way rather than to the
+    // tighter sm, which is reserved below for padding inside a row.
+    marginBottom: Spacing.md,
   },
   row: {
-    paddingVertical: 10,
+    // Same bare-10 case as `wrap`, but this is internal row padding, not a
+    // block-separating margin — resolves to the tighter sm (8) so the
+    // row doesn't pick up extra bulk on top of the requirement line's
+    // fontSize going from 12.5 to Type.body (14).
+    paddingVertical: Spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },
@@ -69,27 +81,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: Spacing.xs,
   },
+  // Was a bare 10/monospace, below the type scale's 11 floor. Raised to
+  // Type.caption — the floor itself, not further — since the ref code is a
+  // secondary label next to the toggle, not the thing being read.
   ref: {
-    fontSize: 10,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     fontFamily: 'monospace',
     color: Colors.textLight,
   },
+  // The point of this migration: this is the highest-volume reading task in
+  // the app, laid out stacked (nothing shares a row with this text), so it
+  // gets the full legibility win from 12.5 straight to Type.body (14) with
+  // no horizontal risk.
   requirement: {
-    fontSize: 12.5,
+    fontSize: Type.body.fontSize,
+    lineHeight: Type.body.lineHeight,
     color: Colors.navy,
-    marginBottom: 6,
-    lineHeight: 17,
+    // Bare 6, not an icon/text gap — per spacing.ts's own documented
+    // resolution for that value, it lands on sm (8), not xs.
+    marginBottom: Spacing.sm,
   },
+  // Follows the normal scale: 12 already lands exactly on Type.label.
   remarks: {
-    fontSize: 12,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     color: Colors.textPrimary,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.sm,
+    // Bare 6, not an icon/text gap - resolves to sm (8), same rule as above.
+    paddingVertical: Spacing.sm,
     backgroundColor: Colors.white,
   },
 });

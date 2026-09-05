@@ -8,7 +8,10 @@ import {
   KeyboardTypeOptions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../constants/colors';
+import { Colors } from '../../design/colors';
+import { Radius } from '../../design/radius';
+import { Spacing } from '../../design/spacing';
+import { Type } from '../../design/typography';
 import { applyTextCase, stripTrailingSpaces, TextCaseMode } from '../../utils/textCase';
 
 interface TextFieldProps {
@@ -96,7 +99,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(({
         ref={ref}
         style={[
           styles.input,
-          multiline && { minHeight: 80, textAlignVertical: 'top', paddingTop: 9 },
+          multiline && { minHeight: 80, textAlignVertical: 'top', paddingTop: Spacing.sm },
           readOnly && styles.inputReadOnly,
         ]}
         value={value}
@@ -129,7 +132,7 @@ TextField.displayName = 'TextField';
 
 const styles = StyleSheet.create({
   group: {
-    marginBottom: 16,
+    marginBottom: Spacing.lg,
     flex: 1,
   },
   // The surface for a read-only field comes from the wrapper that already
@@ -141,39 +144,58 @@ const styles = StyleSheet.create({
   // aligned even when one value wraps and the other doesn't.
   groupDisplay: {
     backgroundColor: Colors.bgMuted,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginBottom: 10,
+    // Bare 10 sat off the 4dp rhythm, equidistant between md (8) and lg
+    // (12); resolved up to lg since this is a card-like filled surface, the
+    // same role EstablishmentCard's own corners play at Radius.lg.
+    borderRadius: Radius.lg,
+    // Bare 10, internal padding (tighter than a block-separating margin) -
+    // resolves to sm (8), the same tie-break ChecklistTable's `row`
+    // documents for internal padding.
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    // Bare 10, block-separating margin (this field from the next one
+    // stacked below it) - resolves to md (12), same tie-break as above but
+    // for the block-separator role instead of internal padding.
+    marginBottom: Spacing.md,
   },
   label: {
-    fontSize: 12,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     fontWeight: '700',
     color: Colors.navy,
     letterSpacing: 0.3,
-    marginBottom: 6,
+    // Bare 6, not an icon/text gap - resolves to sm (8) per spacing.ts's
+    // documented rule for that value.
+    marginBottom: Spacing.sm,
   },
   // Recedes to a caption on a display field: the label repeats on every
   // record, the value is the part actually being read, so the value leads.
   labelDisplay: {
-    fontSize: 10,
+    // Was 10 - below the 11px legibility floor. Raised to Type.caption.
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     fontWeight: '700',
     color: Colors.textLight,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
-    marginBottom: 3,
+    // Bare 3 sits equidistant between none/xxs neighbors; xxs (2) tightens
+    // this caption label right up against its value, matching the "label
+    // recedes, value leads" hierarchy this display treatment is for.
+    marginBottom: Spacing.xxs,
   },
   req: {
     color: Colors.conflict,
   },
   input: {
     width: '100%',
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingHorizontal: Spacing.md,
+    // Bare 9 sat off the 4dp rhythm, nearer to sm (8) than md (12).
+    paddingVertical: Spacing.sm,
     borderWidth: 1.5,
     borderColor: Colors.border,
-    borderRadius: 8,
-    fontSize: 13,
+    borderRadius: Radius.md,
+    fontSize: Type.bodySm.fontSize,
+    lineHeight: Type.bodySm.lineHeight,
     color: Colors.textPrimary,
     backgroundColor: Colors.bgMuted,
   },
@@ -182,7 +204,8 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
   },
   readOnlyValue: {
-    fontSize: 14,
+    fontSize: Type.body.fontSize,
+    lineHeight: Type.body.lineHeight,
     fontWeight: '500',
     color: Colors.textPrimary,
   },
@@ -191,18 +214,21 @@ const styles = StyleSheet.create({
     color: Colors.textLight,
   },
   hint: {
-    fontSize: 11,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     color: Colors.textMuted,
-    marginTop: 4,
+    marginTop: Spacing.xs,
   },
   changeNoteRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 4,
+    // Icon-to-text gap - already exactly xs (4).
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
   },
   changeNote: {
-    fontSize: 11,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     color: Colors.warning.text,
     fontWeight: '600',
     flexShrink: 1,

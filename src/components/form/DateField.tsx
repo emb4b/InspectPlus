@@ -10,7 +10,10 @@ import {
   Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../constants/colors';
+import { Colors } from '../../design/colors';
+import { Radius } from '../../design/radius';
+import { Spacing } from '../../design/spacing';
+import { Type } from '../../design/typography';
 
 interface DateFieldProps {
   label: string;
@@ -228,15 +231,18 @@ DateField.displayName = 'DateField';
 
 const styles = StyleSheet.create({
   group: {
-    marginBottom: 16,
+    marginBottom: Spacing.lg,
     flex: 1,
   },
   label: {
-    fontSize: 12,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     fontWeight: '700',
     color: Colors.navy,
     letterSpacing: 0.3,
-    marginBottom: 6,
+    // Bare 6, not an icon/text gap - resolves to sm (8) per spacing.ts's
+    // documented rule for that value.
+    marginBottom: Spacing.sm,
   },
   req: {
     color: Colors.conflict,
@@ -244,27 +250,31 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: Spacing.sm,
   },
   input: {
     flex: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingHorizontal: Spacing.md,
+    // Bare 9 sat off the 4dp rhythm, nearer to sm (8) than md (12).
+    paddingVertical: Spacing.sm,
     borderWidth: 1.5,
     borderColor: Colors.border,
-    borderRadius: 8,
-    fontSize: 13,
+    borderRadius: Radius.md,
+    fontSize: Type.bodySm.fontSize,
+    lineHeight: Type.bodySm.lineHeight,
     color: Colors.textPrimary,
     backgroundColor: Colors.bgMuted,
   },
   calendarBtn: {
+    // Tied to the input row's own height, not the 4dp rhythm - stays a
+    // literal, same reasoning as DynamicRowTable's removeBtn width.
     width: 38,
     height: 38,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: Colors.border,
-    borderRadius: 8,
+    borderRadius: Radius.md,
     backgroundColor: Colors.bgMuted,
   },
   overlay: {
@@ -274,18 +284,19 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: Colors.white,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 16,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    padding: Spacing.lg,
   },
   sheetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: Spacing.md,
   },
   sheetTitle: {
-    fontSize: 15,
+    fontSize: Type.subheading.fontSize,
+    lineHeight: Type.subheading.lineHeight,
     fontWeight: '700',
     color: Colors.navy,
   },
@@ -293,24 +304,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    // Bare 10, block-separating margin (this header from the weekday row
+    // below it) - resolves to md (12), the same sm/md tie-break
+    // ChecklistTable's `wrap` documents for a block-separating bare 10.
+    marginBottom: Spacing.md,
   },
   navBtn: {
-    padding: 6,
+    // Bare 6, not an icon/text gap (this pads a single lone icon, not an
+    // icon+label pair) - resolves to sm (8).
+    padding: Spacing.sm,
   },
   calTitle: {
-    fontSize: 13.5,
+    // Bare 13.5 sits exactly between bodySm (13) and body (14); resolved
+    // down to bodySm to keep this secondary calendar heading visibly
+    // smaller than the sheet's own Type.subheading title above it.
+    fontSize: Type.bodySm.fontSize,
+    lineHeight: Type.bodySm.lineHeight,
     fontWeight: '700',
     color: Colors.navy,
   },
   weekRow: {
     flexDirection: 'row',
-    marginBottom: 4,
+    marginBottom: Spacing.xs,
   },
   weekLabel: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 10.5,
+    // Was 10.5 - below the 11px legibility floor. Raised to Type.caption.
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     fontWeight: '700',
     color: Colors.textMuted,
     letterSpacing: 0.4,
@@ -324,12 +346,15 @@ const styles = StyleSheet.create({
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 2,
+    paddingVertical: Spacing.xxs,
   },
   dayBtn: {
     width: '80%',
     height: '80%',
-    borderRadius: 999,
+    // Was a bare 999 - RN clamps borderRadius to half the shorter side, so
+    // Radius.pill (also far larger than this box) renders the identical
+    // circle without a magic number.
+    borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -341,7 +366,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.green,
   },
   dayText: {
-    fontSize: 12.5,
+    // Bare 12.5 sits exactly between label (12) and bodySm (13); resolved
+    // down to label - this is a compact grid digit, not prose.
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     color: Colors.textPrimary,
   },
   dayTextSelected: {
@@ -350,12 +378,18 @@ const styles = StyleSheet.create({
   },
   todayBtn: {
     alignSelf: 'center',
-    marginTop: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    // Bare 10, block-separating margin (separates this button from the day
+    // grid above it) - same sm/md tie-break as calHeader above.
+    marginTop: Spacing.md,
+    // Bare 14 sits exactly between md (12) and lg (16); resolved down to
+    // md, the tighter-internal-padding bias used throughout this file.
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
   },
   todayBtnText: {
-    fontSize: 12.5,
+    // Same bare-12.5 resolution as dayText above.
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     fontWeight: '700',
     color: Colors.green,
   },

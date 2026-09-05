@@ -1,5 +1,5 @@
 import React from 'react';
-import { Keyboard, TouchableOpacity, Text } from 'react-native';
+import { Keyboard, TouchableOpacity, Text, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { ReportFilterSheet } from './ReportFilterSheet';
 import { SelectField, DateField } from '../../../components/form';
@@ -119,12 +119,22 @@ describe('ReportFilterSheet field layout', () => {
       <ReportFilterSheet visible onClose={jest.fn()} browser={makeBrowser()} municipalities={[]} />,
     );
 
+    // Check SelectFields: the filterField override should clear flex: 1 from the SelectField's inner group
     const selects = r.root.findAllByType(SelectField);
     expect(selects.length).toBeGreaterThan(0);
-    selects.forEach(node => {
-      expect(flattenStyle(node.props.style).flex).toBeUndefined();
+    selects.forEach(selectNode => {
+      // Find the SelectField's inner group element by locating the View
+      // that has marginBottom (from SelectField's group style)
+      const groupView = selectNode.findAll(
+        (n) => n.type === View && flattenStyle(n.props.style).marginBottom !== undefined,
+      )[0];
+      expect(groupView).toBeDefined();
+      const resolvedFlex = flattenStyle(groupView.props.style).flex;
+      // The override should make flex undefined (not 1)
+      expect(resolvedFlex).toBeUndefined();
     });
 
+    // Check DateFields: these DO keep flex: 1 because they share a row (definite width)
     const dates = r.root.findAllByType(DateField);
     expect(dates).toHaveLength(2);
     dates.forEach(node => {

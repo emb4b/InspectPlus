@@ -17,6 +17,22 @@ export const Type = {
   bodySm: { fontSize: 13, lineHeight: 18 },
   label: { fontSize: 12, lineHeight: 16 },
   caption: { fontSize: 11, lineHeight: 14 },
+  // The one deliberate exception to the body scale above. It exists for
+  // exactly one caller: DynamicRowTable's grid, whose columns are fixed
+  // pixel widths (80-160, set per call site) inside a horizontal
+  // ScrollView. A wide table scrolls instead of squeezing, which removes
+  // the *horizontal* risk of bigger text — but text inside a column can't
+  // scroll away from its own cell, so raising it to `body` (14) would clip
+  // rather than help. `tabular` keeps that grid at its pre-migration 12
+  // under its own name, so a later refactor can't silently promote it to
+  // `body` and clip every column.
+  //
+  // This isn't a new carve-out: FONT_SCALING below already treats
+  // `tabular` as its own case (`{ content: true, tabular: false }`) —
+  // grid content already gets different treatment from prose elsewhere in
+  // this file. This token just gives that existing decision a size to go
+  // with the scaling behavior it already had.
+  tabular: { fontSize: 12, lineHeight: 16 },
 } as const;
 
 export type TypeToken = keyof typeof Type;

@@ -10,7 +10,10 @@ import {
   Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../constants/colors';
+import { Colors } from '../../design/colors';
+import { Radius } from '../../design/radius';
+import { Spacing } from '../../design/spacing';
+import { Type } from '../../design/typography';
 import { AppText } from '../AppText';
 
 interface SelectFieldProps {
@@ -124,16 +127,25 @@ export const SelectField: React.FC<SelectFieldProps> = ({
 };
 
 const styles = StyleSheet.create({
+  // `flex: 1` is intentional: side-by-side in a form row, this field
+  // stretches to share the row's width evenly with its sibling. A caller
+  // that stacks this field standalone (no row sibling) must override this
+  // back to Yoga's default via its own `flex: undefined` style — see
+  // ManageEstablishmentsTab's `filterField` for the documented case where
+  // `flex: 1` otherwise collapses the field to near-zero height.
   group: {
-    marginBottom: 16,
+    marginBottom: Spacing.lg,
     flex: 1,
   },
   label: {
-    fontSize: 12,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     fontWeight: '700',
     color: Colors.navy,
     letterSpacing: 0.3,
-    marginBottom: 6,
+    // Bare 6, not an icon/text gap - resolves to sm (8) per spacing.ts's
+    // documented rule for that value.
+    marginBottom: Spacing.sm,
   },
   req: {
     color: Colors.conflict,
@@ -143,22 +155,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingHorizontal: Spacing.md,
+    // Bare 9 sat off the 4dp rhythm, nearer to sm (8) than md (12).
+    paddingVertical: Spacing.sm,
     borderWidth: 1.5,
     borderColor: Colors.border,
-    borderRadius: 8,
+    borderRadius: Radius.md,
     backgroundColor: Colors.bgMuted,
   },
   value: {
-    fontSize: 13,
+    fontSize: Type.bodySm.fontSize,
+    lineHeight: Type.bodySm.lineHeight,
     color: Colors.textPrimary,
   },
   valueContainer: {
     flex: 1,
   },
   placeholder: {
-    fontSize: 13,
+    fontSize: Type.bodySm.fontSize,
+    lineHeight: Type.bodySm.lineHeight,
     color: Colors.textLight,
     flex: 1,
   },
@@ -172,54 +187,59 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: Colors.white,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 16,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    padding: Spacing.lg,
     maxHeight: '70%',
   },
   sheetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: Spacing.md,
   },
   sheetTitle: {
-    fontSize: 15,
+    fontSize: Type.subheading.fontSize,
+    lineHeight: Type.subheading.lineHeight,
     fontWeight: '700',
     color: Colors.navy,
   },
   search: {
     borderWidth: 1.5,
     borderColor: Colors.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 13,
-    marginBottom: 8,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    fontSize: Type.bodySm.fontSize,
+    lineHeight: Type.bodySm.lineHeight,
+    marginBottom: Spacing.sm,
     color: Colors.textPrimary,
   },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    paddingHorizontal: 4,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.xs,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },
   optionText: {
-    fontSize: 13,
+    fontSize: Type.bodySm.fontSize,
+    lineHeight: Type.bodySm.lineHeight,
     color: Colors.textPrimary,
   },
   optionTextActive: {
-    fontSize: 13,
+    fontSize: Type.bodySm.fontSize,
+    lineHeight: Type.bodySm.lineHeight,
     color: Colors.green,
     fontWeight: '700',
   },
   empty: {
-    fontSize: 12,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     color: Colors.textMuted,
     textAlign: 'center',
-    paddingVertical: 16,
+    paddingVertical: Spacing.lg,
   },
 });
