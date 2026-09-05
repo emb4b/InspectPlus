@@ -14,6 +14,7 @@ import {
   CheckboxRow,
   focusInput,
 } from '../../../components/form';
+import { AddRowButton } from '../../../components/AddRowButton';
 import {
   DAO_2005_10_CHECKLIST,
   DOCUMENTS_REVIEWED_OPTIONS,
@@ -169,7 +170,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
               ]}
               rows={value.waterSources}
               onChange={waterSources => set('waterSources', waterSources)}
-              addLabel="+ Add Water Source"
+              addLabel="Add Water Source"
             />
           </FormSection>
         );
@@ -186,7 +187,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
               ]}
               rows={value.wastewaterSources}
               onChange={wastewaterSources => set('wastewaterSources', wastewaterSources)}
-              addLabel="+ Add Wastewater Source"
+              addLabel="Add Wastewater Source"
             />
           </FormSection>
         );
@@ -205,7 +206,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
               ]}
               rows={value.abstractedWaterQuality}
               onChange={abstractedWaterQuality => set('abstractedWaterQuality', abstractedWaterQuality)}
-              addLabel="+ Add Water Quality Entry"
+              addLabel="Add Water Quality Entry"
             />
           </FormSection>
         );
@@ -348,7 +349,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                 </View>
               );
             })}
-            <AddCardButton label="+ Add WWTP Outlet Detail" onPress={addWwtpDetail} />
+            <AddRowButton style={styles.addBtn} label="Add WWTP Outlet Detail" onPress={addWwtpDetail} />
           </FormSection>
         );
 
@@ -428,7 +429,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                 </View>
               );
             })}
-            <AddCardButton label="+ Add WWTP Treatment Components" onPress={addWwtpComponent} />
+            <AddRowButton style={styles.addBtn} label="Add WWTP Treatment Components" onPress={addWwtpComponent} />
           </FormSection>
         );
 
@@ -594,11 +595,11 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                       </View>
                     );
                   })}
-                  <AddCardButton label="+ Add Parameter" onPress={() => addParameter(i)} small />
+                  <AddRowButton style={styles.addBtn} label="Add Parameter" onPress={() => addParameter(i)} small />
                 </View>
               );
             })}
-            <AddCardButton label="+ Add Sampling Point" onPress={addSamplingPoint} />
+            <AddRowButton style={styles.addBtn} label="Add Sampling Point" onPress={addSamplingPoint} />
           </FormSection>
         );
 
@@ -705,7 +706,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                 </View>
               );
             })}
-            <AddCardButton label="+ Add Parameter" onPress={addPrevParameter} small />
+            <AddRowButton style={styles.addBtn} label="Add Parameter" onPress={addPrevParameter} small />
           </FormSection>
         );
 
@@ -783,7 +784,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                 </View>
               );
             })}
-            <AddCardButton label="+ Add Condition" onPress={addDpCondition} />
+            <AddRowButton style={styles.addBtn} label="Add Condition" onPress={addDpCondition} />
           </FormSection>
         );
 
@@ -839,20 +840,6 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
   );
 };
 
-const AddCardButton: React.FC<{ label: string; onPress: () => void; small?: boolean }> = ({
-  label,
-  onPress,
-  small,
-}) => (
-  <TouchableOpacity
-    style={[styles.addBtn, small && styles.addBtnSmall]}
-    activeOpacity={0.7}
-    onPress={onPress}>
-    <Ionicons name="add" size={13} color={Colors.green} />
-    <Text style={styles.addBtnText}>{label}</Text>
-  </TouchableOpacity>
-);
-
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
@@ -892,26 +879,7 @@ const styles = StyleSheet.create({
     color: Colors.navy,
   },
   addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 5,
     marginBottom: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderWidth: 1.5,
-    borderColor: Colors.greenLight,
-    borderStyle: 'dashed',
-    borderRadius: 8,
-  },
-  addBtnSmall: {
-    paddingVertical: 5,
-    paddingHorizontal: 9,
-  },
-  addBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.green,
   },
   paramHeading: {
     fontSize: 10.5,

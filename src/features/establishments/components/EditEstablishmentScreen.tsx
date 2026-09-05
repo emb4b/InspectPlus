@@ -485,7 +485,7 @@ export const EditEstablishmentScreen: React.FC<EditEstablishmentScreenProps> = (
             ]}
             rows={form.productLines}
             onChange={productLines => setForm({ ...form, productLines })}
-            addLabel="+ Add Row"
+            addLabel="Add Row"
           />
         </FormSection>
 

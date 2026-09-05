@@ -16,6 +16,7 @@ import {
   focusInput,
 } from '../../../components/form';
 import type { DynamicRow, ChecklistValue } from '../../../components/form';
+import { AddRowButton } from '../../../components/AddRowButton';
 import { SectionEditActions } from '../components/SectionEditActions';
 import { useEditableSection } from '../hooks/useEditableSection';
 import {
@@ -66,13 +67,6 @@ async function patchComplianceWater(complianceId: string, patch: Partial<Complia
   });
 }
 
-const AddCardButton: React.FC<{ label: string; onPress: () => void }> = ({ label, onPress }) => (
-  <TouchableOpacity style={styles.addBtn} activeOpacity={0.7} onPress={onPress}>
-    <Ionicons name="add" size={13} color={Colors.green} />
-    <Text style={styles.addBtnText}>{label}</Text>
-  </TouchableOpacity>
-);
-
 // ── Water Sources ───────────────────────────────────────────────────────────
 
 export const WaterSourcesSection: React.FC<{
@@ -108,7 +102,7 @@ export const WaterSourcesSection: React.FC<{
           ]}
           rows={section.draft}
           onChange={rows => section.setDraft(rows)}
-          addLabel="+ Add Water Source"
+          addLabel="Add Water Source"
         />
       ) : (
         <SimpleTable
@@ -161,7 +155,7 @@ export const WastewaterSourcesSection: React.FC<{
           ]}
           rows={section.draft}
           onChange={rows => section.setDraft(rows)}
-          addLabel="+ Add Wastewater Source"
+          addLabel="Add Wastewater Source"
         />
       ) : (
         <SimpleTable
@@ -216,7 +210,7 @@ export const AbstractedWaterQualitySection: React.FC<{
           ]}
           rows={section.draft}
           onChange={rows => section.setDraft(rows)}
-          addLabel="+ Add Water Quality Entry"
+          addLabel="Add Water Quality Entry"
         />
       ) : (
         <SimpleTable
@@ -480,7 +474,7 @@ export const WwtpDetailsSection: React.FC<{
           />
         );
       })}
-      {section.editing && <AddCardButton label="+ Add WWTP Outlet Detail" onPress={addDetail} />}
+      {section.editing && <AddRowButton style={styles.addBtn} label="Add WWTP Outlet Detail" onPress={addDetail} />}
       {section.error && <Text style={styles.errorText}>{section.error}</Text>}
     </FormSection>
   );
@@ -604,7 +598,7 @@ export const WwtpComponentsSection: React.FC<{
           />
         );
       })}
-      {section.editing && <AddCardButton label="+ Add WWTP Treatment Components" onPress={addComponent} />}
+      {section.editing && <AddRowButton style={styles.addBtn} label="Add WWTP Treatment Components" onPress={addComponent} />}
       {section.error && <Text style={styles.errorText}>{section.error}</Text>}
     </FormSection>
   );
@@ -861,7 +855,7 @@ export const SamplingPointsSection: React.FC<{
                 </View>
               );
             })}
-            <AddCardButton label="+ Add Parameter" onPress={() => addParameter(i)} />
+            <AddRowButton style={styles.addBtn} label="Add Parameter" onPress={() => addParameter(i)} />
           </View>
         ) : (
           <View key={i} style={sharedStyles.samplingCard}>
@@ -880,7 +874,7 @@ export const SamplingPointsSection: React.FC<{
           </View>
         );
       })}
-      {section.editing && <AddCardButton label="+ Add Sampling Point" onPress={addPoint} />}
+      {section.editing && <AddRowButton style={styles.addBtn} label="Add Sampling Point" onPress={addPoint} />}
       {section.error && <Text style={styles.errorText}>{section.error}</Text>}
     </FormSection>
   );
@@ -1044,7 +1038,7 @@ export const PreviousInspectionSection: React.FC<{
                   </View>
                 );
               })}
-              <AddCardButton label="+ Add Parameter" onPress={addParameter} />
+              <AddRowButton style={styles.addBtn} label="Add Parameter" onPress={addParameter} />
             </>
           ) : (
             section.draft.parameters.map((param, pi) => (
@@ -1228,7 +1222,7 @@ export const DpConditionsSection: React.FC<{
               </View>
             );
           })}
-          <AddCardButton label="+ Add Condition" onPress={addCondition} />
+          <AddRowButton style={styles.addBtn} label="Add Condition" onPress={addCondition} />
         </>
       ) : (
         <ConditionsList
@@ -1450,22 +1444,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 5,
     marginBottom: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderWidth: 1.5,
-    borderColor: Colors.greenLight,
-    borderStyle: 'dashed',
-    borderRadius: 8,
-  },
-  addBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.green,
   },
   editCard: {
     backgroundColor: Colors.bgMuted,

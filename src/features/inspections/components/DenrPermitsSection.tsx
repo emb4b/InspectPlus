@@ -5,6 +5,7 @@ import { Colors } from '../../../constants/colors';
 import { database, collections } from '../../../db/database';
 import { FormSection, TextField, DateField, focusInput } from '../../../components/form';
 import { AppText } from '../../../components/AppText';
+import { AddRowButton } from '../../../components/AddRowButton';
 import { SectionEditActions } from './SectionEditActions';
 import { useEditableSection } from '../hooks/useEditableSection';
 import type { PermitSnapshotItem } from '../../../services/sync/syncTypes';
@@ -203,10 +204,7 @@ export const DenrPermitsSection: React.FC<DenrPermitsSectionProps> = ({ reportId
         )}
       </View>
       {permitsSection.editing && (
-        <TouchableOpacity style={styles.addBtn} activeOpacity={0.7} onPress={addPermit}>
-          <Ionicons name="add" size={13} color={Colors.green} />
-          <Text style={styles.addBtnText}>+ Add Permit</Text>
-        </TouchableOpacity>
+        <AddRowButton label="Add Permit" onPress={addPermit} style={styles.addBtn} />
       )}
       {permitsSection.error && <Text style={styles.errorText}>{permitsSection.error}</Text>}
     </FormSection>
@@ -283,21 +281,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 5,
     marginBottom: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderWidth: 1.5,
-    borderColor: Colors.greenLight,
-    borderStyle: 'dashed',
-    borderRadius: 8,
-  },
-  addBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.green,
   },
 });

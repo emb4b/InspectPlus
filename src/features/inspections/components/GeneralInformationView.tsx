@@ -552,7 +552,7 @@ const ProductLinesSection = React.memo(function ProductLinesSection({
           ]}
           rows={productLines.draft}
           onChange={rows => productLines.setDraft(rows)}
-          addLabel="+ Add Product Line"
+          addLabel="Add Product Line"
         />
       ) : (
         <SimpleTable
