@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Colors } from '../../../constants/colors';
 import { formatEstablishmentLocation } from '../../../utils/establishmentLocation';
-import { REPORT_TYPES, ReportTypeKey } from '../../../constants/reportTypes';
+import { ENABLED_TYPES, REPORT_TYPES, ReportTypeKey } from '../../../constants/reportTypes';
 import { collections } from '../../../db/database';
 import {
   useEstablishment,
@@ -38,10 +38,6 @@ import { useHeaderScroll } from '../../home/context/HeaderScrollContext';
 interface AddReportSplitPanelProps {
   estabId: string;
 }
-
-// Only Water has a real form today — the rest are visibly disabled here
-// rather than routing into today's placeholder screen.
-const ENABLED_TYPES: ReportTypeKey[] = ['water'];
 
 function todayISO(): string {
   const d = new Date();

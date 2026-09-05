@@ -32,6 +32,13 @@ export interface ReportType {
   route: string;
 }
 
+// Only Water has a real form today — the rest are visibly disabled wherever
+// a report type is picked (the home speed dial's "Soon" badge,
+// AddReportSplitPanel's dimmed rows) rather than routing into today's
+// placeholder screen. Single source of truth so enabling a type in one
+// surface can't leave the other stale.
+export const ENABLED_TYPES: ReportTypeKey[] = ['water'];
+
 export const REPORT_TYPES: ReportType[] = [
   {
     key: 'air',
