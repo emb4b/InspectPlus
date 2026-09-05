@@ -164,6 +164,25 @@ const findControlNoGroup = (r: Renderer) => {
 const groupChildren = (group: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] =>
   (group.children[0] as TestRenderer.ReactTestInstance).children as TestRenderer.ReactTestInstance[];
 
+// The invariant two earlier attempts both broke: the control-number text
+// must be able to SHRINK (so a long value still truncates) but must NEVER
+// GROW. A growing child (flexGrow: 1, or the `flex: 1` shorthand that
+// implies it) claims 100% of controlNoGroup's width for itself, leaving
+// justifyContent: 'flex-end' on the group zero free space to distribute —
+// so the text renders flush against the group's (and row's) START instead
+// of its end, while every other assertion in this suite (the group's own
+// flexGrow/justifyContent, the text's presence, its order in the row) stays
+// green. react-test-renderer performs no Yoga layout (see the IMPORTANT
+// CAVEAT below), so it can only prove the *styling contract* — never that
+// Yoga actually renders the text at the row's end — which is exactly why
+// this assertion is framed as an invariant on that contract (must shrink,
+// must not grow) rather than pinned to one spelling of it.
+const expectShrinksButNeverGrows = (style: Record<string, unknown>) => {
+  expect(style.flexShrink).toBe(1);
+  expect(style.flexGrow).toBeUndefined();
+  expect(style.flex).toBeUndefined();
+};
+
 const noop = () => {};
 
 const baseItem: EstablishmentReportItem = {
@@ -551,9 +570,9 @@ describe('EstablishmentReportsSection date + control number row', () => {
     expect(badge).toBeDefined();
     expect(proseTexts(r).some((n) => n.props.children === 'Overdue')).toBe(true);
 
-    // The control number is the element that shrinks/truncates (flex: 1,
-    // numberOfLines 1) — the date, its icon, and the badge are pinned
-    // (flexShrink: 0) so none of them can be squeezed out by it.
+    // The control number is the element that shrinks/truncates
+    // (flexShrink: 1, numberOfLines 1) — the date, its icon, and the badge
+    // are pinned (flexShrink: 0) so none of them can be squeezed out by it.
     const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === longControlNo);
     expect(controlNoText).toBeDefined();
 
@@ -563,7 +582,10 @@ describe('EstablishmentReportsSection date + control number row', () => {
     const dateText = findDateText(r, controlNoText);
     expect(dateText).toBeDefined();
 
-    expect(flattenStyle(controlNoText?.props.style).flex).toBe(1);
+    // Must shrink to truncate, but must never grow — see
+    // expectShrinksButNeverGrows above for why a growing child would defeat
+    // the group's flex-end alignment.
+    expectShrinksButNeverGrows(flattenStyle(controlNoText?.props.style));
     expect(controlNoText?.props.numberOfLines).toBe(1);
     expect(flattenStyle(dateText?.props.style).flexShrink).toBe(0);
     expect(flattenStyle(badge?.props.style).flexShrink).toBe(0);
@@ -591,13 +613,17 @@ describe('EstablishmentReportsSection date + control number row', () => {
   // at all — flattenStyle() below only confirms the *styling contract*
   // (which properties are declared and with what values), never that Yoga
   // actually resolves them into the group sitting flush against the row's
-  // right edge on a real device. That gap is exactly what let the
-  // marginLeft: 'auto' version of this ship looking done — style-applied
-  // assertions passed while the on-device row was pixel-identical to no
-  // alignment at all. Confirming the group truly lands at the end of the
-  // row (with visible empty space between it and the date/badge for a
-  // short value like this one) requires a real device or simulator check,
-  // not this suite.
+  // right edge on a real device. That gap is exactly what let BOTH earlier
+  // attempts ship looking done while pixel-identical to no alignment at
+  // all: first marginLeft: 'auto' (a no-op alongside the row's own `gap` on
+  // some RN versions), then flex: 1 on the control-number text itself (which
+  // grows to fill controlNoGroup, leaving flex-end nothing to push against)
+  // — every style-applied assertion in this file passed both times.
+  // expectShrinksButNeverGrows below closes the second gap specifically by
+  // pinning the *contract* the text must satisfy; confirming the group truly
+  // lands at the end of the row (with visible empty space between it and
+  // the date/badge for a short value like this one) still requires a real
+  // device or simulator check, not this suite.
   it('keeps a short control number at the end of the row (right-aligned), not sitting immediately after the date', () => {
     const item: EstablishmentReportItem = {
       ...baseItem,
@@ -635,6 +661,13 @@ describe('EstablishmentReportsSection date + control number row', () => {
     const groupStyle = flattenStyle(group.props.style);
     expect(groupStyle.flexGrow).toBe(1);
     expect(groupStyle.justifyContent).toBe('flex-end');
+
+    // This is exactly the scenario the flex: 1 regression broke: a short
+    // value doesn't need to truncate, but a growing text still consumes all
+    // of the group's width regardless, defeating flex-end. Pinning the
+    // group's own contract (above) isn't enough on its own — see
+    // expectShrinksButNeverGrows above.
+    expectShrinksButNeverGrows(flattenStyle(controlNoText?.props.style));
 
     expect(rowChildren[0]).toBe(calendarIcon);
     expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(badge!));

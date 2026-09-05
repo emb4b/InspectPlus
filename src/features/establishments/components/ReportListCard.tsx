@@ -283,12 +283,17 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
                       inconsistency (the date growing under a large system
                       font while this stayed fixed). It switches to
                       FONT_SCALING.content, the same scaling behavior as the
-                      date. flexShrink (via flex: 1 below, plus the group's
-                      own flexShrink: 1/minWidth: 0) still makes this the
-                      element that truncates first, so a long control number
-                      still can't clip the date or push the urgency badge off
-                      the row — matches EstablishmentReportsSection's
-                      controlNo. */}
+                      date. flexShrink: 1 below (plus the group's own
+                      flexShrink: 1/minWidth: 0) still makes this the element
+                      that truncates first, so a long control number still
+                      can't clip the date or push the urgency badge off the
+                      row — matches EstablishmentReportsSection's controlNo.
+                      It deliberately carries no flexGrow: a growing child
+                      would claim all of controlNoGroup's width for itself,
+                      leaving justifyContent: 'flex-end' on the group nothing
+                      to push against — the exact bug this task fixes.
+                      textAlign: 'right' below is a second line of defence in
+                      case this Text's box is ever wider than its content. */}
                   <Text
                     style={styles.controlNo}
                     allowFontScaling={FONT_SCALING.content}
@@ -502,11 +507,19 @@ const styles = StyleSheet.create({
     fontSize: Type.label.fontSize,
     lineHeight: Type.label.lineHeight,
     color: Colors.textMuted,
-    // The element that shrinks/truncates within controlNoGroup (together
-    // with numberOfLines and ellipsizeMode above) so a long value can't clip
-    // the date or shove the urgency badge off the row.
-    flex: 1,
+    // Must SHRINK (so a long value truncates within controlNoGroup, together
+    // with numberOfLines/ellipsizeMode above) but must NEVER GROW. flex: 1
+    // here was the actual bug: it's shorthand for flexGrow: 1 too, so the
+    // text grew to fill controlNoGroup completely, leaving
+    // justifyContent: 'flex-end' on the group zero free space to distribute
+    // — the text rendered flush against the group's (and row's) start
+    // instead of its end. flexShrink: 1 alone keeps the truncation without
+    // reintroducing that growth. textAlign: 'right' is a second line of
+    // defence: even if this Text's box ever ends up wider than its content
+    // for some other reason, the glyphs still sit right-aligned inside it.
+    flexShrink: 1,
     minWidth: 0,
+    textAlign: 'right',
   },
   // Never squeezed by a long control number sharing the row — same
   // flexShrink: 0 guard as the date and urgency badge.
