@@ -1,7 +1,11 @@
 import React, { useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, LayoutChangeEvent } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../../constants/colors';
+import { Colors } from '../../../design/colors';
+import { Elevation } from '../../../design/elevation';
+import { Radius } from '../../../design/radius';
+import { Spacing } from '../../../design/spacing';
+import { Type } from '../../../design/typography';
 import { formatEstablishmentLocation } from '../../../utils/establishmentLocation';
 import { AppText } from '../../../components/AppText';
 import { Button } from '../../../components/Button';
@@ -133,22 +137,22 @@ export const EstablishmentHeaderCard: React.FC<EstablishmentHeaderCardProps> = (
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 20,
+    // Radius.lg + Elevation.raised match Card.tsx / EstablishmentCard.tsx's
+    // "card" surface convention rather than this card's old bespoke
+    // shadow/elevation pairing.
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    marginBottom: Spacing.xl,
     backgroundColor: Colors.white,
     borderWidth: 1,
     borderColor: Colors.border,
-    shadowColor: Colors.textPrimary,
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    ...Elevation.raised,
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
+    // Matches ReportListCard/EstablishmentCard's icon-to-content gap.
+    gap: Spacing.md,
   },
   topRowMeasuring: {
     opacity: 0,
@@ -156,7 +160,7 @@ const styles = StyleSheet.create({
   iconWrap: {
     width: 40,
     height: 40,
-    borderRadius: 10,
+    borderRadius: Radius.md,
     backgroundColor: Colors.greenMuted,
     alignItems: 'center',
     justifyContent: 'center',
@@ -166,24 +170,31 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
+  // Page-level heading, not a list-row name — sized like the other
+  // sheet/section headers in this feature (ReportFilterSheet's sheetTitle,
+  // ManageEstablishmentsTab's sheetTitle), not EstablishmentCard's smaller
+  // list-row "name".
   name: {
-    fontSize: 15.5,
+    fontSize: Type.subheading.fontSize,
+    lineHeight: Type.subheading.lineHeight,
     fontWeight: '800',
     color: Colors.textPrimary,
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 4,
-    marginTop: 3,
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
   },
   // Nudges the icon down from the row's true top edge to align with the
   // text's cap-height instead of its full line-height box.
   locationIcon: {
     marginTop: 2,
   },
+  // Matches EstablishmentCard's "location" text token choice.
   location: {
-    fontSize: 11,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     color: Colors.textMuted,
   },
   locationContainer: {
@@ -192,68 +203,78 @@ const styles = StyleSheet.create({
   syncRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    marginTop: 4,
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
   },
+  // Matches ReportListCard/EstablishmentCard's "Pending sync" text token.
   syncText: {
-    fontSize: 10,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     color: Colors.pending,
     fontWeight: '600',
   },
   actions: {
     flexDirection: 'row',
-    gap: 6,
-    marginTop: 12,
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
   },
   divider: {
     height: 1,
     backgroundColor: Colors.borderLight,
-    marginVertical: 12,
+    marginVertical: Spacing.md,
   },
   statGrid: {
-    gap: 6,
+    gap: Spacing.sm,
   },
   statRow: {
     flexDirection: 'row',
-    gap: 6,
+    gap: Spacing.sm,
   },
   statChip: {
     flex: 1,
     backgroundColor: Colors.bgMuted,
     borderWidth: 1,
     borderColor: Colors.borderLight,
-    borderRadius: 8,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
   },
+  // Was 7.5 — below the 11px legibility floor. Raised to Type.caption, the
+  // scale's floor.
   statLabel: {
-    fontSize: 7.5,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     fontWeight: '700',
     letterSpacing: 0.4,
     color: Colors.textLight,
     textTransform: 'uppercase',
   },
+  // Was 10.5 — below the 11px legibility floor. Raised to Type.caption.
   statValue: {
-    fontSize: 10.5,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     fontWeight: '700',
     color: Colors.textPrimary,
-    marginTop: 2,
+    marginTop: Spacing.xxs,
   },
   inspectorPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    // Icon-to-text gap.
+    gap: Spacing.xs,
     backgroundColor: Colors.survey.bg,
     borderWidth: 1,
     borderColor: Colors.survey.border,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginTop: 10,
+    borderRadius: Radius.pill,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    marginTop: Spacing.sm,
     alignSelf: 'flex-start',
   },
+  // Was 10 — below the 11px legibility floor. Raised to Type.caption.
   inspectorText: {
-    fontSize: 10,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     color: Colors.survey.badgeText,
   },
   inspectorName: {
