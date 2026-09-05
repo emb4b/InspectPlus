@@ -8,7 +8,10 @@ import {
   ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../constants/colors';
+import { Colors } from '../design/colors';
+import { Radius } from '../design/radius';
+import { Spacing } from '../design/spacing';
+import { Type } from '../design/typography';
 
 // The app's single button vocabulary. Before this existed, the same action
 // was drawn differently depending on which screen it landed on — "Edit" was
@@ -110,20 +113,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    borderRadius: 8,
+    // An icon-to-label gap, same as every other icon+text pairing in the
+    // app (see spacing.ts: 6 is deliberately off the 4dp rhythm and
+    // resolves to `xs` for this kind of gap) — was a bare 6 before this
+    // migrated onto the scale.
+    gap: Spacing.xs,
+    borderRadius: Radius.md,
     borderWidth: 1.5,
-    borderColor: 'transparent',
+    borderColor: Colors.transparent,
   },
   sm: {
     minHeight: HEIGHT.sm,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
   },
   md: {
     minHeight: HEIGHT.md,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
   },
   fullWidth: {
     flex: 1,
@@ -152,10 +159,15 @@ const styles = StyleSheet.create({
   label: {
     fontWeight: '700',
   },
+  // `sm`'s label maps to Type.label (12) and `md`'s to Type.bodySm (13) —
+  // the conservative reading that keeps both sizes exactly where they
+  // already were, just resolved from the scale instead of a bare literal.
   smLabel: {
-    fontSize: 12,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
   },
   mdLabel: {
-    fontSize: 13,
+    fontSize: Type.bodySm.fontSize,
+    lineHeight: Type.bodySm.lineHeight,
   },
 });

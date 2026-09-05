@@ -6,7 +6,6 @@
   "app/(app)/survey/new.tsx",
   "app/index.tsx",
   "components/BrandLockup.tsx",
-  "components/Button.tsx",
   "components/form/CheckboxRow.tsx",
   "components/form/ChecklistTable.tsx",
   "components/form/DateField.tsx",
