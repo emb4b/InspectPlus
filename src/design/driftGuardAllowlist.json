@@ -37,7 +37,6 @@
   "features/inspections/components/PurposeOfInspectionTab.tsx",
   "features/inspections/components/PurposeOfInspectionView.tsx",
   "features/inspections/components/ReportFormHeader.tsx",
-  "features/inspections/components/SaveBar.tsx",
   "features/inspections/components/TwoRowTabs.tsx",
   "features/inspections/water/WaterComplianceEditSections.tsx",
   "features/inspections/water/WaterExtraFormSections.tsx"
