@@ -212,6 +212,38 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
               <View style={styles.dateRow}>
                 <Ionicons name="calendar-outline" size={10} color={Colors.textMuted} />
                 <Text style={styles.date}>{formatDate(item.date)}</Text>
+                {/* Decorative: the control number text right beside it
+                    already carries the meaning, so it stays out of the
+                    accessibility tree — same treatment as Button.tsx's own
+                    icons. Matches the calendar icon's size/color so both
+                    icons in this row read as one family; flexShrink: 0 keeps
+                    it from being squeezed by a long control number, same as
+                    the date and urgency badge. */}
+                <Ionicons
+                  name="pricetag-outline"
+                  size={10}
+                  color={Colors.textMuted}
+                  style={styles.controlNoIcon}
+                  importantForAccessibility="no"
+                />
+                {/* Fixed-format monospace: OS font scaling blows it past the
+                    row width, so it opts out per the FONT_SCALING policy —
+                    matches EstablishmentReportsSection's controlNo. Shares
+                    this row with the date; flexShrink+numberOfLines let it
+                    truncate first so a long control number can't clip the
+                    date or push an urgency badge off the row. Sized and
+                    line-heighted identically to the date (Type.label) so the
+                    two share one baseline now that they sit side by side;
+                    Colors.textLight (vs. the date's Colors.textMuted) is what
+                    keeps the date reading as primary and the control number
+                    as secondary. */}
+                <Text
+                  style={styles.controlNo}
+                  allowFontScaling={FONT_SCALING.tabular}
+                  numberOfLines={1}
+                  ellipsizeMode="tail">
+                  {item.controlNo || 'No control number yet'}
+                </Text>
                 {urgency !== 'none' && (
                   <View
                     style={[
@@ -239,12 +271,6 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
                   </View>
                 )}
               </View>
-
-              {/* Fixed-format monospace: OS font scaling blows it past the
-                  card width, so it opts out per the FONT_SCALING policy. */}
-              <Text style={styles.controlNo} allowFontScaling={FONT_SCALING.tabular}>
-                {item.controlNo || 'No control number yet'}
-              </Text>
 
               {/* Sync status sits last in the card body, below every other
                   detail, so it reads as a footer note rather than
@@ -414,10 +440,13 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     marginTop: Spacing.xs,
   },
+  // Fixed width in the row — the control number is what shrinks/truncates,
+  // not the date. Matches EstablishmentReportsSection's "date" token choice.
   date: {
     fontSize: Type.label.fontSize,
     lineHeight: Type.label.lineHeight,
     color: Colors.textMuted,
+    flexShrink: 0,
   },
   urgencyBadge: {
     flexDirection: 'row',
@@ -427,6 +456,9 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xxs,
     borderRadius: Radius.pill,
     marginLeft: Spacing.xs,
+    // Never squeezed by a long control number sharing the row — it's the
+    // control number that truncates, not this badge.
+    flexShrink: 0,
   },
   urgencyBadgeText: {
     fontSize: Type.caption.fontSize,
@@ -434,10 +466,25 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   controlNo: {
-    fontSize: Type.caption.fontSize,
-    lineHeight: Type.caption.lineHeight,
+    // Matches the date's Type.label size/lineHeight exactly so the two sit
+    // on a shared baseline now that they're side by side on one row — a
+    // mismatched size read fine when the control number was a subordinate
+    // line beneath the date, but not beside it. Colors.textLight (vs. the
+    // date's Colors.textMuted) is now what keeps the date leading and the
+    // control number secondary.
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     color: Colors.textLight,
-    marginTop: Spacing.xxs,
     fontFamily: 'monospace',
+    // Shares the date row rather than sitting on its own line below it;
+    // it's the one that shrinks/truncates so a long value can't clip the
+    // date or shove the urgency badge off the row.
+    flex: 1,
+    minWidth: 0,
+  },
+  // Never squeezed by a long control number sharing the row — same
+  // flexShrink: 0 guard as the date and urgency badge.
+  controlNoIcon: {
+    flexShrink: 0,
   },
 });

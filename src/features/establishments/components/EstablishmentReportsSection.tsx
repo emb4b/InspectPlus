@@ -137,12 +137,30 @@ const ReportRow: React.FC<{
               <View style={styles.dateRow}>
                 <Ionicons name="calendar-outline" size={10} color={Colors.textMuted} />
                 <Text style={styles.date}>{formatDate(item.date)}</Text>
+                {/* Decorative: the control number text right beside it
+                    already carries the meaning, so it stays out of the
+                    accessibility tree — same treatment as Button.tsx's own
+                    icons. Matches the calendar icon's size/color so both
+                    icons in this row read as one family; flexShrink: 0 keeps
+                    it from being squeezed by a long control number, same as
+                    the date and urgency badge. */}
+                <Ionicons
+                  name="pricetag-outline"
+                  size={10}
+                  color={Colors.textMuted}
+                  style={styles.controlNoIcon}
+                  importantForAccessibility="no"
+                />
                 {/* Fixed-format monospace: OS font scaling blows it past the
                     row width, so it opts out per the FONT_SCALING policy —
                     matches ReportListCard's controlNo. Shares this row with
                     the date; flexShrink+numberOfLines let it truncate first
                     so a long control number can't clip the date or push an
-                    urgency badge off the row. */}
+                    urgency badge off the row. Sized and line-heighted
+                    identically to the date (Type.label) so the two share one
+                    baseline now that they sit side by side; Colors.textLight
+                    (vs. the date's Colors.textMuted) is what keeps the date
+                    reading as primary and the control number as secondary. */}
                 <Text
                   style={styles.controlNo}
                   allowFontScaling={FONT_SCALING.tabular}
@@ -351,8 +369,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   controlNo: {
-    fontSize: Type.caption.fontSize,
-    lineHeight: Type.caption.lineHeight,
+    // Matches the date's Type.label size/lineHeight exactly so the two sit
+    // on a shared baseline now that they're side by side on one row — a
+    // mismatched size read fine when the control number was a subordinate
+    // line beneath the date, but not beside it. Colors.textLight (vs. the
+    // date's Colors.textMuted) is now what keeps the date leading and the
+    // control number secondary.
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     color: Colors.textLight,
     fontFamily: 'monospace',
     // Shares the date row rather than sitting on its own line below it; it's
@@ -360,5 +384,10 @@ const styles = StyleSheet.create({
     // shove the urgency badge off the row.
     flex: 1,
     minWidth: 0,
+  },
+  // Never squeezed by a long control number sharing the row — same
+  // flexShrink: 0 guard as the date and urgency badge.
+  controlNoIcon: {
+    flexShrink: 0,
   },
 });
