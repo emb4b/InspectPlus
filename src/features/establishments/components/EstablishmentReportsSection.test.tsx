@@ -215,6 +215,77 @@ describe('EstablishmentReportsSection report row token resolution', () => {
   });
 });
 
+describe('EstablishmentReportsSection date + control number row', () => {
+  // Combining the two previously-separate lines is the point of this task —
+  // this asserts real row MEMBERSHIP (both nodes appear as siblings in the
+  // calendar icon's own parent's `.children`), which is exactly what would
+  // fail if the control number were split back onto its own line below the
+  // date row, unlike a bare "both render somewhere" presence check.
+  it('renders the date and control number as siblings of the same row, not on separate lines', () => {
+    const r = render(
+      <EstablishmentReportsSection
+        reports={[baseItem]}
+        currentUid="uid-1"
+        canManageAll={false}
+        onAddReport={noop}
+        onOpenReport={noop}
+        onDeleteReport={noop}
+      />,
+    );
+    const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
+    expect(calendarIcon).toBeDefined();
+    const rowChildren = calendarIcon!.parent!.children;
+
+    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === baseItem.controlNo);
+    const dateText = proseTexts(r).find((n) => flattenStyle(n.props.style).color === Colors.textMuted);
+
+    expect(rowChildren).toContain(dateText);
+    expect(rowChildren).toContain(controlNoText);
+  });
+
+  it('never lets a long control number push the urgency badge out of the row or clip the date', () => {
+    const longControlNo = 'CTRL-2026-0000001-EXTREMELY-LONG-CONTROL-NUMBER-VALUE';
+    const item: EstablishmentReportItem = {
+      ...baseItem,
+      status: 'draft',
+      date: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
+      controlNo: longControlNo,
+    };
+    const r = render(
+      <EstablishmentReportsSection
+        reports={[item]}
+        currentUid="uid-1"
+        canManageAll={false}
+        onAddReport={noop}
+        onOpenReport={noop}
+        onDeleteReport={noop}
+      />,
+    );
+
+    // The badge still renders — a long control number sharing the row must
+    // not crowd it out.
+    const badge = r.root
+      .findAll((n) => (n.type as any)?.name === 'View' || n.type === View)
+      .find((n) => flattenStyle(n.props.style).backgroundColor === Colors.hazwaste.badgeBg);
+    expect(badge).toBeDefined();
+    expect(proseTexts(r).some((n) => n.props.children === 'Overdue')).toBe(true);
+
+    // The date text is still present and untouched — it's the control
+    // number that gives way, not the date.
+    const dateText = proseTexts(r).find((n) => flattenStyle(n.props.style).color === Colors.textMuted);
+    expect(dateText).toBeDefined();
+
+    // The control number is the element that shrinks/truncates (flex: 1,
+    // numberOfLines 1) — the date and badge are pinned (flexShrink: 0) so
+    // neither can be squeezed out by it.
+    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === longControlNo);
+    expect(flattenStyle(controlNoText?.props.style).flex).toBe(1);
+    expect(controlNoText?.props.numberOfLines).toBe(1);
+    expect(flattenStyle(dateText?.props.style).flexShrink).toBe(0);
+    expect(flattenStyle(badge?.props.style).flexShrink).toBe(0);
+  });
+});
+
 describe('EstablishmentReportsSection urgency badge token resolution', () => {
   const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 

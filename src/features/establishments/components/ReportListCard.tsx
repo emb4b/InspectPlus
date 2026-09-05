@@ -209,30 +209,6 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
                 />
               </View>
 
-              {item.syncStatus === 'pending' && (
-                <View style={styles.syncRow}>
-                  <Ionicons name="cloud-upload-outline" size={10} color={Colors.pending} />
-                  <Text style={styles.syncText}>Pending sync</Text>
-                </View>
-              )}
-              {item.syncStatus === 'conflict' && (
-                <TouchableOpacity
-                  style={styles.syncRow}
-                  onPress={() =>
-                    confirmResolveConflict(
-                      item.kind === 'inspection' ? 'inspection_reports' : 'survey_reports',
-                      item.reportId,
-                      item.title,
-                    )
-                  }
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Resolve sync conflict for ${item.title}`}>
-                  <Ionicons name="alert-circle-outline" size={10} color={Colors.conflict} />
-                  <Text style={[styles.syncText, styles.syncTextConflict]}>Sync conflict</Text>
-                </TouchableOpacity>
-              )}
-
               <View style={styles.dateRow}>
                 <Ionicons name="calendar-outline" size={10} color={Colors.textMuted} />
                 <Text style={styles.date}>{formatDate(item.date)}</Text>
@@ -269,6 +245,33 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
               <Text style={styles.controlNo} allowFontScaling={FONT_SCALING.tabular}>
                 {item.controlNo || 'No control number yet'}
               </Text>
+
+              {/* Sync status sits last in the card body, below every other
+                  detail, so it reads as a footer note rather than
+                  competing with the title/meta/date for attention. */}
+              {item.syncStatus === 'pending' && (
+                <View style={styles.syncRow}>
+                  <Ionicons name="cloud-upload-outline" size={10} color={Colors.pending} />
+                  <Text style={styles.syncText}>Pending sync</Text>
+                </View>
+              )}
+              {item.syncStatus === 'conflict' && (
+                <TouchableOpacity
+                  style={styles.syncRow}
+                  onPress={() =>
+                    confirmResolveConflict(
+                      item.kind === 'inspection' ? 'inspection_reports' : 'survey_reports',
+                      item.reportId,
+                      item.title,
+                    )
+                  }
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Resolve sync conflict for ${item.title}`}>
+                  <Ionicons name="alert-circle-outline" size={10} color={Colors.conflict} />
+                  <Text style={[styles.syncText, styles.syncTextConflict]}>Sync conflict</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             {!selectable && <Ionicons name="chevron-forward" size={14} color={Colors.textLight} />}

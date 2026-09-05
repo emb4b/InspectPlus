@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import TestRenderer from 'react-test-renderer';
@@ -16,6 +16,11 @@ import type { AllReportItem } from '../hooks/useEstablishment';
 // babel-plugin-jest-hoist regardless of where they're written, so this
 // still applies before ReportListCard is ever required.
 jest.mock('../../../db/database', () => ({ database: {}, collections: {} }));
+
+const mockConfirmResolveConflict = jest.fn();
+jest.mock('../../../services/sync/syncConflictResolution', () => ({
+  confirmResolveConflict: (...args: unknown[]) => mockConfirmResolveConflict(...args),
+}));
 
 type Renderer = TestRenderer.ReactTestRenderer;
 
@@ -122,6 +127,35 @@ const findCheckbox = (r: Renderer) => {
 
 const findCheckmarkIcons = (r: Renderer) =>
   r.root.findAllByType(Ionicons).filter((n) => n.props.name === 'checkmark' && n.props.size === 14);
+
+// Locate the ordered list of the card body's real JSX children — titleRow,
+// metaRow, dateRow, controlNo, and (conditionally) the sync row — by first
+// finding the `content` View by its resolved shape (flex 1, minWidth 0 —
+// unique to this element in ReportListCard), throwing on zero-or-multiple
+// matches per the findIconWrap convention.
+//
+// `View` from react-native is a forwardRef wrapping a single host layer of
+// the same resolved style (confirmed by inspecting the rendered tree
+// directly: content.children is a single-entry array holding that host
+// layer, not the five JSX siblings), so the real, order-bearing siblings
+// live one level deeper still, on that host layer's own `.children`.
+const findContentChildren = (r: Renderer) => {
+  const views = r.root.findAll((n) => (n.type as any)?.name === 'View' || n.type === View);
+  const matches = views.filter((n) => {
+    const flattened = flattenStyle(n.props.style);
+    return flattened.flex === 1 && flattened.minWidth === 0;
+  });
+  if (matches.length === 0) {
+    throw new Error('No content View found: expected a View with flex===1, minWidth===0');
+  }
+  if (matches.length > 1) {
+    throw new Error(`Expected 1 content View but found ${matches.length}; the locator is not sufficiently specific`);
+  }
+  // Every direct JSX child in this card body is itself a View/Text/
+  // TouchableOpacity element, never bare text — so this cast is safe.
+  const hostLayer = matches[0].children[0] as TestRenderer.ReactTestInstance;
+  return hostLayer.children as TestRenderer.ReactTestInstance[];
+};
 
 const baseItem: AllReportItem = {
   key: 'survey-1',
@@ -491,5 +525,93 @@ describe('ReportListCard Edit/Delete visibility (unchanged by this task)', () =>
     );
     expect(findEditButtons(r, surveyReport)).toHaveLength(0);
     expect(findDeleteButtons(r, surveyReport)).toHaveLength(0);
+  });
+});
+
+describe('ReportListCard sync flag placement', () => {
+  afterEach(() => {
+    mockConfirmResolveConflict.mockClear();
+  });
+
+  // The bug this task fixes: the sync flag used to sit between metaRow and
+  // dateRow, mid-card. This asserts actual render ORDER — not just that the
+  // row exists — so it would fail against the old position.
+  it('renders the pending-sync row after every other element in the card body', () => {
+    const item: AllReportItem = { ...baseItem, syncStatus: 'pending' };
+    const r = render(
+      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    const children = findContentChildren(r);
+    expect(children.length).toBeGreaterThan(1);
+
+    const lastChild = children[children.length - 1];
+    expect(lastChild.findAllByType(Ionicons).some((n) => n.props.name === 'cloud-upload-outline')).toBe(true);
+
+    // The control number — previously the very last element — must now sit
+    // strictly earlier than the sync row.
+    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === item.controlNo);
+    const controlNoIndex = children.indexOf(controlNoText!);
+    expect(controlNoIndex).toBeGreaterThanOrEqual(0);
+    expect(controlNoIndex).toBeLessThan(children.length - 1);
+  });
+
+  it('renders the conflict-sync row after every other element in the card body', () => {
+    const item: AllReportItem = { ...baseItem, syncStatus: 'conflict' };
+    const r = render(
+      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    const children = findContentChildren(r);
+    expect(children.length).toBeGreaterThan(1);
+
+    const lastChild = children[children.length - 1];
+    expect(lastChild.findAllByType(Ionicons).some((n) => n.props.name === 'alert-circle-outline')).toBe(true);
+
+    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === item.controlNo);
+    const controlNoIndex = children.indexOf(controlNoText!);
+    expect(controlNoIndex).toBeGreaterThanOrEqual(0);
+    expect(controlNoIndex).toBeLessThan(children.length - 1);
+  });
+
+  it('shows only the pending row, never the conflict row, when syncStatus is "pending"', () => {
+    const item: AllReportItem = { ...baseItem, syncStatus: 'pending' };
+    const r = render(
+      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    expect(r.root.findAllByType(Ionicons).some((n) => n.props.name === 'cloud-upload-outline')).toBe(true);
+    expect(r.root.findAllByType(Ionicons).some((n) => n.props.name === 'alert-circle-outline')).toBe(false);
+  });
+
+  it('shows only the conflict row, never the pending row, when syncStatus is "conflict"', () => {
+    const item: AllReportItem = { ...baseItem, syncStatus: 'conflict' };
+    const r = render(
+      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    expect(r.root.findAllByType(Ionicons).some((n) => n.props.name === 'alert-circle-outline')).toBe(true);
+    expect(r.root.findAllByType(Ionicons).some((n) => n.props.name === 'cloud-upload-outline')).toBe(false);
+  });
+
+  it('shows neither sync row when syncStatus is "synced"', () => {
+    const r = render(
+      <ReportListCard item={baseItem} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    expect(r.root.findAllByType(Ionicons).some((n) => n.props.name === 'cloud-upload-outline')).toBe(false);
+    expect(r.root.findAllByType(Ionicons).some((n) => n.props.name === 'alert-circle-outline')).toBe(false);
+  });
+
+  it('still resolves and fires confirmResolveConflict when the (now-last) conflict row is pressed', () => {
+    const item: AllReportItem = { ...baseItem, syncStatus: 'conflict' };
+    const r = render(
+      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    const children = findContentChildren(r);
+    const conflictRow = children[children.length - 1];
+
+    TestRenderer.act(() => {
+      conflictRow.props.onPress();
+    });
+
+    // baseItem.kind is 'survey', so the conflict resolves against
+    // 'survey_reports' — the branch's condition is unchanged by the move.
+    expect(mockConfirmResolveConflict).toHaveBeenCalledWith('survey_reports', item.reportId, item.title);
   });
 });
