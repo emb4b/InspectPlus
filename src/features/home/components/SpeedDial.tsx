@@ -24,6 +24,10 @@ const RISE_DISTANCE = 12;
 // Exits run faster than entrances — a dismissal shouldn't make the user wait
 // for the same choreography they already sat through on the way in.
 const CLOSE_DURATION = Math.round(Duration.short * (2 / 3));
+// Clearance from the footer stack. Deliberately more than the usual
+// Spacing.lg gutter: the FAB is a one-handed target in the field, and at
+// 16dp it read as crowded against the footer bar on device.
+const FAB_EDGE_INSET = Spacing.xl;
 
 interface SpeedDialProps {
   // How far AppChrome's measured footer stack (the active screen's own
@@ -90,7 +94,7 @@ export const SpeedDial: React.FC<SpeedDialProps> = ({ bottomInset = 0 }) => {
             // above the FAB rather than behind it — same relationship as
             // before, just shifted up by whatever footer chrome AppChrome
             // measured underneath both.
-            { bottom: Spacing.lg + bottomInset + FAB_SIZE + Spacing.md },
+            { bottom: FAB_EDGE_INSET + bottomInset + FAB_SIZE + Spacing.md },
           ]}
           pointerEvents="box-none">
           {REPORT_TYPES.map((item, index) => (
@@ -106,7 +110,7 @@ export const SpeedDial: React.FC<SpeedDialProps> = ({ bottomInset = 0 }) => {
       )}
 
       <View
-        style={[styles.fabWrap, { bottom: Spacing.lg + bottomInset }]}
+        style={[styles.fabWrap, { bottom: FAB_EDGE_INSET + bottomInset }]}
         pointerEvents="box-none">
         <Fab open={open} onPress={toggle} />
       </View>

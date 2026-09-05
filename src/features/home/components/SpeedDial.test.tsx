@@ -8,6 +8,9 @@ import { FAB_SIZE } from './Fab';
 import { REPORT_TYPES } from '../../../constants/reportTypes';
 import { Spacing } from '../../../design/spacing';
 
+// Mirrors the constant defined in SpeedDial.tsx
+const FAB_EDGE_INSET = Spacing.xl;
+
 // jest.mock calls are hoisted above these imports by babel-plugin-jest-hoist
 // regardless of source order (see Fab.test.tsx / Skeleton.test.tsx for the
 // same convention), so writing them after the imports they mock is safe and
@@ -184,30 +187,30 @@ describe('SpeedDial', () => {
   describe('bottom inset (footer clearance)', () => {
     const FOOTER_INSET = 40;
 
-    it('anchors the trigger Spacing.lg above the bottom when bottomInset is omitted', () => {
+    it('anchors the trigger FAB_EDGE_INSET above the bottom when bottomInset is omitted', () => {
       const r = render();
       const style = flattenStyle(findFabWrapView(r).props.style);
-      expect(style.bottom).toBe(Spacing.lg);
+      expect(style.bottom).toBe(FAB_EDGE_INSET);
     });
 
     it('stacks the rows to clear the trigger and its own inset when bottomInset is omitted', () => {
       const r = render();
       openDial(r);
       const style = flattenStyle(findRowsView(r).props.style);
-      expect(style.bottom).toBe(Spacing.lg + FAB_SIZE + Spacing.md);
+      expect(style.bottom).toBe(FAB_EDGE_INSET + FAB_SIZE + Spacing.md);
     });
 
     it('shifts the trigger up by the measured footer inset', () => {
       const r = render({ bottomInset: FOOTER_INSET });
       const style = flattenStyle(findFabWrapView(r).props.style);
-      expect(style.bottom).toBe(Spacing.lg + FOOTER_INSET);
+      expect(style.bottom).toBe(FAB_EDGE_INSET + FOOTER_INSET);
     });
 
     it('shifts the rows up by the same footer inset, still clearing the trigger by FAB_SIZE + Spacing.md', () => {
       const r = render({ bottomInset: FOOTER_INSET });
       openDial(r);
       const style = flattenStyle(findRowsView(r).props.style);
-      expect(style.bottom).toBe(Spacing.lg + FOOTER_INSET + FAB_SIZE + Spacing.md);
+      expect(style.bottom).toBe(FAB_EDGE_INSET + FOOTER_INSET + FAB_SIZE + Spacing.md);
     });
   });
 });
