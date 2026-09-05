@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { BackHandler, StyleSheet, Text, View } from 'react-native';
+import { BackHandler, LayoutChangeEvent, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -9,7 +9,7 @@ import Animated, {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Touchable } from '../../../components/Touchable';
-import { REPORT_TYPES, ReportType } from '../../../constants/reportTypes';
+import { ENABLED_TYPES, REPORT_TYPES, ReportType } from '../../../constants/reportTypes';
 import { Colors } from '../../../design/colors';
 import { Duration, useMotion } from '../../../design/motion';
 import { Radius } from '../../../design/radius';
@@ -44,6 +44,24 @@ export const SpeedDial: React.FC<SpeedDialProps> = ({ bottomInset = 0 }) => {
   const [open, setOpen] = useState(false);
   const { timing, reduced } = useMotion();
   const scrimOpacity = useSharedValue(0);
+
+  // Shared uniform pill width, computed from measurement rather than a
+  // hardcoded constant so adding or renaming a report type can't desync it.
+  //
+  // Each row reports its own pill's natural (unconstrained) rendered width
+  // here; this only ever grows to the largest one seen. That one-directional
+  // rule is what keeps this from oscillating: once a row's pill is given
+  // `width: pillWidth`, its next layout measurement reports exactly
+  // `pillWidth` back (an explicit width pins the measured size — it no
+  // longer reflects content), which is never greater than the current max,
+  // so the state "update" resolves to the same value React already holds.
+  // React bails out of re-rendering when a state setter returns the same
+  // value it already had, so the loop terminates on its own rather than
+  // needing a separate "have I already applied a width" flag.
+  const [pillWidth, setPillWidth] = useState<number | null>(null);
+  const handlePillMeasured = useCallback((width: number) => {
+    setPillWidth(current => (current === null || width > current ? width : current));
+  }, []);
 
   const close = useCallback(() => setOpen(false), []);
   const toggle = useCallback(() => setOpen(current => !current), []);
@@ -104,6 +122,9 @@ export const SpeedDial: React.FC<SpeedDialProps> = ({ bottomInset = 0 }) => {
               item={item}
               index={index}
               reduced={reduced}
+              enabled={ENABLED_TYPES.includes(item.key)}
+              pillWidth={pillWidth}
+              onPillMeasured={handlePillMeasured}
               onPress={() => select(item.route)}
             />
           ))}
@@ -123,10 +144,21 @@ interface DialRowProps {
   item: ReportType;
   index: number;
   reduced: boolean;
+  enabled: boolean;
+  pillWidth: number | null;
+  onPillMeasured: (width: number) => void;
   onPress: () => void;
 }
 
-const DialRow: React.FC<DialRowProps> = ({ item, index, reduced, onPress }) => {
+const DialRow: React.FC<DialRowProps> = ({
+  item,
+  index,
+  reduced,
+  enabled,
+  pillWidth,
+  onPillMeasured,
+  onPress,
+}) => {
   const IconAsset = item.iconAsset;
   const progress = useSharedValue(reduced ? 1 : 0);
 
@@ -143,32 +175,59 @@ const DialRow: React.FC<DialRowProps> = ({ item, index, reduced, onPress }) => {
     transform: [{ translateY: (1 - progress.value) * RISE_DISTANCE }],
   }));
 
+  const handlePillLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      onPillMeasured(event.nativeEvent.layout.width);
+    },
+    [onPillMeasured],
+  );
+
   return (
     <Animated.View style={[styles.row, rowStyle]}>
-      <View style={[styles.pill, { backgroundColor: item.bgColor, borderColor: item.borderColor }]}>
-        <Text style={[styles.pillTitle, { color: item.textColor }]} numberOfLines={1}>
-          {item.shortTitle}
-        </Text>
-        <Text style={styles.pillLaw} numberOfLines={1}>
-          {item.law}
-        </Text>
-      </View>
-      {/* The visible label is the short one; the accessible name is the full
-          legal title, which is what a screen reader user needs. */}
+      {/* The whole row — pill and icon together — is one touch target. The
+          visible label is the short one; the accessible name is the full
+          legal title, which is what a screen reader user needs. An
+          unavailable type is announced as disabled rather than removed, so
+          it stays visible (and still animates in) but cannot be activated. */}
       <Touchable
         accessibilityRole="button"
         accessibilityLabel={item.title}
-        onPress={onPress}
-        style={[styles.rowButton, { backgroundColor: item.bgColor, borderColor: item.borderColor }]}>
-        {IconAsset ? (
-          <IconAsset width={20} height={20} />
-        ) : (
-          <Ionicons
-            name={item.iconName as keyof typeof Ionicons.glyphMap}
-            size={20}
-            color={item.textColor}
-          />
-        )}
+        accessibilityState={{ disabled: !enabled }}
+        disabled={!enabled}
+        onPress={enabled ? onPress : undefined}
+        style={[styles.rowTouchable, !enabled && styles.rowTouchableDisabled]}>
+        <View
+          style={[
+            styles.pill,
+            { backgroundColor: item.bgColor, borderColor: item.borderColor },
+            pillWidth !== null ? { width: pillWidth } : null,
+          ]}
+          onLayout={handlePillLayout}>
+          <View style={styles.pillHeader}>
+            <Text style={[styles.pillTitle, { color: item.textColor }]} numberOfLines={1}>
+              {item.shortTitle}
+            </Text>
+            {!enabled && (
+              <View style={styles.soonBadge}>
+                <Text style={styles.soonBadgeText}>Soon</Text>
+              </View>
+            )}
+          </View>
+          <Text style={styles.pillLaw} numberOfLines={1}>
+            {item.law}
+          </Text>
+        </View>
+        <View style={[styles.rowButton, { backgroundColor: item.bgColor, borderColor: item.borderColor }]}>
+          {IconAsset ? (
+            <IconAsset width={20} height={20} />
+          ) : (
+            <Ionicons
+              name={item.iconName as keyof typeof Ionicons.glyphMap}
+              size={20}
+              color={item.textColor}
+            />
+          )}
+        </View>
       </Touchable>
     </Animated.View>
   );
@@ -197,9 +256,18 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   row: {
+    // Layout now lives on `rowTouchable` below — this wrapper exists only
+    // so the staggered entrance animation has a stable node to animate.
+  },
+  rowTouchable: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+  },
+  // Matches Button's own disabled treatment (opacity 0.55) so a dimmed,
+  // non-interactive row reads the same way everywhere in the app.
+  rowTouchableDisabled: {
+    opacity: 0.55,
   },
   pill: {
     borderWidth: 1,
@@ -208,14 +276,33 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xs,
     maxWidth: 200,
   },
+  pillHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+  },
   pillTitle: {
     fontSize: Type.bodySm.fontSize,
     lineHeight: Type.bodySm.lineHeight,
     fontWeight: '700',
+    // Lets the title give way to the "Soon" badge sharing this row instead
+    // of pushing it out past the pill's own maxWidth.
+    flexShrink: 1,
   },
   pillLaw: {
     fontSize: Type.caption.fontSize,
     lineHeight: Type.caption.lineHeight,
+    color: Colors.textMuted,
+  },
+  soonBadge: {
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.xs,
+    backgroundColor: Colors.bgLight,
+  },
+  soonBadgeText: {
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
+    fontWeight: '700',
     color: Colors.textMuted,
   },
   rowButton: {

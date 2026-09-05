@@ -4,6 +4,7 @@ import { GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import TestRenderer from 'react-test-renderer';
 import { EstablishmentReportsSection } from './EstablishmentReportsSection';
+import { REPORT_TYPE_DISPLAY, ReportDataKey } from '../../../constants/reportTypeDisplay';
 import { Colors } from '../../../design/colors';
 import { Radius } from '../../../design/radius';
 import { Type } from '../../../design/typography';
@@ -118,14 +119,45 @@ describe('EstablishmentReportsSection report row token resolution', () => {
     expect(style.borderRadius).toBe(Radius.md);
   });
 
-  it.each([
-    ['air_monitoring', 'partly-sunny-outline'],
-    ['water_monitoring', 'water-outline'],
-    ['hazardous_waste', 'warning-outline'],
-    ['eia', 'globe-outline'],
-    ['survey', 'leaf-outline'],
-  ] as const)('resolves the %s report icon glyph, always in the water text color', (reportType, glyph) => {
-    const item: EstablishmentReportItem = { ...baseItem, reportType };
+  const ALL_DATA_KEYS: ReportDataKey[] = [
+    'air_monitoring',
+    'water_monitoring',
+    'hazardous_waste',
+    'eia',
+    'survey',
+  ];
+
+  it.each(ALL_DATA_KEYS)(
+    'resolves %s icon and background/color from REPORT_TYPE_DISPLAY, not a hardcoded water treatment',
+    (reportType) => {
+      const item: EstablishmentReportItem = { ...baseItem, reportType };
+      const r = render(
+        <EstablishmentReportsSection
+          reports={[item]}
+          currentUid="uid-1"
+          canManageAll={false}
+          onAddReport={noop}
+          onOpenReport={noop}
+          onDeleteReport={noop}
+        />,
+      );
+      const expected = REPORT_TYPE_DISPLAY[reportType];
+
+      const wrapStyle = flattenStyle(findIconWrap(r).props.style);
+      expect(wrapStyle.backgroundColor).toBe(expected.bgColor);
+
+      const icon = r.root.findAllByType(Ionicons).find((n) => n.props.size === 17);
+      expect(icon?.props.name).toBe(expected.icon);
+      expect(icon?.props.color).toBe(expected.textColor);
+    },
+  );
+
+  // The bug this task fixes: every row previously rendered with a
+  // hardcoded backgroundColor: Colors.water.bg / color: Colors.water.text
+  // regardless of the report's actual type. Assert an air report resolves
+  // to the air palette specifically, not water's.
+  it('an air_monitoring report does not render with the water palette', () => {
+    const item: EstablishmentReportItem = { ...baseItem, reportType: 'air_monitoring' };
     const r = render(
       <EstablishmentReportsSection
         reports={[item]}
@@ -136,14 +168,39 @@ describe('EstablishmentReportsSection report row token resolution', () => {
         onDeleteReport={noop}
       />,
     );
+
+    const wrapStyle = flattenStyle(findIconWrap(r).props.style);
+    expect(wrapStyle.backgroundColor).not.toBe(Colors.water.bg);
+    expect(wrapStyle.backgroundColor).toBe(Colors.air.bg);
+
     const icon = r.root.findAllByType(Ionicons).find((n) => n.props.size === 17);
-    expect(icon?.props.name).toBe(glyph);
-    // Unlike ReportListCard, this row intentionally uses one fixed treatment
-    // for every report type — restyling this section must not change that.
-    expect(icon?.props.color).toBe(Colors.water.text);
+    expect(icon?.props.color).not.toBe(Colors.water.text);
+    expect(icon?.props.color).toBe(Colors.air.text);
   });
 
-  it('falls back to a neutral document icon for an unrecognized report type', () => {
+  // Regression coverage for the specific swapped-icon bug: eia and survey
+  // must each resolve their OWN icon, not each other's — matches
+  // ReportListCard's equivalent coverage.
+  it('eia and survey resolve distinct, non-swapped icons', () => {
+    const eiaItem: EstablishmentReportItem = { ...baseItem, reportType: 'eia' };
+    const surveyItem: EstablishmentReportItem = { ...baseItem, reportType: 'survey' };
+
+    const eiaR = render(
+      <EstablishmentReportsSection reports={[eiaItem]} currentUid="uid-1" canManageAll={false} onAddReport={noop} onOpenReport={noop} onDeleteReport={noop} />,
+    );
+    const surveyR = render(
+      <EstablishmentReportsSection reports={[surveyItem]} currentUid="uid-1" canManageAll={false} onAddReport={noop} onOpenReport={noop} onDeleteReport={noop} />,
+    );
+
+    const eiaIcon = eiaR.root.findAllByType(Ionicons).find((n) => n.props.size === 17);
+    const surveyIcon = surveyR.root.findAllByType(Ionicons).find((n) => n.props.size === 17);
+
+    expect(eiaIcon?.props.name).toBe('document-text-outline');
+    expect(surveyIcon?.props.name).toBe('globe-outline');
+    expect(eiaIcon?.props.name).not.toBe(surveyIcon?.props.name);
+  });
+
+  it('falls back to a neutral treatment for an unrecognized report type', () => {
     const item: EstablishmentReportItem = { ...baseItem, reportType: 'some_future_type' };
     const r = render(
       <EstablishmentReportsSection
@@ -155,8 +212,12 @@ describe('EstablishmentReportsSection report row token resolution', () => {
         onDeleteReport={noop}
       />,
     );
+    const wrapStyle = flattenStyle(findIconWrap(r).props.style);
+    expect(wrapStyle.backgroundColor).toBe(Colors.bgLight);
+
     const icon = r.root.findAllByType(Ionicons).find((n) => n.props.size === 17);
     expect(icon?.props.name).toBe('document-outline');
+    expect(icon?.props.color).toBe(Colors.textMuted);
   });
 
   it('resolves the title and date text sizes from the type scale', () => {
@@ -212,6 +273,77 @@ describe('EstablishmentReportsSection report row token resolution', () => {
       />,
     );
     expect(r.root.findAllByType(Text).some((n) => n.props.children === 'No control number yet')).toBe(true);
+  });
+});
+
+describe('EstablishmentReportsSection date + control number row', () => {
+  // Combining the two previously-separate lines is the point of this task —
+  // this asserts real row MEMBERSHIP (both nodes appear as siblings in the
+  // calendar icon's own parent's `.children`), which is exactly what would
+  // fail if the control number were split back onto its own line below the
+  // date row, unlike a bare "both render somewhere" presence check.
+  it('renders the date and control number as siblings of the same row, not on separate lines', () => {
+    const r = render(
+      <EstablishmentReportsSection
+        reports={[baseItem]}
+        currentUid="uid-1"
+        canManageAll={false}
+        onAddReport={noop}
+        onOpenReport={noop}
+        onDeleteReport={noop}
+      />,
+    );
+    const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
+    expect(calendarIcon).toBeDefined();
+    const rowChildren = calendarIcon!.parent!.children;
+
+    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === baseItem.controlNo);
+    const dateText = proseTexts(r).find((n) => flattenStyle(n.props.style).color === Colors.textMuted);
+
+    expect(rowChildren).toContain(dateText);
+    expect(rowChildren).toContain(controlNoText);
+  });
+
+  it('never lets a long control number push the urgency badge out of the row or clip the date', () => {
+    const longControlNo = 'CTRL-2026-0000001-EXTREMELY-LONG-CONTROL-NUMBER-VALUE';
+    const item: EstablishmentReportItem = {
+      ...baseItem,
+      status: 'draft',
+      date: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
+      controlNo: longControlNo,
+    };
+    const r = render(
+      <EstablishmentReportsSection
+        reports={[item]}
+        currentUid="uid-1"
+        canManageAll={false}
+        onAddReport={noop}
+        onOpenReport={noop}
+        onDeleteReport={noop}
+      />,
+    );
+
+    // The badge still renders — a long control number sharing the row must
+    // not crowd it out.
+    const badge = r.root
+      .findAll((n) => (n.type as any)?.name === 'View' || n.type === View)
+      .find((n) => flattenStyle(n.props.style).backgroundColor === Colors.hazwaste.badgeBg);
+    expect(badge).toBeDefined();
+    expect(proseTexts(r).some((n) => n.props.children === 'Overdue')).toBe(true);
+
+    // The date text is still present and untouched — it's the control
+    // number that gives way, not the date.
+    const dateText = proseTexts(r).find((n) => flattenStyle(n.props.style).color === Colors.textMuted);
+    expect(dateText).toBeDefined();
+
+    // The control number is the element that shrinks/truncates (flex: 1,
+    // numberOfLines 1) — the date and badge are pinned (flexShrink: 0) so
+    // neither can be squeezed out by it.
+    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === longControlNo);
+    expect(flattenStyle(controlNoText?.props.style).flex).toBe(1);
+    expect(controlNoText?.props.numberOfLines).toBe(1);
+    expect(flattenStyle(dateText?.props.style).flexShrink).toBe(0);
+    expect(flattenStyle(badge?.props.style).flexShrink).toBe(0);
   });
 });
 

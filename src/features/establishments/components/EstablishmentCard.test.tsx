@@ -77,6 +77,35 @@ const findActionButton = (r: Renderer, label: string) =>
     (n) => n.type === TouchableOpacity && n.props?.children?.[1]?.props?.children === label,
   );
 
+// Locate the ordered list of the card body's real JSX children — name,
+// locationRow, tagRow, and (conditionally) the sync row — by first finding
+// the `content` View by its resolved shape (flex 1, minWidth 0 — unique to
+// this element in EstablishmentCard), throwing on zero-or-multiple matches
+// per the findIconWrap convention.
+//
+// `View` from react-native is a forwardRef wrapping a single host layer of
+// the same resolved style (confirmed by inspecting the rendered tree
+// directly — same finding as ReportListCard.test.tsx's identical helper),
+// so the real, order-bearing siblings live one level deeper still, on that
+// host layer's own `.children`.
+const findContentChildren = (r: Renderer) => {
+  const views = r.root.findAll((n) => (n.type as any)?.name === 'View' || n.type === View);
+  const matches = views.filter((n) => {
+    const flattened = flattenStyle(n.props.style);
+    return flattened.flex === 1 && flattened.minWidth === 0;
+  });
+  if (matches.length === 0) {
+    throw new Error('No content View found: expected a View with flex===1, minWidth===0');
+  }
+  if (matches.length > 1) {
+    throw new Error(`Expected 1 content View but found ${matches.length}; the locator is not sufficiently specific`);
+  }
+  // Every direct JSX child in this card body is itself a View/Text/
+  // TouchableOpacity element, never bare text — so this cast is safe.
+  const hostLayer = matches[0].children[0] as TestRenderer.ReactTestInstance;
+  return hostLayer.children as TestRenderer.ReactTestInstance[];
+};
+
 const isPanGestureEnabled = (r: Renderer): boolean | undefined =>
   (r.root.findByType(GestureDetector).props as { gesture: { config: { enabled?: boolean } } }).gesture
     .config.enabled;
@@ -290,6 +319,53 @@ describe('EstablishmentCard sync indicator', () => {
     const r = render(<EstablishmentCard item={baseItem} onPress={noop} />);
     expect(r.root.findAllByType(Ionicons).some((n) => n.props.name === 'cloud-upload-outline')).toBe(false);
     expect(r.root.findAllByType(Ionicons).some((n) => n.props.name === 'alert-circle-outline')).toBe(false);
+  });
+});
+
+describe('EstablishmentCard sync flag placement', () => {
+  // The bug this task fixes: the sync flag used to sit between locationRow
+  // and tagRow, mid-card. This asserts actual render ORDER — not just that
+  // the row exists — so it would fail against the old position.
+  it('renders the pending-sync row after every other element in the card body, below the tags', () => {
+    const item: EstablishmentDTO = { ...baseItem, syncStatus: 'pending', complianceTags: ['Air Monitoring'] };
+    const r = render(<EstablishmentCard item={item} onPress={noop} />);
+    const children = findContentChildren(r);
+    // name, locationRow, tagRow, syncRow — at least 4 elements now that the
+    // sync row is present and last.
+    expect(children.length).toBeGreaterThanOrEqual(4);
+
+    const lastChild = children[children.length - 1];
+    expect(lastChild.findAllByType(Ionicons).some((n) => n.props.name === 'cloud-upload-outline')).toBe(true);
+
+    // The tag row — previously followed immediately by the sync row,
+    // mid-card — must now sit strictly earlier than the sync row.
+    const airLaw = REPORT_TYPES.find((t) => t.key === 'air')!.law;
+    const tagLabel = proseTexts(r).find((n) => n.props.children === airLaw);
+    expect(tagLabel).toBeDefined();
+    expect(children.slice(0, -1).some((c) => c.findAllByType(Text).some((n) => n.props.children === airLaw))).toBe(true);
+  });
+
+  it('renders the conflict-sync row after every other element in the card body, below the tags', () => {
+    const item: EstablishmentDTO = { ...baseItem, syncStatus: 'conflict' };
+    const r = render(<EstablishmentCard item={item} onPress={noop} />);
+    const children = findContentChildren(r);
+    expect(children.length).toBeGreaterThan(1);
+
+    const lastChild = children[children.length - 1];
+    expect(lastChild.findAllByType(Ionicons).some((n) => n.props.name === 'alert-circle-outline')).toBe(true);
+  });
+
+  it('still resolves and fires confirmResolveConflict when the (now-last) conflict row is pressed', () => {
+    const item: EstablishmentDTO = { ...baseItem, syncStatus: 'conflict' };
+    const r = render(<EstablishmentCard item={item} onPress={noop} />);
+    const children = findContentChildren(r);
+    const conflictRow = children[children.length - 1];
+
+    TestRenderer.act(() => {
+      conflictRow.props.onPress();
+    });
+
+    expect(mockConfirmResolveConflict).toHaveBeenCalledWith('establishments', item.estabId, item.name);
   });
 });
 

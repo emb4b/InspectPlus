@@ -19,7 +19,11 @@ import { Type } from '../design/typography';
 // establishment card, and the confirm button was green at two different
 // sizes. Everything here is one radius, one stroke weight, and paddings on
 // the 4/8dp rhythm so that can't drift again.
-export type ButtonVariant = 'primary' | 'success' | 'danger' | 'outline' | 'subtle';
+// 'add' rather than the more literal 'dashed': the name describes what the
+// variant means (this button appends something), not how it's currently
+// drawn. If the treatment changes again — a solid fill, a different color —
+// the name still fits every add-row/add-card call site using it.
+export type ButtonVariant = 'primary' | 'success' | 'danger' | 'outline' | 'subtle' | 'add';
 export type ButtonSize = 'sm' | 'md';
 
 interface ButtonProps {
@@ -54,6 +58,7 @@ const LABEL_COLOR: Record<ButtonVariant, string> = {
   danger: Colors.textWhite,
   outline: Colors.navy,
   subtle: Colors.textPrimary,
+  add: Colors.green,
 };
 
 export const Button: React.FC<ButtonProps> = ({
@@ -155,6 +160,14 @@ const styles = StyleSheet.create({
   },
   subtle: {
     backgroundColor: Colors.bgLight,
+  },
+  // Dashed green, restoring the pre-consolidation treatment for "this
+  // appends something" actions (add a row, add a card). borderWidth stays
+  // the shared 1.5 from `base` — only the color and stroke style change.
+  add: {
+    backgroundColor: Colors.white,
+    borderColor: Colors.greenLight,
+    borderStyle: 'dashed',
   },
   label: {
     fontWeight: '700',

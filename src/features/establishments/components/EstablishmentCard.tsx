@@ -179,23 +179,6 @@ export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
                 />
               </View>
 
-              {/* Sync status indicator */}
-              {item.syncStatus === 'pending' && (
-                <View style={styles.syncRow}>
-                  <Ionicons name="cloud-upload-outline" size={10} color={Colors.pending} />
-                  <Text style={styles.syncText}>Pending sync</Text>
-                </View>
-              )}
-              {item.syncStatus === 'conflict' && (
-                <TouchableOpacity
-                  style={styles.syncRow}
-                  onPress={() => confirmResolveConflict('establishments', item.estabId, item.name)}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-                  <Ionicons name="alert-circle-outline" size={10} color={Colors.conflict} />
-                  <Text style={[styles.syncText, { color: Colors.conflict }]}>Sync conflict</Text>
-                </TouchableOpacity>
-              )}
-
               {/* Compliance tags */}
               <View style={styles.tagRow}>
                 {visibleTags.map(tag => {
@@ -220,6 +203,25 @@ export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
                   <Text style={styles.noTags}>No reports yet</Text>
                 )}
               </View>
+
+              {/* Sync status sits last in the card body, below the tags, so
+                  it reads as a footer note rather than competing with the
+                  name/location/tags for attention. */}
+              {item.syncStatus === 'pending' && (
+                <View style={styles.syncRow}>
+                  <Ionicons name="cloud-upload-outline" size={10} color={Colors.pending} />
+                  <Text style={styles.syncText}>Pending sync</Text>
+                </View>
+              )}
+              {item.syncStatus === 'conflict' && (
+                <TouchableOpacity
+                  style={styles.syncRow}
+                  onPress={() => confirmResolveConflict('establishments', item.estabId, item.name)}
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                  <Ionicons name="alert-circle-outline" size={10} color={Colors.conflict} />
+                  <Text style={[styles.syncText, { color: Colors.conflict }]}>Sync conflict</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* Chevron */}
@@ -328,7 +330,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
-    marginBottom: Spacing.xs,
+    // Now the last element in the card body (below the tags) rather than
+    // sitting mid-card between location and tags, so it needs space above
+    // itself instead of below.
+    marginTop: Spacing.xs,
   },
   syncText: {
     fontSize: Type.caption.fontSize,

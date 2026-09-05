@@ -160,15 +160,13 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
   useScreenFooter(
     () => (
       <SaveBar
-        establishmentName={generalInfo.name || 'New Establishment'}
-        typeLabel="Water Monitoring"
         saving={saving}
         onDiscard={() => router.back()}
         onSaveDraft={() => handleSave('draft')}
         onSubmit={() => handleSave('submitted')}
       />
     ),
-    [generalInfo.name, saving, handleSave]
+    [saving, handleSave]
   );
 
   const hasDp = establishmentHasDischargePermit(generalInfo.denrPermits);

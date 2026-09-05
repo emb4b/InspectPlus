@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppText } from '../../../components/AppText';
 import { Button } from '../../../components/Button';
 import { EmptyState } from '../../../components/EmptyState';
+import { REPORT_TYPE_DISPLAY, ReportDataKey } from '../../../constants/reportTypeDisplay';
 import { Colors } from '../../../design/colors';
 import { Duration } from '../../../design/motion';
 import { Radius } from '../../../design/radius';
@@ -26,14 +27,6 @@ interface EstablishmentReportsSectionProps {
   onDeleteReport: (item: EstablishmentReportItem) => void;
 }
 
-const REPORT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  air_monitoring: 'partly-sunny-outline',
-  water_monitoring: 'water-outline',
-  hazardous_waste: 'warning-outline',
-  eia: 'globe-outline',
-  survey: 'leaf-outline',
-};
-
 function formatDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
@@ -53,6 +46,10 @@ const ReportRow: React.FC<{
   showDelete: boolean;
 }> = ({ item, onOpen, onDelete, showDelete }) => {
   const urgency = getReportUrgency(item.date, item.status);
+  // An unrecognized type still renders — a report written by a newer app
+  // version shouldn't produce a blank row on an older one. Matches
+  // ReportListCard's fallback so the two components can't drift again.
+  const display = REPORT_TYPE_DISPLAY[item.reportType as ReportDataKey];
 
   const revealWidth = showDelete ? ACTION_WIDTH : 0;
   const openThreshold = revealWidth * OPEN_THRESHOLD_RATIO;
@@ -128,14 +125,31 @@ const ReportRow: React.FC<{
             activeOpacity={0.75}
             accessibilityRole="button"
             accessibilityLabel={item.title}>
-            <View style={styles.iconWrap}>
-              <Ionicons name={REPORT_ICONS[item.reportType] ?? 'document-outline'} size={17} color={Colors.water.text} />
+            <View style={[styles.iconWrap, { backgroundColor: display?.bgColor ?? Colors.bgLight }]}>
+              <Ionicons
+                name={display?.icon ?? 'document-outline'}
+                size={17}
+                color={display?.textColor ?? Colors.textMuted}
+              />
             </View>
             <View style={styles.content}>
               <AppText variant="marquee" text={item.title} style={styles.title} />
               <View style={styles.dateRow}>
                 <Ionicons name="calendar-outline" size={10} color={Colors.textMuted} />
                 <Text style={styles.date}>{formatDate(item.date)}</Text>
+                {/* Fixed-format monospace: OS font scaling blows it past the
+                    row width, so it opts out per the FONT_SCALING policy —
+                    matches ReportListCard's controlNo. Shares this row with
+                    the date; flexShrink+numberOfLines let it truncate first
+                    so a long control number can't clip the date or push an
+                    urgency badge off the row. */}
+                <Text
+                  style={styles.controlNo}
+                  allowFontScaling={FONT_SCALING.tabular}
+                  numberOfLines={1}
+                  ellipsizeMode="tail">
+                  {item.controlNo || 'No control number yet'}
+                </Text>
                 {urgency !== 'none' && (
                   <View
                     style={[
@@ -157,12 +171,6 @@ const ReportRow: React.FC<{
                   </View>
                 )}
               </View>
-              {/* Fixed-format monospace: OS font scaling blows it past the
-                  row width, so it opts out per the FONT_SCALING policy —
-                  matches ReportListCard's controlNo. */}
-              <Text style={styles.controlNo} allowFontScaling={FONT_SCALING.tabular}>
-                {item.controlNo || 'No control number yet'}
-              </Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
           </TouchableOpacity>
@@ -296,7 +304,6 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: Radius.md,
-    backgroundColor: Colors.water.bg,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -318,11 +325,13 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     marginTop: Spacing.xs,
   },
-  // Matches ReportListCard's "date" token choice.
+  // Matches ReportListCard's "date" token choice. Fixed width in the row —
+  // the control number is what shrinks/truncates, not the date.
   date: {
     fontSize: Type.label.fontSize,
     lineHeight: Type.label.lineHeight,
     color: Colors.textMuted,
+    flexShrink: 0,
   },
   urgencyBadge: {
     flexDirection: 'row',
@@ -332,6 +341,9 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xxs,
     borderRadius: Radius.pill,
     marginLeft: Spacing.xs,
+    // Never squeezed by a long control number sharing the row — it's the
+    // control number that truncates, not this badge.
+    flexShrink: 0,
   },
   urgencyBadgeText: {
     fontSize: Type.caption.fontSize,
@@ -342,7 +354,11 @@ const styles = StyleSheet.create({
     fontSize: Type.caption.fontSize,
     lineHeight: Type.caption.lineHeight,
     color: Colors.textLight,
-    marginTop: Spacing.xxs,
     fontFamily: 'monospace',
+    // Shares the date row rather than sitting on its own line below it; it's
+    // the one that shrinks/truncates so a long value can't clip the date or
+    // shove the urgency badge off the row.
+    flex: 1,
+    minWidth: 0,
   },
 });

@@ -74,10 +74,32 @@ describe('Button token resolution', () => {
     ['danger', Colors.conflict, Colors.textWhite],
     ['outline', Colors.white, Colors.navy],
     ['subtle', Colors.bgLight, Colors.textPrimary],
+    ['add', Colors.white, Colors.green],
   ] as const)('resolves the %s variant background and label color from tokens', (variant, bg, labelColor) => {
     const r = render(<Button label="Edit" onPress={() => {}} variant={variant} />);
     expect(flattenStyle(findButton(r).props.style).backgroundColor).toBe(bg);
     expect(flattenStyle(findLabelText(r, 'Edit').props.style).color).toBe(labelColor);
+  });
+
+  // 'add' is the odd one out among the variants above: its distinguishing
+  // feature isn't its background (white, same as outline) but a dashed
+  // green border, restoring the pre-consolidation add-row/add-card
+  // treatment. Covered separately so the border itself is asserted, not
+  // just background/label color.
+  describe('add variant (dashed green, for "this appends something" actions)', () => {
+    it('resolves a dashed border in Colors.greenLight', () => {
+      const r = render(<Button label="Add Row" onPress={() => {}} variant="add" icon="add" />);
+      const style = flattenStyle(findButton(r).props.style);
+      expect(style.borderStyle).toBe('dashed');
+      expect(style.borderColor).toBe(Colors.greenLight);
+    });
+
+    it('drives both the icon and the label color from Colors.green', () => {
+      const r = render(<Button label="Add Row" onPress={() => {}} variant="add" icon="add" />);
+      const icon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'add');
+      expect(icon?.props.color).toBe(Colors.green);
+      expect(flattenStyle(findLabelText(r, 'Add Row').props.style).color).toBe(Colors.green);
+    });
   });
 
   it('resolves sm padding from Spacing.md/Spacing.sm', () => {

@@ -14,6 +14,7 @@ import { router } from 'expo-router';
 import { Colors } from '../../../constants/colors';
 import { formatEstablishmentLocation } from '../../../utils/establishmentLocation';
 import { AppText } from '../../../components/AppText';
+import { Button } from '../../../components/Button';
 import { useEstablishments } from '../../establishments/hooks/useEstablishment';
 import type { EstablishmentDTO } from '../../establishments/types';
 import { useHeaderScroll } from '../../home/context/HeaderScrollContext';
@@ -70,10 +71,20 @@ export const EstablishmentPickerStep: React.FC<EstablishmentPickerStepProps> = (
           />
         </View>
 
-        <TouchableOpacity style={styles.newBtn} activeOpacity={0.75} onPress={onCreateNew}>
-          <Ionicons name="add-circle" size={16} color={Colors.green} />
-          <Text style={styles.newBtnText}>New Establishment</Text>
-        </TouchableOpacity>
+        {/* Button, not AddRowButton: AddRowButton is named and documented
+            (see its own comment) for the "add a row / add a card" case —
+            table and card rows specifically. Adding a new establishment
+            isn't a row, so routing it through AddRowButton would make that
+            component's name lie about what it's for. Button directly, with
+            the shared dashed-green "add" variant, gets the same
+            consolidated treatment without borrowing a name that doesn't fit. */}
+        <Button
+          label="New Establishment"
+          icon="add-circle"
+          variant="add"
+          onPress={onCreateNew}
+          style={styles.newBtn}
+        />
 
         {loading ? (
           <View style={styles.centered}>
@@ -172,24 +183,13 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     paddingVertical: 0,
   },
+  // Button supplies its own padding, border, and radius for the "add"
+  // variant now — only the layout concerns that are this screen's to own
+  // (left-aligned, content-width; spacing against the list below) stay
+  // here, passed in via Button's `style` prop.
   newBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
     alignSelf: 'flex-start',
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderWidth: 1.5,
-    borderColor: Colors.greenLight,
-    borderStyle: 'dashed',
-    borderRadius: 8,
     marginBottom: 14,
-  },
-  newBtnText: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: Colors.green,
   },
   centered: {
     alignItems: 'center',

@@ -23,15 +23,16 @@ interface AddRowButtonProps {
 // right next to an Ionicons "add" glyph that already says the same thing.
 // That's what put "⊕ + Add Parameter" on screen. This wraps the app's
 // single Button primitive instead, so every add action gets the same 48dp
-// target, the same accessibility contract, and the same outline treatment
-// as every other secondary action in the button hierarchy — one place to
-// change if the treatment moves again, and no leading "+" left to double
-// up with the icon.
+// target, the same accessibility contract, and Button's dashed-green `add`
+// variant (restoring the dashed/green treatment these five buttons had
+// before an earlier consolidation flattened them to solid navy outline) —
+// one place to change if the treatment moves again, and no leading "+" left
+// to double up with the icon.
 export const AddRowButton: React.FC<AddRowButtonProps> = ({ label, onPress, small, style }) => (
   <Button
     label={label}
     icon="add"
-    variant="outline"
+    variant="add"
     size={small ? 'sm' : 'md'}
     onPress={onPress}
     style={[styles.selfStart, style]}
