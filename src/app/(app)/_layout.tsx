@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { View, StyleSheet, StatusBar } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, StyleSheet, StatusBar, LayoutChangeEvent } from 'react-native';
 import { Stack, usePathname } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '../../design/colors';
@@ -20,6 +20,17 @@ function AppChrome() {
   const screenFooter = useActiveScreenFooter();
   const fabHidden = useFabHidden();
 
+  // Measured height of the footer stack below (the active screen's own
+  // registered footer, if any, plus HomeFooter) so SpeedDial can anchor its
+  // trigger and rows above it instead of a fixed Spacing.lg that assumed no
+  // footer was ever there. onLayout fires whenever that stack's height
+  // actually changes — e.g. a screen registering (or clearing) a taller
+  // Save/Cancel row through useScreenFooter.
+  const [footerHeight, setFooterHeight] = useState(0);
+  const handleFooterLayout = useCallback((event: LayoutChangeEvent) => {
+    setFooterHeight(event.nativeEvent.layout.height);
+  }, []);
+
   // Each screen mounts its own scroll container, so the collapsed state from
   // whatever page the user just left shouldn't carry over to the next one.
   useEffect(() => {
@@ -32,11 +43,13 @@ function AppChrome() {
       <View style={styles.content}>
         <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }} />
       </View>
-      {screenFooter}
-      <HomeFooter />
+      <View onLayout={handleFooterLayout}>
+        {screenFooter}
+        <HomeFooter />
+      </View>
       {/* Last child, so its scrim and rows layer over the chrome. Unmounting
           on a route change also closes any open dial. */}
-      {isFabRoute(pathname) && !fabHidden && <SpeedDial />}
+      {isFabRoute(pathname) && !fabHidden && <SpeedDial bottomInset={footerHeight} />}
     </>
   );
 }

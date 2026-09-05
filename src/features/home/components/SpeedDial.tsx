@@ -25,7 +25,17 @@ const RISE_DISTANCE = 12;
 // for the same choreography they already sat through on the way in.
 const CLOSE_DURATION = Math.round(Duration.short * (2 / 3));
 
-export const SpeedDial: React.FC = () => {
+interface SpeedDialProps {
+  // How far AppChrome's measured footer stack (the active screen's own
+  // registered footer plus HomeFooter) reaches up from the bottom of the
+  // safe area. Both the trigger and its rows shift up by this amount so
+  // neither ever renders underneath that chrome. Defaults to 0 so a caller
+  // that hasn't measured yet (or a screen with no footer at all) keeps the
+  // original Spacing.lg-from-the-bottom placement.
+  bottomInset?: number;
+}
+
+export const SpeedDial: React.FC<SpeedDialProps> = ({ bottomInset = 0 }) => {
   const [open, setOpen] = useState(false);
   const { timing, reduced } = useMotion();
   const scrimOpacity = useSharedValue(0);
@@ -73,7 +83,16 @@ export const SpeedDial: React.FC = () => {
       )}
 
       {open && (
-        <View style={styles.rows} pointerEvents="box-none">
+        <View
+          style={[
+            styles.rows,
+            // Clears the trigger and its own inset, so the first row sits
+            // above the FAB rather than behind it — same relationship as
+            // before, just shifted up by whatever footer chrome AppChrome
+            // measured underneath both.
+            { bottom: Spacing.lg + bottomInset + FAB_SIZE + Spacing.md },
+          ]}
+          pointerEvents="box-none">
           {REPORT_TYPES.map((item, index) => (
             <DialRow
               key={item.key}
@@ -86,7 +105,9 @@ export const SpeedDial: React.FC = () => {
         </View>
       )}
 
-      <View style={styles.fabWrap} pointerEvents="box-none">
+      <View
+        style={[styles.fabWrap, { bottom: Spacing.lg + bottomInset }]}
+        pointerEvents="box-none">
         <Fab open={open} onPress={toggle} />
       </View>
     </View>
@@ -159,14 +180,14 @@ const styles = StyleSheet.create({
   fabWrap: {
     position: 'absolute',
     right: Spacing.lg,
-    bottom: Spacing.lg,
+    // `bottom` is computed at render time from the measured footer inset —
+    // see the inline style merged in above.
   },
   rows: {
     position: 'absolute',
     right: Spacing.lg,
-    // Clears the trigger and its own inset, so the first row sits above the
-    // FAB rather than behind it.
-    bottom: Spacing.lg + FAB_SIZE + Spacing.md,
+    // `bottom` is computed at render time from the measured footer inset —
+    // see the inline style merged in above.
     gap: Spacing.md,
     alignItems: 'flex-end',
   },
