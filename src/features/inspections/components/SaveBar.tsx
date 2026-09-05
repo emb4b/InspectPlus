@@ -1,8 +1,10 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../../constants/colors';
+import { View, Text, StyleSheet } from 'react-native';
+import { Button } from '../../../components/Button';
 import { AppText } from '../../../components/AppText';
+import { Colors } from '../../../design/colors';
+import { Spacing } from '../../../design/spacing';
+import { Type } from '../../../design/typography';
 
 interface SaveBarProps {
   establishmentName: string;
@@ -32,22 +34,19 @@ export const SaveBar: React.FC<SaveBarProps> = ({
       <Text style={styles.infoLabel}> · {typeLabel}</Text>
     </View>
     <View style={styles.actions}>
-      <TouchableOpacity style={styles.ghostBtn} onPress={onDiscard} disabled={saving} activeOpacity={0.7}>
-        <Text style={styles.ghostText}>Discard</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.outlineBtn} onPress={onSaveDraft} disabled={saving} activeOpacity={0.7}>
-        <Text style={styles.outlineText}>Save Draft</Text>
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.submitBtn} onPress={onSubmit} disabled={saving} activeOpacity={0.85}>
-        {saving ? (
-          <ActivityIndicator size="small" color={Colors.textWhite} />
-        ) : (
-          <>
-            <Text style={styles.submitText}>Submit Report</Text>
-            <Ionicons name="checkmark" size={14} color={Colors.textWhite} />
-          </>
-        )}
-      </TouchableOpacity>
+      <Button label="Discard" variant="subtle" onPress={onDiscard} disabled={saving} style={styles.discardBtn} />
+      <Button label="Save Draft" variant="outline" onPress={onSaveDraft} disabled={saving} style={styles.draftBtn} />
+      {/* minWidth so swapping the label for the loading spinner doesn't
+          resize the button and shift its neighbours sideways mid-save. */}
+      <Button
+        label="Submit Report"
+        variant="success"
+        icon="checkmark"
+        onPress={onSubmit}
+        disabled={saving}
+        loading={saving}
+        style={styles.submitBtn}
+      />
     </View>
   </View>
 );
@@ -57,24 +56,23 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderTopWidth: 2,
     borderTopColor: Colors.border,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    flexDirection: 'column',
+    gap: Spacing.sm,
   },
   info: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
   },
   infoLabel: {
-    fontSize: 11.5,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     color: Colors.textMuted,
   },
   infoStrong: {
-    fontSize: 11.5,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     color: Colors.navy,
     fontWeight: '700',
   },
@@ -83,45 +81,16 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
-    gap: 8,
+    gap: Spacing.sm,
   },
-  ghostBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 8,
-    backgroundColor: Colors.bgLight,
+  discardBtn: {
+    flex: 1,
   },
-  ghostText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.navy,
-  },
-  outlineBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: Colors.border,
-  },
-  outlineText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.navy,
+  draftBtn: {
+    flex: 1,
   },
   submitBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 8,
-    backgroundColor: Colors.green,
+    flex: 1.3,
     minWidth: 120,
-    justifyContent: 'center',
-  },
-  submitText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.textWhite,
   },
 });

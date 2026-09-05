@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, TextInput, StyleSheet } from 'react-nativ
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { FormSection, TextField, DateField, focusInput } from '../../../components/form';
+import { AddRowButton } from '../../../components/AddRowButton';
 import type { PermitSnapshotItem } from '../../../services/sync/syncTypes';
 
 const emptyPermit = (): PermitSnapshotItem => ({
@@ -113,10 +114,7 @@ export const DenrPermitsFormSection: React.FC<DenrPermitsFormSectionProps> = ({ 
           onRemove={() => removePermitAt(index)}
         />
       ))}
-      <TouchableOpacity style={styles.addBtn} activeOpacity={0.7} onPress={addPermit}>
-        <Ionicons name="add" size={13} color={Colors.green} />
-        <Text style={styles.addBtnText}>+ Add Permit</Text>
-      </TouchableOpacity>
+      <AddRowButton label="Add Permit" onPress={addPermit} style={styles.addBtn} />
     </FormSection>
   );
 };
@@ -152,21 +150,6 @@ const styles = StyleSheet.create({
     color: Colors.navy,
   },
   addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 5,
     marginBottom: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderWidth: 1.5,
-    borderColor: Colors.greenLight,
-    borderStyle: 'dashed',
-    borderRadius: 8,
-  },
-  addBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.green,
   },
 });

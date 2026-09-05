@@ -3,8 +3,14 @@ import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from 'rea
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../../constants/colors';
 import { AppText } from '../../../components/AppText';
+import { Button } from '../../../components/Button';
+import { EmptyState } from '../../../components/EmptyState';
+import { Colors } from '../../../design/colors';
+import { Duration } from '../../../design/motion';
+import { Radius } from '../../../design/radius';
+import { Spacing } from '../../../design/spacing';
+import { FONT_SCALING, Type } from '../../../design/typography';
 import { getReportUrgency } from '../../../utils/reportUrgency';
 import type { EstablishmentReportItem } from '../hooks/useEstablishment';
 
@@ -55,7 +61,7 @@ const ReportRow: React.FC<{
   const startX = useSharedValue(0);
 
   const close = () => {
-    translateX.value = withTiming(0, { duration: 200 });
+    translateX.value = withTiming(0, { duration: Duration.base });
   };
 
   const panGesture = Gesture.Pan()
@@ -71,7 +77,7 @@ const ReportRow: React.FC<{
     .onEnd(() => {
       translateX.value = withTiming(
         translateX.value < -openThreshold ? -revealWidth : 0,
-        { duration: 200 },
+        { duration: Duration.base },
       );
     });
 
@@ -98,7 +104,12 @@ const ReportRow: React.FC<{
     <View style={styles.rowWrap}>
       {showDelete && (
         <View style={styles.swipeActions}>
-          <TouchableOpacity style={styles.deleteAction} onPress={handleDelete} activeOpacity={0.8}>
+          <TouchableOpacity
+            style={styles.deleteAction}
+            onPress={handleDelete}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete ${item.title}`}>
             <Ionicons name="trash-outline" size={20} color={Colors.textWhite} />
             <Text style={styles.deleteActionText}>Delete</Text>
           </TouchableOpacity>
@@ -114,7 +125,9 @@ const ReportRow: React.FC<{
               urgency === 'due-soon' && styles.rowDueSoon,
             ]}
             onPress={handlePress}
-            activeOpacity={0.75}>
+            activeOpacity={0.75}
+            accessibilityRole="button"
+            accessibilityLabel={item.title}>
             <View style={styles.iconWrap}>
               <Ionicons name={REPORT_ICONS[item.reportType] ?? 'document-outline'} size={17} color={Colors.water.text} />
             </View>
@@ -144,7 +157,12 @@ const ReportRow: React.FC<{
                   </View>
                 )}
               </View>
-              <Text style={styles.controlNo}>{item.controlNo || 'No control number yet'}</Text>
+              {/* Fixed-format monospace: OS font scaling blows it past the
+                  row width, so it opts out per the FONT_SCALING policy —
+                  matches ReportListCard's controlNo. */}
+              <Text style={styles.controlNo} allowFontScaling={FONT_SCALING.tabular}>
+                {item.controlNo || 'No control number yet'}
+              </Text>
             </View>
             <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
           </TouchableOpacity>
@@ -169,21 +187,19 @@ export const EstablishmentReportsSection: React.FC<EstablishmentReportsSectionPr
         <Ionicons name="document-text-outline" size={16} color={Colors.navy} />
         <Text style={styles.headerTitle}>Inspection Reports</Text>
       </View>
-      <TouchableOpacity style={styles.addBtn} onPress={onAddReport} activeOpacity={0.8}>
-        <Ionicons name="add" size={13} color={Colors.textWhite} />
-        <Text style={styles.addBtnText}>Add Report</Text>
-      </TouchableOpacity>
+      {/* A section-header action, not the screen's one primary — the
+          EstablishmentHeaderCard's filled Add Report already fills that
+          role, so this stays outline to avoid two filled navy buttons on
+          the same screen. */}
+      <Button label="Add Report" icon="add" variant="outline" size="sm" onPress={onAddReport} />
     </View>
 
     {loading ? (
-      <View style={styles.emptyState}>
+      <View style={styles.loadingState}>
         <ActivityIndicator size="small" color={Colors.navy} />
       </View>
     ) : reports.length === 0 ? (
-      <View style={styles.emptyState}>
-        <Ionicons name="document-outline" size={32} color={Colors.border} />
-        <Text style={styles.emptyText}>No reports filed yet for this establishment.</Text>
-      </View>
+      <EmptyState icon="document-outline" message="No reports filed yet for this establishment." />
     ) : (
       reports.map(item => (
         <ReportRow
@@ -204,53 +220,34 @@ export const EstablishmentReportsSection: React.FC<EstablishmentReportsSectionPr
 
 const styles = StyleSheet.create({
   section: {
-    marginBottom: 28,
+    marginBottom: Spacing.xxl,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: 8,
-    marginBottom: 14,
+    paddingBottom: Spacing.sm,
+    marginBottom: Spacing.md,
     borderBottomWidth: 2,
     borderBottomColor: Colors.border,
   },
   headerTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 7,
+    gap: Spacing.sm,
   },
   headerTitle: {
-    fontSize: 15,
+    fontSize: Type.subheading.fontSize,
+    lineHeight: Type.subheading.lineHeight,
     fontWeight: '700',
     color: Colors.navy,
   },
-  addBtn: {
-    flexDirection: 'row',
+  loadingState: {
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 7,
-    backgroundColor: Colors.navy,
-  },
-  addBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.textWhite,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 28,
-    gap: 8,
-  },
-  emptyText: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    textAlign: 'center',
+    paddingVertical: Spacing.xl,
   },
   rowWrap: {
-    marginBottom: 10,
+    marginBottom: Spacing.md,
   },
   swipeActions: {
     position: 'absolute',
@@ -258,30 +255,34 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     flexDirection: 'row',
-    borderRadius: 10,
+    borderRadius: Radius.lg,
     overflow: 'hidden',
   },
+  // Same "delete" red as ReportListCard/EstablishmentCard's swipe actions —
+  // this row previously hardcoded its own separate red hex instead of
+  // reusing it.
   deleteAction: {
     width: ACTION_WIDTH,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
-    backgroundColor: '#e74c3c',
+    gap: Spacing.xs,
+    backgroundColor: Colors.conflict,
   },
   deleteActionText: {
-    fontSize: 11,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     fontWeight: '700',
     color: Colors.textWhite,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: Spacing.md,
     backgroundColor: Colors.white,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 10,
-    padding: 12,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
   },
   rowDueSoon: {
     borderColor: Colors.warning.border,
@@ -294,7 +295,7 @@ const styles = StyleSheet.create({
   iconWrap: {
     width: 38,
     height: 38,
-    borderRadius: 8,
+    borderRadius: Radius.md,
     backgroundColor: Colors.water.bg,
     alignItems: 'center',
     justifyContent: 'center',
@@ -304,38 +305,44 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
+  // Matches ReportListCard's "title" token choice.
   title: {
-    fontSize: 12.5,
+    fontSize: Type.body.fontSize,
+    lineHeight: Type.body.lineHeight,
     fontWeight: '700',
     color: Colors.textPrimary,
   },
   dateRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 3,
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
   },
+  // Matches ReportListCard's "date" token choice.
   date: {
-    fontSize: 10.5,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     color: Colors.textMuted,
   },
   urgencyBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 20,
-    marginLeft: 4,
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xxs,
+    borderRadius: Radius.pill,
+    marginLeft: Spacing.xs,
   },
   urgencyBadgeText: {
-    fontSize: 9,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     fontWeight: '700',
   },
   controlNo: {
-    fontSize: 10,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     color: Colors.textLight,
-    marginTop: 2,
+    marginTop: Spacing.xxs,
     fontFamily: 'monospace',
   },
 });

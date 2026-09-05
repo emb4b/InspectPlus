@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../constants/colors';
 import { focusInput } from './focusInput';
 import { AppText } from '../AppText';
+import { AddRowButton } from '../AddRowButton';
 
 export interface DynamicColumn {
   key: string;
@@ -45,7 +46,7 @@ export const DynamicRowTable: React.FC<DynamicRowTableProps> = ({
   columns,
   rows,
   onChange,
-  addLabel = '+ Add Row',
+  addLabel = 'Add Row',
 }) => {
   const [pickerFor, setPickerFor] = useState<{ rowIndex: number; column: DynamicColumn } | null>(null);
   const cellRefs = useRef<Record<string, TextInput | null>>({});
@@ -155,10 +156,7 @@ export const DynamicRowTable: React.FC<DynamicRowTableProps> = ({
         </View>
       </ScrollView>
 
-      <TouchableOpacity style={styles.addBtn} activeOpacity={0.7} onPress={addRow}>
-        <Ionicons name="add" size={14} color={Colors.green} />
-        <Text style={styles.addBtnText}>{addLabel}</Text>
-      </TouchableOpacity>
+      <AddRowButton label={addLabel} onPress={addRow} small style={styles.addBtn} />
 
       <Modal
         visible={!!pickerFor}
@@ -251,22 +249,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 5,
     marginTop: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderWidth: 1.5,
-    borderColor: Colors.greenLight,
-    borderStyle: 'dashed',
-    borderRadius: 8,
-  },
-  addBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.green,
   },
   overlay: {
     flex: 1,

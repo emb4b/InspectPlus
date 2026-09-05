@@ -1,5 +1,6 @@
 import type React from 'react';
 import type { SvgProps } from 'react-native-svg';
+import type { ReportDataKey } from './reportTypeDisplay';
 
 export type ReportTypeKey =
   | 'air'
@@ -11,6 +12,12 @@ export type ReportTypeKey =
 
 export interface ReportType {
   key: ReportTypeKey;
+  // Which recorded-report bucket this create-flow produces. The two hazwaste
+  // entries both resolve to 'hazardous_waste' — see reportTypeDisplay.ts.
+  dataKey: ReportDataKey;
+  // Compact label for the speed dial, where the full legal `title` does not
+  // fit on a phone. The full title stays the accessibility label.
+  shortTitle: string;
   law: string;
   title: string;
   iconName: string;       // Ionicons name
@@ -28,6 +35,8 @@ export interface ReportType {
 export const REPORT_TYPES: ReportType[] = [
   {
     key: 'air',
+    dataKey: 'air_monitoring',
+    shortTitle: 'Air quality',
     law: 'R.A. 8749',
     title: 'Air Quality Management',
     iconName: 'partly-sunny-outline',
@@ -40,6 +49,8 @@ export const REPORT_TYPES: ReportType[] = [
   },
   {
     key: 'water',
+    dataKey: 'water_monitoring',
+    shortTitle: 'Water quality',
     law: 'R.A. 9275',
     title: 'Water Quality Management',
     iconName: 'water-outline',
@@ -52,6 +63,8 @@ export const REPORT_TYPES: ReportType[] = [
   },
   {
     key: 'hazwaste_generator',
+    dataKey: 'hazardous_waste',
+    shortTitle: 'Hazwaste generators',
     law: 'R.A. 6969',
     title: 'Hazardous Waste Generators',
     iconName: 'warning-outline',
@@ -64,6 +77,8 @@ export const REPORT_TYPES: ReportType[] = [
   },
   {
     key: 'hazwaste_tsd',
+    dataKey: 'hazardous_waste',
+    shortTitle: 'Hazwaste TSD',
     law: 'R.A. 6969',
     title: 'Hazardous Waste Treaters and TSD Facilities',
     iconName: 'lock-closed-outline',
@@ -76,6 +91,8 @@ export const REPORT_TYPES: ReportType[] = [
   },
   {
     key: 'eia',
+    dataKey: 'eia',
+    shortTitle: 'EIA',
     law: 'P.D. 1586',
     title: 'Environmental Impact Assessment',
     iconName: 'document-text-outline',
@@ -88,6 +105,8 @@ export const REPORT_TYPES: ReportType[] = [
   },
   {
     key: 'survey',
+    dataKey: 'survey',
+    shortTitle: 'Site survey',
     law: 'ECC Survey Inspection',
     title: 'Site Inspection Report for New Project With/Without ECC Applications',
     iconName: 'globe-outline',

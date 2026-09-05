@@ -362,7 +362,7 @@ export const GeneralInformationTab: React.FC<GeneralInformationTabProps> = ({
           ]}
           rows={value.productLines}
           onChange={productLines => onChange({ ...value, productLines })}
-          addLabel="+ Add Product Line"
+          addLabel="Add Product Line"
         />
       </FormSection>
     </View>

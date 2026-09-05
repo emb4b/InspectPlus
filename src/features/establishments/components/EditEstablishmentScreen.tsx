@@ -485,7 +485,7 @@ export const EditEstablishmentScreen: React.FC<EditEstablishmentScreenProps> = (
             ]}
             rows={form.productLines}
             onChange={productLines => setForm({ ...form, productLines })}
-            addLabel="+ Add Row"
+            addLabel="Add Row"
           />
         </FormSection>
 
@@ -493,7 +493,7 @@ export const EditEstablishmentScreen: React.FC<EditEstablishmentScreenProps> = (
           <Ionicons name="information-circle-outline" size={13} color={Colors.textMuted} />
           <Text style={styles.permitsNoteText}>
             DENR Permits, Licenses &amp; Clearances are managed separately — use{' '}
-            <Text style={styles.permitsNoteStrong}>Update Permits</Text> from the establishment page.
+            <Text style={styles.permitsNoteStrong}>Edit</Text> on the DENR Permits section of the establishment page.
           </Text>
         </View>
       </KeyboardAwareScrollView>

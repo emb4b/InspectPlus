@@ -1,10 +1,17 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../../constants/colors';
 import { AppText } from '../../../components/AppText';
+import { Badge } from '../../../components/Badge';
+import { REPORT_TYPE_DISPLAY, ReportDataKey } from '../../../constants/reportTypeDisplay';
+import { Colors } from '../../../design/colors';
+import { Duration } from '../../../design/motion';
+import { Elevation } from '../../../design/elevation';
+import { Radius } from '../../../design/radius';
+import { Spacing } from '../../../design/spacing';
+import { FONT_SCALING, Type } from '../../../design/typography';
 import { getReportUrgency } from '../../../utils/reportUrgency';
 import { confirmResolveConflict } from '../../../services/sync/syncConflictResolution';
 import type { AllReportItem } from '../hooks/useEstablishment';
@@ -18,15 +25,12 @@ interface ReportListCardProps {
   onPress: (item: AllReportItem) => void;
   onEdit: (item: AllReportItem) => void;
   onDelete: (item: AllReportItem) => void;
+  // Selection mode (the Export tab). Omitted everywhere else, which leaves
+  // the card's original open/swipe behavior exactly as it was.
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (item: AllReportItem) => void;
 }
-
-const REPORT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  air_monitoring: 'partly-sunny-outline',
-  water_monitoring: 'water-outline',
-  hazardous_waste: 'warning-outline',
-  eia: 'globe-outline',
-  survey: 'leaf-outline',
-};
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -38,6 +42,8 @@ function formatDate(iso: string): string {
 // EstablishmentCard's swipe-actions treatment.
 const ACTION_WIDTH = 72;
 const OPEN_THRESHOLD_RATIO = 0.4;
+const CHECKBOX_SIZE = 22;
+const ICON_BOX = 38;
 
 export const ReportListCard: React.FC<ReportListCardProps> = ({
   item,
@@ -46,18 +52,23 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
   onPress,
   onEdit,
   onDelete,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
 }) => {
   const isSubmitted = item.status === 'submitted';
   const urgency = getReportUrgency(item.date, item.status);
+  // An unrecognized type still renders — a report written by a newer app
+  // version shouldn't produce a blank row on an older one.
+  const display = REPORT_TYPE_DISPLAY[item.reportType as ReportDataKey];
+
   // Delete is only wired up for inspection reports, and only for the
   // inspector who owns the record or a Developer account — matches the
-  // "own record" / Developer-full-access delete RLS policies on the
-  // backend (see EstablishmentReportsSection's showDelete).
+  // "own record" / Developer-full-access delete RLS policies on the backend.
   const isOwnerOrManager = item.inspectorUid === currentUid || canManageAll;
   const showDelete = item.kind === 'inspection' && isOwnerOrManager;
-  // Editing only exists for inspection reports (section-level edit on the
-  // report detail screen — see InspectionReportDetailScreen's canEdit), and
-  // only while still a draft owned by this inspector, or a Developer account.
+  // Editing only exists for inspection reports, and only while still a draft
+  // owned by this inspector, or a Developer account.
   const showEdit = item.kind === 'inspection' && !isSubmitted && isOwnerOrManager;
 
   const visibleActionCount = (showEdit ? 1 : 0) + (showDelete ? 1 : 0);
@@ -68,11 +79,13 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
   const startX = useSharedValue(0);
 
   const close = () => {
-    translateX.value = withTiming(0, { duration: 200 });
+    translateX.value = withTiming(0, { duration: Duration.base });
   };
 
   const panGesture = Gesture.Pan()
-    .enabled(revealWidth > 0)
+    // Swiping for edit/delete and ticking rows for export are two conflicting
+    // gestures on one row, so the swipe is off while selecting.
+    .enabled(revealWidth > 0 && !selectable)
     .activeOffsetX([-10, 10])
     .failOffsetY([-8, 8])
     .onStart(() => {
@@ -82,19 +95,21 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
       translateX.value = Math.min(0, Math.max(-revealWidth, startX.value + e.translationX));
     })
     .onEnd(() => {
-      translateX.value = withTiming(
-        translateX.value < -openThreshold ? -revealWidth : 0,
-        { duration: 200 },
-      );
+      translateX.value = withTiming(translateX.value < -openThreshold ? -revealWidth : 0, {
+        duration: Duration.base,
+      });
     });
 
   const cardAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
   }));
 
-  // A tap while the row is swiped open snaps it shut instead of navigating —
-  // the standard swipe-actions convention.
   const handleCardPress = () => {
+    if (selectable) {
+      onToggleSelect?.(item);
+      return;
+    }
+    // A tap while the row is swiped open snaps it shut instead of navigating.
     if (translateX.value < -1) {
       close();
       return;
@@ -115,18 +130,22 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
           <TouchableOpacity
             style={[styles.actionBtn, styles.actionEdit]}
             onPress={() => handleAction(onEdit)}
-            activeOpacity={0.8}>
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`Edit ${item.title}`}>
             <Ionicons name="pencil" size={20} color={Colors.textWhite} />
-            <Text style={styles.actionEditText}>Edit</Text>
+            <Text style={styles.actionText}>Edit</Text>
           </TouchableOpacity>
         )}
         {showDelete && (
           <TouchableOpacity
             style={[styles.actionBtn, styles.actionDelete]}
             onPress={() => handleAction(onDelete)}
-            activeOpacity={0.8}>
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel={`Delete ${item.title}`}>
             <Ionicons name="trash-outline" size={20} color={Colors.textWhite} />
-            <Text style={styles.actionDeleteText}>Delete</Text>
+            <Text style={styles.actionText}>Delete</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -141,35 +160,55 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
               urgency === 'due-soon' && styles.cardDueSoon,
             ]}
             onPress={handleCardPress}
-            activeOpacity={0.75}>
-            <View style={styles.iconWrap}>
-              <Ionicons name={REPORT_ICONS[item.reportType] ?? 'document-outline'} size={17} color={Colors.water.text} />
+            activeOpacity={0.75}
+            accessibilityRole={selectable ? 'checkbox' : 'button'}
+            accessibilityLabel={`${item.title} for ${item.estabName}`}
+            accessibilityState={selectable ? { checked: selected } : undefined}>
+            {selectable && (
+              <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
+                {selected && <Ionicons name="checkmark" size={14} color={Colors.textWhite} />}
+              </View>
+            )}
+
+            <View style={[styles.iconWrap, { backgroundColor: display?.bgColor ?? Colors.bgLight }]}>
+              <Ionicons
+                name={display?.icon ?? 'document-outline'}
+                size={17}
+                color={display?.textColor ?? Colors.textMuted}
+              />
             </View>
+
             <View style={styles.content}>
               <View style={styles.titleRow}>
-                <AppText variant="marquee" text={item.title} style={styles.title} containerStyle={styles.titleContainer} />
+                <AppText
+                  variant="marquee"
+                  text={item.title}
+                  style={styles.title}
+                  containerStyle={styles.titleContainer}
+                />
                 {item.status && (
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      { backgroundColor: isSubmitted ? Colors.greenMuted : Colors.warning.badgeBg },
-                    ]}>
-                    <Text
-                      style={[
-                        styles.statusBadgeText,
-                        { color: isSubmitted ? Colors.green : Colors.warning.text },
-                      ]}>
-                      {isSubmitted ? 'Submitted' : 'Draft'}
-                    </Text>
-                  </View>
+                  <Badge
+                    label={isSubmitted ? 'Submitted' : 'Draft'}
+                    tone={isSubmitted ? 'success' : 'warning'}
+                  />
                 )}
               </View>
+
               <View style={styles.metaRow}>
-                <Ionicons name="business-outline" size={10} color={Colors.textMuted} style={styles.metaIcon} />
-                <AppText variant="marquee" text={item.estabName} style={styles.estabName} containerStyle={styles.estabNameContainer} />
+                <Ionicons
+                  name="business-outline"
+                  size={10}
+                  color={Colors.textMuted}
+                  style={styles.metaIcon}
+                />
+                <AppText
+                  variant="marquee"
+                  text={item.estabName}
+                  style={styles.estabName}
+                  containerStyle={styles.estabNameContainer}
+                />
               </View>
 
-              {/* Sync status indicator */}
               {item.syncStatus === 'pending' && (
                 <View style={styles.syncRow}>
                   <Ionicons name="cloud-upload-outline" size={10} color={Colors.pending} />
@@ -179,14 +218,18 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
               {item.syncStatus === 'conflict' && (
                 <TouchableOpacity
                   style={styles.syncRow}
-                  onPress={() => confirmResolveConflict(
-                    item.kind === 'inspection' ? 'inspection_reports' : 'survey_reports',
-                    item.reportId,
-                    item.title
-                  )}
-                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
+                  onPress={() =>
+                    confirmResolveConflict(
+                      item.kind === 'inspection' ? 'inspection_reports' : 'survey_reports',
+                      item.reportId,
+                      item.title,
+                    )
+                  }
+                  hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Resolve sync conflict for ${item.title}`}>
                   <Ionicons name="alert-circle-outline" size={10} color={Colors.conflict} />
-                  <Text style={[styles.syncText, { color: Colors.conflict }]}>Sync conflict</Text>
+                  <Text style={[styles.syncText, styles.syncTextConflict]}>Sync conflict</Text>
                 </TouchableOpacity>
               )}
 
@@ -197,7 +240,10 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
                   <View
                     style={[
                       styles.urgencyBadge,
-                      { backgroundColor: urgency === 'overdue' ? Colors.hazwaste.badgeBg : Colors.warning.badgeBg },
+                      {
+                        backgroundColor:
+                          urgency === 'overdue' ? Colors.hazwaste.badgeBg : Colors.warning.badgeBg,
+                      },
                     ]}>
                     <Ionicons
                       name="alert-circle"
@@ -207,18 +253,25 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
                     <Text
                       style={[
                         styles.urgencyBadgeText,
-                        { color: urgency === 'overdue' ? Colors.hazwaste.badgeText : Colors.warning.text },
+                        {
+                          color:
+                            urgency === 'overdue' ? Colors.hazwaste.badgeText : Colors.warning.text,
+                        },
                       ]}>
                       {urgency === 'overdue' ? 'Overdue' : 'Due soon'}
                     </Text>
                   </View>
                 )}
               </View>
-              <Text style={styles.controlNo}>{item.controlNo || 'No control number yet'}</Text>
+
+              {/* Fixed-format monospace: OS font scaling blows it past the
+                  card width, so it opts out per the FONT_SCALING policy. */}
+              <Text style={styles.controlNo} allowFontScaling={FONT_SCALING.tabular}>
+                {item.controlNo || 'No control number yet'}
+              </Text>
             </View>
 
-            {/* Chevron */}
-            <Ionicons name="chevron-forward" size={14} color={Colors.textLight} />
+            {!selectable && <Ionicons name="chevron-forward" size={14} color={Colors.textLight} />}
           </TouchableOpacity>
         </Animated.View>
       </GestureDetector>
@@ -228,7 +281,7 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
 
 const styles = StyleSheet.create({
   rowWrap: {
-    marginBottom: 10,
+    marginBottom: Spacing.md,
   },
   swipeActions: {
     position: 'absolute',
@@ -236,45 +289,37 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     flexDirection: 'row',
-    borderRadius: 10,
+    borderRadius: Radius.lg,
     overflow: 'hidden',
   },
   actionBtn: {
     width: ACTION_WIDTH,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: Spacing.xs,
   },
   actionEdit: {
     backgroundColor: Colors.navy,
   },
-  actionEditText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: Colors.textWhite,
-  },
   actionDelete: {
-    backgroundColor: '#e74c3c',
+    backgroundColor: Colors.conflict,
   },
-  actionDeleteText: {
-    fontSize: 11,
+  actionText: {
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     fontWeight: '700',
     color: Colors.textWhite,
   },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: Spacing.md,
     backgroundColor: Colors.white,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 10,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    ...Elevation.raised,
   },
   cardDueSoon: {
     borderColor: Colors.warning.border,
@@ -284,11 +329,24 @@ const styles = StyleSheet.create({
     borderColor: Colors.hazwaste.border,
     backgroundColor: Colors.hazwaste.bg,
   },
+  checkbox: {
+    width: CHECKBOX_SIZE,
+    height: CHECKBOX_SIZE,
+    borderRadius: Radius.xs,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  checkboxChecked: {
+    backgroundColor: Colors.accent,
+    borderColor: Colors.accent,
+  },
   iconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 8,
-    backgroundColor: Colors.water.bg,
+    width: ICON_BOX,
+    height: ICON_BOX,
+    borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -301,41 +359,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    gap: 6,
+    gap: Spacing.sm,
   },
   title: {
-    fontSize: 12.5,
+    fontSize: Type.body.fontSize,
+    lineHeight: Type.body.lineHeight,
     fontWeight: '700',
     color: Colors.textPrimary,
   },
   titleContainer: {
     flex: 1,
   },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 20,
-    flexShrink: 0,
-  },
-  statusBadgeText: {
-    fontSize: 9.5,
-    fontWeight: '700',
-  },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 4,
-    marginTop: 3,
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
   },
   // Nudges the icon down from the row's true top edge to align with the
-  // text's cap-height instead of its full line-height box, now that
-  // metaRow no longer vertically centers it against (potentially 2-line)
-  // wrapped estabName text.
+  // text's cap-height rather than its full line-height box.
   metaIcon: {
     marginTop: 1,
   },
   estabName: {
-    fontSize: 10.5,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     fontWeight: '600',
     color: Colors.textSecondary,
   },
@@ -345,41 +393,48 @@ const styles = StyleSheet.create({
   syncRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    marginTop: 3,
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
   },
   syncText: {
-    fontSize: 9,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     color: Colors.pending,
     fontWeight: '600',
+  },
+  syncTextConflict: {
+    color: Colors.conflict,
   },
   dateRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 3,
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
   },
   date: {
-    fontSize: 10.5,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     color: Colors.textMuted,
   },
   urgencyBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 20,
-    marginLeft: 4,
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xxs,
+    borderRadius: Radius.pill,
+    marginLeft: Spacing.xs,
   },
   urgencyBadgeText: {
-    fontSize: 9,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     fontWeight: '700',
   },
   controlNo: {
-    fontSize: 10,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     color: Colors.textLight,
-    marginTop: 2,
+    marginTop: Spacing.xxs,
     fontFamily: 'monospace',
   },
 });

@@ -3,7 +3,10 @@ import { View, Text, ActivityIndicator, TouchableOpacity, Alert, StyleSheet } fr
 import Animated from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
-import { Colors } from '../../../constants/colors';
+import { Colors } from '../../../design/colors';
+import { Radius } from '../../../design/radius';
+import { Spacing } from '../../../design/spacing';
+import { Type } from '../../../design/typography';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { useInspectorName } from '../../../core/hooks/useInspectorName';
 import { useGuardedPress } from '../../../utils/useGuardedPress';
@@ -207,14 +210,15 @@ const styles = StyleSheet.create({
   backBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
+    gap: Spacing.xxs,
     alignSelf: 'flex-start',
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 4,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.xs,
   },
   backText: {
-    fontSize: 12.5,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     fontWeight: '600',
     color: Colors.navy,
   },
@@ -223,30 +227,36 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   content: {
-    padding: 16,
-    paddingBottom: 32,
+    padding: Spacing.lg,
+    paddingBottom: Spacing.xxl,
   },
+  // Matches ManageReportsTab's centeredState/stateText/retryBtn/retryText —
+  // same loading/error/not-found treatment, just full-screen here (flex: 1 +
+  // centered) since this replaces the whole screen rather than sitting
+  // inside an already-scrollable tab body.
   centeredState: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    gap: 10,
+    padding: Spacing.xl,
+    gap: Spacing.sm,
   },
   stateText: {
-    fontSize: 13,
+    fontSize: Type.bodySm.fontSize,
+    lineHeight: Type.bodySm.lineHeight,
     color: Colors.textMuted,
     textAlign: 'center',
   },
   retryBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.sm,
     backgroundColor: Colors.navy,
-    borderRadius: 8,
-    marginTop: 4,
+    borderRadius: Radius.md,
+    marginTop: Spacing.xs,
   },
   retryText: {
-    fontSize: 12,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     fontWeight: '700',
     color: Colors.textWhite,
   },

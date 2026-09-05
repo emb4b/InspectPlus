@@ -12,7 +12,12 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { Colors } from '../../../constants/colors';
+import { EmptyState } from '../../../components/EmptyState';
+import { Section } from '../../../components/Section';
+import { Colors } from '../../../design/colors';
+import { Radius } from '../../../design/radius';
+import { Spacing } from '../../../design/spacing';
+import { Type } from '../../../design/typography';
 import { useGuardedPress } from '../../../utils/useGuardedPress';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { SelectField } from '../../../components/form';
@@ -202,21 +207,21 @@ export const ManageEstablishmentsTab = forwardRef<ManageEstablishmentsTabHandle>
       </View>
 
       {/* Section label + count */}
-      <View style={styles.sectionRow}>
-        <Text style={styles.sectionLabel}>EXISTING ESTABLISHMENTS</Text>
-        <Text style={styles.sectionCount}>{establishments.length} total</Text>
-      </View>
+      <Section
+        title="EXISTING ESTABLISHMENTS"
+        right={<Text style={styles.sectionCount}>{establishments.length} total</Text>}
+      />
 
       {/* List */}
       {paginated.length === 0 ? (
-        <View style={styles.centeredState}>
-          <Ionicons name="business-outline" size={40} color={Colors.border} />
-          <Text style={styles.stateText}>
-            {search || activeFilterCount > 0
+        <EmptyState
+          icon="business-outline"
+          message={
+            search || activeFilterCount > 0
               ? 'No establishments match your search or filters.'
-              : 'No establishments yet.'}
-          </Text>
-        </View>
+              : 'No establishments yet.'
+          }
+        />
       ) : (
         paginated.map(item => {
           // Edit/Delete are owner-only actions — matches the "own record"
@@ -378,60 +383,62 @@ ManageEstablishmentsTab.displayName = 'ManageEstablishmentsTab';
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
-    paddingBottom: 32,
+    padding: Spacing.lg,
+    paddingBottom: Spacing.xxl,
   },
   centeredState: {
     alignItems: 'center',
-    paddingTop: 48,
-    gap: 10,
+    paddingTop: Spacing.xxxl,
+    gap: Spacing.sm,
   },
   stateText: {
-    fontSize: 13,
+    fontSize: Type.bodySm.fontSize,
+    lineHeight: Type.bodySm.lineHeight,
     color: Colors.textMuted,
     textAlign: 'center',
   },
   retryBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 8,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.sm,
     backgroundColor: Colors.navy,
-    borderRadius: 8,
-    marginTop: 4,
+    borderRadius: Radius.md,
+    marginTop: Spacing.xs,
   },
   retryText: {
-    fontSize: 12,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     fontWeight: '700',
     color: Colors.textWhite,
   },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 14,
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
   },
   searchWrap: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 24,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 8,
+    backgroundColor: Colors.bgLight,
+    borderRadius: Radius.pill,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    gap: Spacing.sm,
   },
   searchInput: {
     flex: 1,
-    fontSize: 13,
+    fontSize: Type.bodySm.fontSize,
     color: Colors.textPrimary,
     paddingVertical: 0,
   },
   filterBtn: {
     width: 38,
     height: 38,
-    borderRadius: 19,
+    borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: Colors.bgLight,
   },
   filterBtnActive: {
     backgroundColor: Colors.navy,
@@ -442,14 +449,14 @@ const styles = StyleSheet.create({
     right: -2,
     minWidth: 16,
     height: 16,
-    borderRadius: 8,
-    paddingHorizontal: 3,
-    backgroundColor: '#e74c3c',
+    borderRadius: Radius.pill,
+    paddingHorizontal: Spacing.xxs,
+    backgroundColor: Colors.conflict,
     alignItems: 'center',
     justifyContent: 'center',
   },
   filterBadgeText: {
-    fontSize: 9,
+    fontSize: Type.caption.fontSize,
     fontWeight: '700',
     color: Colors.textWhite,
   },
@@ -460,19 +467,20 @@ const styles = StyleSheet.create({
   },
   sheet: {
     backgroundColor: Colors.white,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 16,
+    borderTopLeftRadius: Radius.xl,
+    borderTopRightRadius: Radius.xl,
+    padding: Spacing.lg,
     maxHeight: '80%',
   },
   sheetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: Spacing.md,
   },
   sheetTitle: {
-    fontSize: 15,
+    fontSize: Type.subheading.fontSize,
+    lineHeight: Type.subheading.lineHeight,
     fontWeight: '700',
     color: Colors.navy,
   },
@@ -487,47 +495,37 @@ const styles = StyleSheet.create({
   },
   clearBtn: {
     alignSelf: 'center',
-    marginTop: 4,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    marginTop: Spacing.xs,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
   },
   clearBtnText: {
-    fontSize: 13,
+    fontSize: Type.bodySm.fontSize,
+    lineHeight: Type.bodySm.lineHeight,
     fontWeight: '700',
     color: Colors.conflict,
   },
-  sectionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  sectionLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-    color: Colors.textMuted,
-    fontFamily: 'monospace',
-  },
   sectionCount: {
-    fontSize: 10,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     color: Colors.textLight,
   },
   pager: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    marginTop: 16,
+    gap: Spacing.sm,
+    marginTop: Spacing.lg,
   },
   pageArrow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
-    paddingHorizontal: 4,
+    gap: Spacing.xxs,
+    paddingHorizontal: Spacing.xs,
   },
   pageArrowText: {
-    fontSize: 11,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     color: Colors.textMuted,
   },
   pageDisabled: {
@@ -536,7 +534,7 @@ const styles = StyleSheet.create({
   pageNum: {
     width: 26,
     height: 26,
-    borderRadius: 6,
+    borderRadius: Radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.bgLight,
@@ -545,7 +543,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.navy,
   },
   pageNumText: {
-    fontSize: 11,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     fontWeight: '600',
     color: Colors.textMuted,
   },
@@ -553,7 +552,8 @@ const styles = StyleSheet.create({
     color: Colors.textWhite,
   },
   pageDots: {
-    fontSize: 11,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     color: Colors.textMuted,
   },
 });

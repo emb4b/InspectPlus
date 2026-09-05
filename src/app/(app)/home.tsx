@@ -6,10 +6,11 @@ import {
   RefreshControl,
   StyleSheet,
 } from 'react-native';
-import { Colors } from '../../constants/colors';
+import { Colors } from '../../design/colors';
+import { Spacing } from '../../design/spacing';
+import { Type } from '../../design/typography';
 import { useAuthContext } from '../../core/providers/AuthProvider';
 import { HomeTabs, HomeTab } from '../../features/home/components/HomeTabs';
-import { CreateNewReportTab } from '../../features/inspections/components/CreateNewReportTab';
 import {
   ManageEstablishmentsTab,
   ManageEstablishmentsTabHandle,
@@ -18,6 +19,10 @@ import {
   ManageReportsTab,
   ManageReportsTabHandle,
 } from '../../features/establishments/components/ManageReportsTab';
+import {
+  ExportReportsTab,
+  ExportReportsTabHandle,
+} from '../../features/establishments/components/ExportReportsTab';
 import { subscribeToSyncDataChanged } from '../../services/sync/syncEvents';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -39,24 +44,15 @@ function getFormattedTime(): string {
   });
 }
 
-// ── Import/Export placeholder ─────────────────────────────────────────────────
-// Disabled along with its menu entry in HomeTabs — feature isn't ready yet.
-//
-// const ImportExportTab: React.FC = () => (
-//   <View style={styles.placeholderWrap}>
-//     <Text style={styles.placeholderTitle}>Import / Export Reports</Text>
-//     <Text style={styles.placeholderSub}>This feature is coming soon.</Text>
-//   </View>
-// );
-
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const { fullName } = useAuthContext();
-  const [activeTab, setActiveTab] = useState<HomeTab>('create');
+  const [activeTab, setActiveTab] = useState<HomeTab>('manageReports');
   const [refreshing, setRefreshing] = useState(false);
   const manageEstablishmentsRef = useRef<ManageEstablishmentsTabHandle>(null);
   const manageReportsRef = useRef<ManageReportsTabHandle>(null);
+  const exportReportsRef = useRef<ExportReportsTabHandle>(null);
   const firstName = fullName?.trim().split(/\s+/)[0] ?? 'Inspector';
 
   // Ticks the header clock once a second — cheap enough given it's just one
@@ -69,30 +65,28 @@ export default function HomeScreen() {
 
   // A sync can complete while Home is already mounted and focused (the
   // manual "Sync Now" button, or the post-login sync landing right as this
-  // screen appears) — pull-to-refresh alone wouldn't pick that up, so both
-  // tabs also refetch whenever local data changes for any reason.
+  // screen appears) — pull-to-refresh alone wouldn't pick that up, so all
+  // three tabs also refetch whenever local data changes for any reason.
   useEffect(() => {
     return subscribeToSyncDataChanged(() => {
       manageEstablishmentsRef.current?.refresh();
       manageReportsRef.current?.refresh();
+      exportReportsRef.current?.refresh();
     });
   }, []);
 
   const renderTab = () => {
     switch (activeTab) {
-      case 'create':
-        return <CreateNewReportTab />;
-      case 'manageEstablishments':
-        return <ManageEstablishmentsTab ref={manageEstablishmentsRef} />;
       case 'manageReports':
         return <ManageReportsTab ref={manageReportsRef} />;
-      // case 'export':
-      //   return <ImportExportTab />;
+      case 'manageEstablishments':
+        return <ManageEstablishmentsTab ref={manageEstablishmentsRef} />;
+      case 'exportReports':
+        return <ExportReportsTab ref={exportReportsRef} />;
     }
   };
 
-  // Pull-to-refresh reloads the active tab's data. The "create" and "export"
-  // tabs are static, so the gesture just settles back for those.
+  // Pull-to-refresh reloads the active tab's data.
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
@@ -100,6 +94,8 @@ export default function HomeScreen() {
         await manageEstablishmentsRef.current?.refresh();
       } else if (activeTab === 'manageReports') {
         await manageReportsRef.current?.refresh();
+      } else if (activeTab === 'exportReports') {
+        await exportReportsRef.current?.refresh();
       }
     } finally {
       setRefreshing(false);
@@ -147,21 +143,23 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   welcomeWrap: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.md,
     backgroundColor: Colors.white,
   },
   welcomeText: {
-    fontSize: 22,
+    fontSize: Type.display.fontSize,
+    lineHeight: Type.display.lineHeight,
     fontWeight: '800',
     color: Colors.navy,
     fontStyle: 'italic',
   },
   dateText: {
-    fontSize: 12,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     color: Colors.textMuted,
-    marginTop: 3,
+    marginTop: Spacing.xs,
   },
   scroll: {
     flex: 1,
@@ -169,22 +167,5 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-  },
-  placeholderWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 48,
-    gap: 10,
-  },
-  placeholderTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.textSecondary,
-  },
-  placeholderSub: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    textAlign: 'center',
   },
 });

@@ -1,7 +1,10 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../../constants/colors';
+import { Colors } from '../../../design/colors';
+import { Radius } from '../../../design/radius';
+import { Spacing } from '../../../design/spacing';
+import { Type } from '../../../design/typography';
 import { FormSection, TextField } from '../../../components/form';
 import { AppText } from '../../../components/AppText';
 import { Button } from '../../../components/Button';
@@ -164,7 +167,7 @@ export const EstablishmentInfoSections: React.FC<EstablishmentInfoSectionsProps>
         title="DENR Permits, Licenses & Clearances"
         headerRight={
           onUpdatePermits && (
-            <Button label="Update Permits" icon="pencil" variant="outline" onPress={onUpdatePermits} />
+            <Button label="Edit" icon="pencil" variant="outline" onPress={onUpdatePermits} />
           )
         }>
         {permits.length === 0 ? (
@@ -184,33 +187,36 @@ export const EstablishmentInfoSections: React.FC<EstablishmentInfoSectionsProps>
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    gap: 14,
+    gap: Spacing.md,
   },
   row3: {
     flexDirection: 'row',
-    gap: 14,
+    gap: Spacing.md,
   },
   emptyText: {
-    fontSize: 12,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     color: Colors.textMuted,
     fontStyle: 'italic',
   },
   table: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 8,
+    borderRadius: Radius.md,
     overflow: 'hidden',
   },
   tableHeaderRow: {
     flexDirection: 'row',
     backgroundColor: Colors.bgMuted,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
     borderBottomWidth: 1.5,
     borderBottomColor: Colors.border,
   },
+  // Was 10 — below the 11px legibility floor. Raised to Type.caption.
   tableHeaderCell: {
-    fontSize: 10,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
@@ -218,13 +224,14 @@ const styles = StyleSheet.create({
   },
   tableRow: {
     flexDirection: 'row',
-    paddingVertical: 9,
-    paddingHorizontal: 10,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.sm,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },
   tableCell: {
-    fontSize: 12.5,
+    fontSize: Type.bodySm.fontSize,
+    lineHeight: Type.bodySm.lineHeight,
     color: Colors.textPrimary,
   },
   colProduct: {
@@ -234,22 +241,24 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   permitList: {
-    gap: 12,
+    gap: Spacing.md,
   },
   permitCard: {
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 10,
-    padding: 12,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
   },
   permitCardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginBottom: 10,
+    // Icon-to-text gap.
+    gap: Spacing.xs,
+    marginBottom: Spacing.sm,
   },
   permitCardTitle: {
-    fontSize: 11.5,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     fontWeight: '700',
     color: Colors.navy,
   },
@@ -260,15 +269,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
-    gap: 8,
+    marginBottom: Spacing.sm,
+    gap: Spacing.sm,
   },
+  // Was 10.5 — below the 11px legibility floor. Raised to Type.caption.
   permitLabel: {
-    fontSize: 10.5,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     color: Colors.textMuted,
   },
   permitValue: {
-    fontSize: 11.5,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     fontWeight: '600',
     color: Colors.textPrimary,
     textAlign: 'right',

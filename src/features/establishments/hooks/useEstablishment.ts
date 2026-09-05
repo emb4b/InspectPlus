@@ -6,6 +6,7 @@ import type { EstablishmentDTO, ComplianceTag, SyncStatus } from '../types';
 import { toDisplaySyncStatus } from '../types';
 import { resolveInspectorNames } from '../../../services/inspectorNames';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
+import { REPORT_TYPE_DISPLAY } from '../../../constants/reportTypeDisplay';
 
 // ── Jurisdiction visibility ─────────────────────────────────────────────────
 // Mirrors the "inspectors can read jurisdiction establishments" and "admins
@@ -530,13 +531,13 @@ export interface EstablishmentReportItem {
   purposeId?: string;
 }
 
-export const INSPECTION_TYPE_LABELS: Record<string, string> = {
-  air_monitoring: 'Air Monitoring',
-  water_monitoring: 'Water Monitoring',
-  hazardous_waste: 'Hazwaste Monitoring',
-  eia: 'EIA',
-  survey: 'Survey',
-};
+// Derived so the labels can't drift from the icons and colors beside them —
+// REPORT_TYPE_DISPLAY is the source of truth. The Record<string, string>
+// shape is unchanged, so existing consumers (ManageReportsTab,
+// InspectionReportDetailScreen, EstablishmentDetailScreen) are unaffected.
+export const INSPECTION_TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(REPORT_TYPE_DISPLAY).map(([key, meta]) => [key, meta.label]),
+);
 
 interface UseEstablishmentReportsReturn {
   reports: EstablishmentReportItem[];
