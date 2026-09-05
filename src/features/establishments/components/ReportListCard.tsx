@@ -212,6 +212,19 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
               <View style={styles.dateRow}>
                 <Ionicons name="calendar-outline" size={10} color={Colors.textMuted} />
                 <Text style={styles.date}>{formatDate(item.date)}</Text>
+                {/* Fixed-format monospace: OS font scaling blows it past the
+                    row width, so it opts out per the FONT_SCALING policy —
+                    matches EstablishmentReportsSection's controlNo. Shares
+                    this row with the date; flexShrink+numberOfLines let it
+                    truncate first so a long control number can't clip the
+                    date or push an urgency badge off the row. */}
+                <Text
+                  style={styles.controlNo}
+                  allowFontScaling={FONT_SCALING.tabular}
+                  numberOfLines={1}
+                  ellipsizeMode="tail">
+                  {item.controlNo || 'No control number yet'}
+                </Text>
                 {urgency !== 'none' && (
                   <View
                     style={[
@@ -239,12 +252,6 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
                   </View>
                 )}
               </View>
-
-              {/* Fixed-format monospace: OS font scaling blows it past the
-                  card width, so it opts out per the FONT_SCALING policy. */}
-              <Text style={styles.controlNo} allowFontScaling={FONT_SCALING.tabular}>
-                {item.controlNo || 'No control number yet'}
-              </Text>
 
               {/* Sync status sits last in the card body, below every other
                   detail, so it reads as a footer note rather than
@@ -414,10 +421,13 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     marginTop: Spacing.xs,
   },
+  // Fixed width in the row — the control number is what shrinks/truncates,
+  // not the date. Matches EstablishmentReportsSection's "date" token choice.
   date: {
     fontSize: Type.label.fontSize,
     lineHeight: Type.label.lineHeight,
     color: Colors.textMuted,
+    flexShrink: 0,
   },
   urgencyBadge: {
     flexDirection: 'row',
@@ -427,6 +437,9 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xxs,
     borderRadius: Radius.pill,
     marginLeft: Spacing.xs,
+    // Never squeezed by a long control number sharing the row — it's the
+    // control number that truncates, not this badge.
+    flexShrink: 0,
   },
   urgencyBadgeText: {
     fontSize: Type.caption.fontSize,
@@ -437,7 +450,11 @@ const styles = StyleSheet.create({
     fontSize: Type.caption.fontSize,
     lineHeight: Type.caption.lineHeight,
     color: Colors.textLight,
-    marginTop: Spacing.xxs,
     fontFamily: 'monospace',
+    // Shares the date row rather than sitting on its own line below it;
+    // it's the one that shrinks/truncates so a long value can't clip the
+    // date or shove the urgency badge off the row.
+    flex: 1,
+    minWidth: 0,
   },
 });

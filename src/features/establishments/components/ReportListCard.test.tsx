@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import TestRenderer from 'react-test-renderer';
 import { ReportListCard } from './ReportListCard';
 import { Colors } from '../../../design/colors';
+import { FONT_SCALING } from '../../../design/typography';
 import { REPORT_TYPE_DISPLAY, ReportDataKey } from '../../../constants/reportTypeDisplay';
 import type { AllReportItem } from '../hooks/useEstablishment';
 
@@ -32,6 +33,20 @@ const render = (element: React.ReactElement) => {
 
 const flattenStyle = (style: unknown): Record<string, unknown> =>
   Object.assign({}, ...([style].flat(Infinity).filter(Boolean) as Record<string, unknown>[]));
+
+// @expo/vector-icons renders its glyph as a Text under the hood, with the
+// icon's `size`/`color` props applied to that Text's style — the calendar
+// icon here uses color: Colors.textMuted, same as the date Text right next
+// to it, so a bare color-based lookup for the date text would double-match
+// the icon's own internal glyph Text. Same technique as
+// EstablishmentReportsSection.test.tsx.
+const iconGlyphTexts = (r: Renderer): Set<TestRenderer.ReactTestInstance> =>
+  new Set(r.root.findAllByType(Ionicons).flatMap((icon) => icon.findAllByType(Text)));
+
+const proseTexts = (r: Renderer) => {
+  const glyphs = iconGlyphTexts(r);
+  return r.root.findAllByType(Text).filter((n) => !glyphs.has(n));
+};
 
 // Locate the report-icon wrap View by its resolved shape styles (width 38 /
 // height 38 / borderRadius 8 — unique to this element in ReportListCard).
@@ -129,8 +144,10 @@ const findCheckmarkIcons = (r: Renderer) =>
   r.root.findAllByType(Ionicons).filter((n) => n.props.name === 'checkmark' && n.props.size === 14);
 
 // Locate the ordered list of the card body's real JSX children — titleRow,
-// metaRow, dateRow, controlNo, and (conditionally) the sync row — by first
-// finding the `content` View by its resolved shape (flex 1, minWidth 0 —
+// metaRow, dateRow (which now also carries the control number as one of its
+// own children — see the "date + control number row" tests below), and
+// (conditionally) the sync row — by first finding the `content` View by its
+// resolved shape (flex 1, minWidth 0 —
 // unique to this element in ReportListCard), throwing on zero-or-multiple
 // matches per the findIconWrap convention.
 //
@@ -536,7 +553,14 @@ describe('ReportListCard sync flag placement', () => {
   // The bug this task fixes: the sync flag used to sit between metaRow and
   // dateRow, mid-card. This asserts actual render ORDER — not just that the
   // row exists — so it would fail against the old position.
-  it('renders the pending-sync row after every other element in the card body', () => {
+  //
+  // The control number no longer has its own top-level slot in `children` —
+  // it now lives inside the dateRow alongside the date (see the "date +
+  // control number row" describe block below) — so this looks up the dateRow
+  // itself (the child that contains the control-number Text) rather than the
+  // control number directly, and asserts THAT row sits strictly before the
+  // sync row.
+  it('renders the pending-sync row after every other element in the card body, including the date/control-number row', () => {
     const item: AllReportItem = { ...baseItem, syncStatus: 'pending' };
     const r = render(
       <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
@@ -547,15 +571,19 @@ describe('ReportListCard sync flag placement', () => {
     const lastChild = children[children.length - 1];
     expect(lastChild.findAllByType(Ionicons).some((n) => n.props.name === 'cloud-upload-outline')).toBe(true);
 
-    // The control number — previously the very last element — must now sit
-    // strictly earlier than the sync row.
+    // The date/control-number row — previously ending in a separate,
+    // now-removed controlNo child — must still sit strictly earlier than the
+    // sync row.
     const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === item.controlNo);
-    const controlNoIndex = children.indexOf(controlNoText!);
-    expect(controlNoIndex).toBeGreaterThanOrEqual(0);
-    expect(controlNoIndex).toBeLessThan(children.length - 1);
+    expect(controlNoText).toBeDefined();
+    const dateRowChild = children.find((c) => c.findAllByType(Text).includes(controlNoText!));
+    expect(dateRowChild).toBeDefined();
+    const dateRowIndex = children.indexOf(dateRowChild!);
+    expect(dateRowIndex).toBeGreaterThanOrEqual(0);
+    expect(dateRowIndex).toBeLessThan(children.length - 1);
   });
 
-  it('renders the conflict-sync row after every other element in the card body', () => {
+  it('renders the conflict-sync row after every other element in the card body, including the date/control-number row', () => {
     const item: AllReportItem = { ...baseItem, syncStatus: 'conflict' };
     const r = render(
       <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
@@ -567,9 +595,12 @@ describe('ReportListCard sync flag placement', () => {
     expect(lastChild.findAllByType(Ionicons).some((n) => n.props.name === 'alert-circle-outline')).toBe(true);
 
     const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === item.controlNo);
-    const controlNoIndex = children.indexOf(controlNoText!);
-    expect(controlNoIndex).toBeGreaterThanOrEqual(0);
-    expect(controlNoIndex).toBeLessThan(children.length - 1);
+    expect(controlNoText).toBeDefined();
+    const dateRowChild = children.find((c) => c.findAllByType(Text).includes(controlNoText!));
+    expect(dateRowChild).toBeDefined();
+    const dateRowIndex = children.indexOf(dateRowChild!);
+    expect(dateRowIndex).toBeGreaterThanOrEqual(0);
+    expect(dateRowIndex).toBeLessThan(children.length - 1);
   });
 
   it('shows only the pending row, never the conflict row, when syncStatus is "pending"', () => {
@@ -613,5 +644,84 @@ describe('ReportListCard sync flag placement', () => {
     // baseItem.kind is 'survey', so the conflict resolves against
     // 'survey_reports' — the branch's condition is unchanged by the move.
     expect(mockConfirmResolveConflict).toHaveBeenCalledWith('survey_reports', item.reportId, item.title);
+  });
+});
+
+describe('ReportListCard date + control number row', () => {
+  // Combining the two previously-separate lines is the point of this task —
+  // this asserts real row MEMBERSHIP (both nodes appear as siblings in the
+  // calendar icon's own parent's `.children`), which is exactly what would
+  // fail if the control number were split back onto its own line below the
+  // date row, unlike a bare "both render somewhere" presence check. Mirrors
+  // EstablishmentReportsSection.test.tsx's equivalent assertion, which this
+  // task's reference implementation already established.
+  it('renders the date and control number as siblings of the same row, not on separate lines', () => {
+    const r = render(
+      <ReportListCard item={baseItem} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
+    expect(calendarIcon).toBeDefined();
+    const rowChildren = calendarIcon!.parent!.children;
+
+    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === baseItem.controlNo);
+    const dateText = proseTexts(r).find((n) => flattenStyle(n.props.style).color === Colors.textMuted);
+
+    expect(dateText).toBeDefined();
+    expect(controlNoText).toBeDefined();
+    expect(rowChildren).toContain(dateText);
+    expect(rowChildren).toContain(controlNoText);
+  });
+
+  it('keeps the control number opted out of OS font scaling and now truncating to a single line', () => {
+    const r = render(
+      <ReportListCard item={baseItem} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === baseItem.controlNo);
+    expect(controlNoText?.props.allowFontScaling).toBe(FONT_SCALING.tabular);
+    expect(controlNoText?.props.numberOfLines).toBe(1);
+    expect(controlNoText?.props.ellipsizeMode).toBe('tail');
+  });
+
+  it('never lets a long control number push the urgency badge out of the row or clip the date', () => {
+    const longControlNo = 'CTRL-2026-0000001-EXTREMELY-LONG-CONTROL-NUMBER-VALUE';
+    const item: AllReportItem = {
+      ...baseItem,
+      status: 'draft',
+      date: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
+      controlNo: longControlNo,
+    };
+    const r = render(
+      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+
+    // The badge still renders — a long control number sharing the row must
+    // not crowd it out.
+    const badge = r.root
+      .findAll((n) => (n.type as any)?.name === 'View' || n.type === View)
+      .find((n) => flattenStyle(n.props.style).backgroundColor === Colors.hazwaste.badgeBg);
+    expect(badge).toBeDefined();
+    expect(proseTexts(r).some((n) => n.props.children === 'Overdue')).toBe(true);
+
+    // The date text is still present and untouched — it's the control
+    // number that gives way, not the date.
+    const dateText = proseTexts(r).find((n) => flattenStyle(n.props.style).color === Colors.textMuted);
+    expect(dateText).toBeDefined();
+
+    // The control number is the element that shrinks/truncates (flex: 1,
+    // numberOfLines 1) — the date and badge are pinned (flexShrink: 0) so
+    // neither can be squeezed out by it.
+    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === longControlNo);
+    expect(flattenStyle(controlNoText?.props.style).flex).toBe(1);
+    expect(controlNoText?.props.numberOfLines).toBe(1);
+    expect(flattenStyle(dateText?.props.style).flexShrink).toBe(0);
+    expect(flattenStyle(badge?.props.style).flexShrink).toBe(0);
+  });
+
+  it("falls back to 'No control number yet' when controlNo is null", () => {
+    const item: AllReportItem = { ...baseItem, controlNo: null };
+    const r = render(
+      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    expect(r.root.findAllByType(Text).some((n) => n.props.children === 'No control number yet')).toBe(true);
   });
 });
