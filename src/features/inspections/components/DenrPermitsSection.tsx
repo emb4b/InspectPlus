@@ -185,7 +185,7 @@ export const DenrPermitsSection: React.FC<DenrPermitsSectionProps> = ({ reportId
           canEdit={canEdit}
         />
       }>
-      {permitsSection.draft.length === 0 && (
+      {permitsSection.draft.length === 0 && !permitsSection.editing && (
         <Text style={styles.emptyText}>No permits on record for this report.</Text>
       )}
       <View style={permitsSection.editing ? undefined : styles.permitList}>
