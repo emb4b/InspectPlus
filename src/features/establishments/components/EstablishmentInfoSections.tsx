@@ -167,7 +167,7 @@ export const EstablishmentInfoSections: React.FC<EstablishmentInfoSectionsProps>
         title="DENR Permits, Licenses & Clearances"
         headerRight={
           onUpdatePermits && (
-            <Button label="Update Permits" icon="pencil" variant="outline" onPress={onUpdatePermits} />
+            <Button label="Edit" icon="pencil" variant="outline" onPress={onUpdatePermits} />
           )
         }>
         {permits.length === 0 ? (

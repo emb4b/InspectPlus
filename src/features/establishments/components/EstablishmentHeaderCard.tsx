@@ -94,8 +94,11 @@ export const EstablishmentHeaderCard: React.FC<EstablishmentHeaderCardProps> = (
       <View style={styles.actions}>
         <Button label="Add Report" icon="add" variant="primary" size="md" onPress={onAddReport} fullWidth />
         {/* Same variant as the Edit beside a section header — it's the same
-            action, so it gets the same button. */}
-        {onEdit && <Button label="Edit" icon="pencil" variant="outline" size="md" onPress={onEdit} />}
+            action, so it gets the same button. Only one filled `primary`
+            button belongs on a screen (this card's Add Report is it), so
+            this stays `sm` `outline` like every other section-header
+            action. */}
+        {onEdit && <Button label="Edit" icon="pencil" variant="outline" size="sm" onPress={onEdit} />}
       </View>
 
       <View style={styles.divider} />

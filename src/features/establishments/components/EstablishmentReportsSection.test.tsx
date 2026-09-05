@@ -406,6 +406,30 @@ describe('EstablishmentReportsSection press wiring (unchanged by this task)', ()
   });
 });
 
+describe('EstablishmentReportsSection button hierarchy', () => {
+  // The button hierarchy this task establishes: exactly one filled `primary`
+  // button per screen, and every section-header action is `sm` `outline`.
+  // EstablishmentHeaderCard's own "Add Report" is the screen's one primary
+  // action, so this section-header "Add Report" must not also be filled —
+  // two filled navy buttons on the same screen was the bug.
+  it('renders Add Report as outline, not primary, at sm size', () => {
+    const r = render(
+      <EstablishmentReportsSection
+        reports={[baseItem]}
+        currentUid="uid-1"
+        canManageAll={false}
+        onAddReport={noop}
+        onOpenReport={noop}
+        onDeleteReport={noop}
+      />,
+    );
+    const style = flattenStyle(findAddReportButton(r).props.style);
+    expect(style.minHeight).toBe(32); // sm
+    expect(style.backgroundColor).toBe(Colors.white); // outline, not primary's navy fill
+    expect(style.borderColor).toBe(Colors.navy);
+  });
+});
+
 describe('EstablishmentReportsSection loading and empty states (unchanged by this task)', () => {
   it('shows a spinner and no rows while loading', () => {
     const r = render(

@@ -187,7 +187,11 @@ export const EstablishmentReportsSection: React.FC<EstablishmentReportsSectionPr
         <Ionicons name="document-text-outline" size={16} color={Colors.navy} />
         <Text style={styles.headerTitle}>Inspection Reports</Text>
       </View>
-      <Button label="Add Report" icon="add" variant="primary" size="sm" onPress={onAddReport} />
+      {/* A section-header action, not the screen's one primary — the
+          EstablishmentHeaderCard's filled Add Report already fills that
+          role, so this stays outline to avoid two filled navy buttons on
+          the same screen. */}
+      <Button label="Add Report" icon="add" variant="outline" size="sm" onPress={onAddReport} />
     </View>
 
     {loading ? (
