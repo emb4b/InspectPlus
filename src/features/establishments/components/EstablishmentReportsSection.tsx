@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppText } from '../../../components/AppText';
 import { Button } from '../../../components/Button';
 import { EmptyState } from '../../../components/EmptyState';
+import { REPORT_TYPE_DISPLAY, ReportDataKey } from '../../../constants/reportTypeDisplay';
 import { Colors } from '../../../design/colors';
 import { Duration } from '../../../design/motion';
 import { Radius } from '../../../design/radius';
@@ -26,14 +27,6 @@ interface EstablishmentReportsSectionProps {
   onDeleteReport: (item: EstablishmentReportItem) => void;
 }
 
-const REPORT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  air_monitoring: 'partly-sunny-outline',
-  water_monitoring: 'water-outline',
-  hazardous_waste: 'warning-outline',
-  eia: 'globe-outline',
-  survey: 'leaf-outline',
-};
-
 function formatDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
@@ -53,6 +46,10 @@ const ReportRow: React.FC<{
   showDelete: boolean;
 }> = ({ item, onOpen, onDelete, showDelete }) => {
   const urgency = getReportUrgency(item.date, item.status);
+  // An unrecognized type still renders — a report written by a newer app
+  // version shouldn't produce a blank row on an older one. Matches
+  // ReportListCard's fallback so the two components can't drift again.
+  const display = REPORT_TYPE_DISPLAY[item.reportType as ReportDataKey];
 
   const revealWidth = showDelete ? ACTION_WIDTH : 0;
   const openThreshold = revealWidth * OPEN_THRESHOLD_RATIO;
@@ -128,8 +125,12 @@ const ReportRow: React.FC<{
             activeOpacity={0.75}
             accessibilityRole="button"
             accessibilityLabel={item.title}>
-            <View style={styles.iconWrap}>
-              <Ionicons name={REPORT_ICONS[item.reportType] ?? 'document-outline'} size={17} color={Colors.water.text} />
+            <View style={[styles.iconWrap, { backgroundColor: display?.bgColor ?? Colors.bgLight }]}>
+              <Ionicons
+                name={display?.icon ?? 'document-outline'}
+                size={17}
+                color={display?.textColor ?? Colors.textMuted}
+              />
             </View>
             <View style={styles.content}>
               <AppText variant="marquee" text={item.title} style={styles.title} />
@@ -303,7 +304,6 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: Radius.md,
-    backgroundColor: Colors.water.bg,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
