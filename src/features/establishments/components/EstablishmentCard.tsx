@@ -8,9 +8,14 @@ import {
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../../constants/colors';
-import { formatEstablishmentLocation } from '../../../utils/establishmentLocation';
 import { AppText } from '../../../components/AppText';
+import { Colors } from '../../../design/colors';
+import { Duration } from '../../../design/motion';
+import { Elevation } from '../../../design/elevation';
+import { Radius } from '../../../design/radius';
+import { Spacing } from '../../../design/spacing';
+import { Type } from '../../../design/typography';
+import { formatEstablishmentLocation } from '../../../utils/establishmentLocation';
 import { REPORT_TYPES, ReportTypeKey } from '../../../constants/reportTypes';
 import { confirmResolveConflict } from '../../../services/sync/syncConflictResolution';
 import type { EstablishmentDTO, ComplianceTag } from '../types';
@@ -52,6 +57,7 @@ const MAX_VISIBLE_TAGS = 3;
 // comfortable tap target (unlike the old cramped inline pill buttons).
 const ACTION_WIDTH = 72;
 const OPEN_THRESHOLD_RATIO = 0.4;
+const ICON_BOX = 44;
 
 export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
   item,
@@ -76,7 +82,7 @@ export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
   const startX = useSharedValue(0);
 
   const close = () => {
-    translateX.value = withTiming(0, { duration: 200 });
+    translateX.value = withTiming(0, { duration: Duration.base });
   };
 
   const panGesture = Gesture.Pan()
@@ -91,7 +97,7 @@ export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
     .onEnd(() => {
       translateX.value = withTiming(
         translateX.value < -openThreshold ? -revealWidth : 0,
-        { duration: 200 },
+        { duration: Duration.base },
       );
     });
 
@@ -155,7 +161,7 @@ export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
             disabled={!onPress}>
             {/* Icon */}
             <View style={styles.iconWrap}>
-              <Ionicons name="business" size={22} color="#94a3b8" />
+              <Ionicons name="business" size={22} color={Colors.textLight} />
             </View>
 
             {/* Content */}
@@ -164,7 +170,7 @@ export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
 
               {/* Location */}
               <View style={styles.locationRow}>
-                <Ionicons name="location" size={10} color="#e74c3c" />
+                <Ionicons name="location" size={10} color={Colors.conflict} />
                 <AppText
                   variant="marquee"
                   text={formatEstablishmentLocation(item)}
@@ -227,7 +233,7 @@ export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
 
 const styles = StyleSheet.create({
   rowWrap: {
-    marginBottom: 10,
+    marginBottom: Spacing.md,
   },
   swipeActions: {
     position: 'absolute',
@@ -235,20 +241,21 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     flexDirection: 'row',
-    borderRadius: 10,
+    borderRadius: Radius.lg,
     overflow: 'hidden',
   },
   actionBtn: {
     width: ACTION_WIDTH,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: Spacing.xs,
   },
   actionAdd: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: Colors.bgLight,
   },
   actionAddText: {
-    fontSize: 11,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     fontWeight: '700',
     color: Colors.textSecondary,
   },
@@ -256,15 +263,17 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.navy,
   },
   actionEditText: {
-    fontSize: 11,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     fontWeight: '700',
     color: Colors.textWhite,
   },
   actionDelete: {
-    backgroundColor: '#e74c3c',
+    backgroundColor: Colors.conflict,
   },
   actionDeleteText: {
-    fontSize: 11,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     fontWeight: '700',
     color: Colors.textWhite,
   },
@@ -272,22 +281,18 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 10,
-    padding: 12,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
+    gap: Spacing.md,
+    ...Elevation.raised,
   },
   iconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    backgroundColor: '#f1f5f9',
+    width: ICON_BOX,
+    height: ICON_BOX,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.bgLight,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -297,21 +302,23 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   name: {
-    fontSize: 12.5,
+    fontSize: Type.body.fontSize,
+    lineHeight: Type.body.lineHeight,
     fontWeight: '700',
     color: Colors.textPrimary,
   },
   nameContainer: {
-    marginBottom: 3,
+    marginBottom: Spacing.xs,
   },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    marginBottom: 4,
+    gap: Spacing.xs,
+    marginBottom: Spacing.xs,
   },
   location: {
-    fontSize: 10,
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
     color: Colors.textMuted,
   },
   locationContainer: {
@@ -320,45 +327,49 @@ const styles = StyleSheet.create({
   syncRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    marginBottom: 4,
+    gap: Spacing.xs,
+    marginBottom: Spacing.xs,
   },
   syncText: {
-    fontSize: 9,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     color: Colors.pending,
     fontWeight: '600',
   },
   tagRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 5,
-    marginTop: 2,
+    gap: Spacing.xs,
+    marginTop: Spacing.xxs,
   },
   tag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 20,
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xxs,
+    borderRadius: Radius.pill,
   },
   tagText: {
-    fontSize: 9,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     fontWeight: '600',
   },
   tagOverflow: {
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 20,
-    backgroundColor: '#e2e8f0',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xxs,
+    borderRadius: Radius.pill,
+    backgroundColor: Colors.border,
   },
   tagOverflowText: {
-    fontSize: 9,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     fontWeight: '600',
     color: Colors.textMuted,
   },
   noTags: {
-    fontSize: 9,
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
     color: Colors.textLight,
     fontStyle: 'italic',
   },
