@@ -3,6 +3,7 @@ import { Text, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import TestRenderer, { act } from 'react-test-renderer';
 import { AddRowButton } from './AddRowButton';
+import { Colors } from '../design/colors';
 
 type Renderer = TestRenderer.ReactTestRenderer;
 
@@ -77,5 +78,24 @@ describe('AddRowButton', () => {
   it('is left-aligned rather than stretching full width, matching every prior call site', () => {
     const r = render(<AddRowButton label="Add Row" onPress={() => {}} />);
     expect(flattenStyle(findButton(r).props.style).alignSelf).toBe('flex-start');
+  });
+
+  // Restores the dashed-green treatment these five buttons had before an
+  // earlier consolidation (commit d2a17c0) flattened them onto Button's
+  // solid-navy `outline` variant. Renders via Button's `add` variant so this
+  // one call site change reaches every AddRowButton user at once.
+  it('renders via Button\'s dashed-green "add" variant, not "outline"', () => {
+    const r = render(<AddRowButton label="Add Row" onPress={() => {}} />);
+    const style = flattenStyle(findButton(r).props.style);
+    expect(style.borderStyle).toBe('dashed');
+    expect(style.borderColor).toBe(Colors.greenLight);
+  });
+
+  it('renders its icon and label in Colors.green', () => {
+    const r = render(<AddRowButton label="Add Row" onPress={() => {}} />);
+    const icon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'add');
+    expect(icon?.props.color).toBe(Colors.green);
+    const labelText = findLabelText(r, 'Add Row');
+    expect(flattenStyle(labelText.props.style).color).toBe(Colors.green);
   });
 });
