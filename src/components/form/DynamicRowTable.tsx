@@ -11,7 +11,10 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../constants/colors';
+import { Colors } from '../../design/colors';
+import { Radius } from '../../design/radius';
+import { Spacing } from '../../design/spacing';
+import { Type } from '../../design/typography';
 import { focusInput } from './focusInput';
 import { AppText } from '../AppText';
 import { AddRowButton } from '../AddRowButton';
@@ -111,7 +114,7 @@ export const DynamicRowTable: React.FC<DynamicRowTableProps> = ({
                   focusableCells[focusableCells.length - 1].rowIndex === rowIndex &&
                   focusableCells[focusableCells.length - 1].colKey === col.key;
                 return (
-                  <View key={col.key} style={{ width: col.width, paddingHorizontal: 3 }}>
+                  <View key={col.key} style={[styles.cellWrap, { width: col.width }]}>
                     {col.type === 'select' ? (
                       <TouchableOpacity
                         style={styles.selectCell}
@@ -192,38 +195,62 @@ export const DynamicRowTable: React.FC<DynamicRowTableProps> = ({
 
 const styles = StyleSheet.create({
   wrap: {
-    marginBottom: 10,
+    // Same bare-10 / block-separating-margin resolution as ChecklistTable's
+    // `wrap` — see the comment there.
+    marginBottom: Spacing.md,
   },
   headerRow: {
     flexDirection: 'row',
     backgroundColor: Colors.bgMuted,
     borderBottomWidth: 1.5,
     borderBottomColor: Colors.border,
-    paddingVertical: 8,
+    paddingVertical: Spacing.sm,
   },
+  // Deliberately Type.tabular (12), NOT Type.body (14) — see the token's own
+  // comment in typography.ts. This grid's columns are fixed pixel widths
+  // (set per call site, 80-160) inside a horizontal ScrollView: a wide
+  // table scrolls rather than squeezing, but text inside one column can't
+  // scroll away from its own cell, so body-sized text here would clip
+  // instead of helping.
   headerCell: {
-    fontSize: 10,
+    fontSize: Type.tabular.fontSize,
+    lineHeight: Type.tabular.lineHeight,
     fontWeight: '700',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
     color: Colors.textMuted,
-    paddingHorizontal: 3,
+    // Bare 3 rounds up to the nearest token, xs (4) — a 1px-per-side nudge
+    // that doesn't affect the totalWidth math below (that sum is driven
+    // entirely by each column's own `width`, not this inner padding).
+    paddingHorizontal: Spacing.xs,
   },
   dataRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
-    paddingVertical: 6,
+    // Bare 6, not an icon/text gap - resolves to sm (8) per spacing.ts's
+    // documented rule for that value.
+    paddingVertical: Spacing.sm,
   },
+  // The per-column cell wrapper. `width` stays an inline per-column value
+  // (it comes from the `columns` prop, not the token scale) — only the
+  // inner padding is tokenized here, same rounding as headerCell above.
+  cellWrap: {
+    paddingHorizontal: Spacing.xs,
+  },
+  // Type.tabular, not Type.body - same fixed-width-column reasoning as
+  // headerCell.
   cellInput: {
-    fontSize: 12,
+    fontSize: Type.tabular.fontSize,
+    lineHeight: Type.tabular.lineHeight,
     color: Colors.textPrimary,
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.sm,
+    // Bare 6, resolves to sm (8) - see dataRow above.
+    paddingVertical: Spacing.sm,
     backgroundColor: Colors.white,
   },
   selectCell: {
@@ -232,50 +259,65 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: Colors.border,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
     backgroundColor: Colors.white,
   },
+  // Type.tabular, not Type.body - same fixed-width-column reasoning as
+  // headerCell/cellInput. This is the guard: promoting this to Type.body
+  // would clip the selected value inside its fixed-width column.
   selectCellText: {
-    fontSize: 12,
+    fontSize: Type.tabular.fontSize,
+    lineHeight: Type.tabular.lineHeight,
     color: Colors.textPrimary,
   },
   selectCellTextContainer: {
     flex: 1,
   },
   removeBtn: {
+    // Tied to the `+ 40` in totalWidth's calc above and the header's own
+    // 40-wide spacer — a structural layout constant shared between three
+    // places, not a spacing value (40 isn't on the Spacing scale at all),
+    // so it stays a literal rather than being forced onto a nearby token.
     width: 40,
     alignItems: 'center',
   },
   addBtn: {
-    marginTop: 8,
+    marginTop: Spacing.sm,
   },
   overlay: {
     flex: 1,
     backgroundColor: Colors.overlay,
     justifyContent: 'center',
-    padding: 24,
+    padding: Spacing.xl,
   },
   sheet: {
     backgroundColor: Colors.white,
-    borderRadius: 14,
-    padding: 16,
+    // Bare 14 sat between lg (12) and xl (16); resolved to xl to match the
+    // larger radius this app already uses for other floating modal-scale
+    // surfaces (see Elevation.modal's equivalent weight tier).
+    borderRadius: Radius.xl,
+    padding: Spacing.lg,
     maxHeight: '60%',
   },
   sheetTitle: {
-    fontSize: 14,
+    fontSize: Type.body.fontSize,
+    lineHeight: Type.body.lineHeight,
     fontWeight: '700',
     color: Colors.navy,
-    marginBottom: 10,
+    // Bare 10, block-separating margin (title from the option list below)
+    // - resolves to md (12), same role as the file-level `wrap` margins.
+    marginBottom: Spacing.md,
   },
   option: {
-    paddingVertical: 12,
+    paddingVertical: Spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderLight,
   },
   optionText: {
-    fontSize: 13,
+    fontSize: Type.bodySm.fontSize,
+    lineHeight: Type.bodySm.lineHeight,
     color: Colors.textPrimary,
   },
 });
