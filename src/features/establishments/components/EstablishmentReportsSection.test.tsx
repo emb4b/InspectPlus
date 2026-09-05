@@ -115,6 +115,33 @@ const findDateText = (r: Renderer, excluding?: TestRenderer.ReactTestInstance) =
 const resolvedAllowFontScaling = (n: TestRenderer.ReactTestInstance | undefined): boolean =>
   (n?.props.allowFontScaling as boolean | undefined) ?? true;
 
+// The pricetag icon and the control-number text are glued together inside a
+// shared container (`controlNoGroup`) so the icon can't be stranded mid-row
+// once the group is pushed to the end of dateRow via its own
+// `marginLeft: 'auto'` — a style value unique to this one element in the
+// row. Same throw-on-zero-or-multiple convention as findIconWrap above.
+const findControlNoGroup = (r: Renderer) => {
+  const views = r.root.findAll((n) => (n.type as any)?.name === 'View' || n.type === View);
+  const matches = views.filter((n) => flattenStyle(n.props.style).marginLeft === 'auto');
+  if (matches.length === 0) {
+    throw new Error("No control-number group View found: expected a View with marginLeft === 'auto'");
+  }
+  if (matches.length > 1) {
+    throw new Error(`Expected 1 control-number group View but found ${matches.length}; the locator is not sufficiently specific`);
+  }
+  return matches[0];
+};
+
+// The group is found via a style-shape match (like findIconWrap), so it's
+// the composite View instance, one level above the host layer that actually
+// holds its real JSX children — react-native's View is a forwardRef
+// wrapping a single host layer of the same resolved style, so the real,
+// order-bearing children live one level deeper still, on that host layer's
+// own `.children` (same indirection ReportListCard.test.tsx documents for
+// its equivalent `content` View lookup).
+const groupChildren = (group: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] =>
+  (group.children[0] as TestRenderer.ReactTestInstance).children as TestRenderer.ReactTestInstance[];
+
 const noop = () => {};
 
 const baseItem: EstablishmentReportItem = {
@@ -331,11 +358,11 @@ describe('EstablishmentReportsSection report row token resolution', () => {
 
 describe('EstablishmentReportsSection date + control number row', () => {
   // Combining the two previously-separate lines is the point of this task —
-  // this asserts real row MEMBERSHIP (both nodes appear as siblings in the
-  // calendar icon's own parent's `.children`), which is exactly what would
-  // fail if the control number were split back onto its own line below the
-  // date row, unlike a bare "both render somewhere" presence check.
-  it('renders the date and control number as siblings of the same row, not on separate lines', () => {
+  // this asserts real row MEMBERSHIP: the date sits directly in dateRow,
+  // and the control number is reachable through its own end-aligned group
+  // (also a direct child of dateRow), rather than either being split back
+  // onto its own line below the row.
+  it('renders the date directly in the row and the control number inside its own end-aligned group, not on separate lines', () => {
     const r = render(
       <EstablishmentReportsSection
         reports={[baseItem]}
@@ -352,9 +379,43 @@ describe('EstablishmentReportsSection date + control number row', () => {
 
     const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === baseItem.controlNo);
     const dateText = findDateText(r, controlNoText);
+    const group = findControlNoGroup(r);
 
     expect(rowChildren).toContain(dateText);
-    expect(rowChildren).toContain(controlNoText);
+    expect(rowChildren).toContain(group);
+    // The control number itself is no longer a direct child of dateRow —
+    // it's nested one level deeper, inside the group — but it is still
+    // reachable through it, which is what "same row" now means.
+    expect(rowChildren).not.toContain(controlNoText);
+    expect(group.findAllByType(Text)).toContain(controlNoText);
+  });
+
+  // The bug this task fixes: the control number used to sit immediately
+  // after the date. This asserts the actual ORDER of dateRow's real
+  // children — the calendar icon and date first, the control-number group
+  // last — which is exactly what would fail if the control number went
+  // back to sitting right after the date instead of being pushed to the
+  // end of the row.
+  it('places the date first and the control-number group last in the date row', () => {
+    const r = render(
+      <EstablishmentReportsSection
+        reports={[baseItem]}
+        currentUid="uid-1"
+        canManageAll={false}
+        onAddReport={noop}
+        onOpenReport={noop}
+        onDeleteReport={noop}
+      />,
+    );
+    const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
+    const rowChildren = calendarIcon!.parent!.children;
+    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === baseItem.controlNo);
+    const dateText = findDateText(r, controlNoText);
+    const group = findControlNoGroup(r);
+
+    expect(rowChildren[0]).toBe(calendarIcon);
+    expect(rowChildren[1]).toBe(dateText);
+    expect(rowChildren[rowChildren.length - 1]).toBe(group);
   });
 
   // The bug this task fixes: the date and control number now sit side by
@@ -392,11 +453,10 @@ describe('EstablishmentReportsSection date + control number row', () => {
     expect(controlNoStyle.fontFamily).toBe(dateStyle.fontFamily);
   });
 
-  // The second bug this task fixes: the control number had no icon of its
-  // own, unlike the date's calendar-outline. pricetag-outline is the same
-  // glyph InspectionReportHeader.tsx already uses for a control number
-  // elsewhere in the app.
-  it('renders a decorative pricetag-outline icon immediately before the control number text', () => {
+  // The pricetag icon must travel with the control number as one unit — the
+  // real trap this guards against is the icon being stranded mid-row while
+  // only the text gets pushed to the end.
+  it('renders the pricetag icon inside the same container as the control-number text, so it cannot be stranded mid-row', () => {
     const r = render(
       <EstablishmentReportsSection
         reports={[baseItem]}
@@ -413,6 +473,18 @@ describe('EstablishmentReportsSection date + control number row', () => {
     expect(pricetagIcon).toBeDefined();
     expect(controlNoText).toBeDefined();
 
+    const group = findControlNoGroup(r);
+    const children = groupChildren(group);
+    expect(children).toContain(pricetagIcon);
+    expect(children).toContain(controlNoText);
+
+    // Immediately before the control number text, mirroring how the
+    // calendar icon precedes the date at the start of the row.
+    const iconIndex = children.indexOf(pricetagIcon!);
+    const textIndex = children.indexOf(controlNoText!);
+    expect(iconIndex).toBeGreaterThanOrEqual(0);
+    expect(textIndex).toBe(iconIndex + 1);
+
     // Decorative: the control number text right beside it already carries
     // the meaning, so this icon must stay out of the accessibility tree —
     // same convention as Button.tsx's own icons.
@@ -423,19 +495,11 @@ describe('EstablishmentReportsSection date + control number row', () => {
     expect(pricetagIcon?.props.size).toBe(calendarIcon?.props.size);
     expect(pricetagIcon?.props.color).toBe(calendarIcon?.props.color);
 
-    // Immediately before the control number text, mirroring how the
-    // calendar icon precedes the date, within the shared date row.
-    const rowChildren = calendarIcon!.parent!.children;
-    const iconIndex = rowChildren.indexOf(pricetagIcon!);
-    const textIndex = rowChildren.indexOf(controlNoText!);
-    expect(iconIndex).toBeGreaterThanOrEqual(0);
-    expect(textIndex).toBe(iconIndex + 1);
-
-    // Never squeezed by a long control number sharing the row.
+    // Never squeezed within the group.
     expect(flattenStyle(pricetagIcon?.props.style).flexShrink).toBe(0);
   });
 
-  it('never lets a long control number push the urgency badge out of the row or clip the date', () => {
+  it('never lets a long control number push the urgency badge out of the row, clip the date, or dislodge the group from the end of the row', () => {
     const longControlNo = 'CTRL-2026-0000001-EXTREMELY-LONG-CONTROL-NUMBER-VALUE';
     const item: EstablishmentReportItem = {
       ...baseItem,
@@ -453,6 +517,9 @@ describe('EstablishmentReportsSection date + control number row', () => {
         onDeleteReport={noop}
       />,
     );
+
+    const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
+    const rowChildren = calendarIcon!.parent!.children;
 
     // The badge still renders — a long control number sharing the row must
     // not crowd it out.
@@ -482,6 +549,86 @@ describe('EstablishmentReportsSection date + control number row', () => {
     const pricetagIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'pricetag-outline');
     expect(pricetagIcon).toBeDefined();
     expect(flattenStyle(pricetagIcon?.props.style).flexShrink).toBe(0);
+
+    // Even a value long enough to force truncation must not reorder the
+    // row: date (with its icon) first, badge next, the control-number
+    // group still last.
+    const group = findControlNoGroup(r);
+    expect(rowChildren[0]).toBe(calendarIcon);
+    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(badge!));
+    expect(rowChildren.indexOf(badge!)).toBeLessThan(rowChildren.indexOf(group));
+    expect(rowChildren[rowChildren.length - 1]).toBe(group);
+  });
+
+  // The flip side of the long-control-number test above: a short value must
+  // not fall back to sitting right after the date either — the group's
+  // marginLeft: 'auto' keeps it pinned to the end of the row regardless of
+  // how little space it actually needs.
+  it('keeps a short control number at the end of the row (right-aligned), not sitting immediately after the date', () => {
+    const item: EstablishmentReportItem = {
+      ...baseItem,
+      status: 'draft',
+      date: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
+      controlNo: 'C-1',
+    };
+    const r = render(
+      <EstablishmentReportsSection
+        reports={[item]}
+        currentUid="uid-1"
+        canManageAll={false}
+        onAddReport={noop}
+        onOpenReport={noop}
+        onDeleteReport={noop}
+      />,
+    );
+
+    const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
+    const rowChildren = calendarIcon!.parent!.children;
+    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === 'C-1');
+    const dateText = findDateText(r, controlNoText);
+    const badge = r.root
+      .findAll((n) => (n.type as any)?.name === 'View' || n.type === View)
+      .find((n) => flattenStyle(n.props.style).backgroundColor === Colors.hazwaste.badgeBg);
+    const group = findControlNoGroup(r);
+
+    // The mechanism: marginLeft: 'auto' on the group is what pushes it to
+    // the row's end regardless of the control number's own width.
+    expect(flattenStyle(group.props.style).marginLeft).toBe('auto');
+
+    expect(rowChildren[0]).toBe(calendarIcon);
+    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(badge!));
+    expect(rowChildren.indexOf(badge!)).toBeLessThan(rowChildren.indexOf(group));
+    expect(rowChildren[rowChildren.length - 1]).toBe(group);
+  });
+
+  it('renders the urgency badge between the date and the control-number group when present', () => {
+    const item: EstablishmentReportItem = {
+      ...baseItem,
+      status: 'draft',
+      date: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+    const r = render(
+      <EstablishmentReportsSection
+        reports={[item]}
+        currentUid="uid-1"
+        canManageAll={false}
+        onAddReport={noop}
+        onOpenReport={noop}
+        onDeleteReport={noop}
+      />,
+    );
+    const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
+    const rowChildren = calendarIcon!.parent!.children;
+    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === item.controlNo);
+    const dateText = findDateText(r, controlNoText);
+    const badge = r.root
+      .findAll((n) => (n.type as any)?.name === 'View' || n.type === View)
+      .find((n) => flattenStyle(n.props.style).backgroundColor === Colors.hazwaste.badgeBg);
+    const group = findControlNoGroup(r);
+    expect(badge).toBeDefined();
+
+    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(badge!));
+    expect(rowChildren.indexOf(badge!)).toBeLessThan(rowChildren.indexOf(group));
   });
 });
 
