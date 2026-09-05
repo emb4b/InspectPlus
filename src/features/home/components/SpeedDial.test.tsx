@@ -9,7 +9,7 @@ import { REPORT_TYPES } from '../../../constants/reportTypes';
 import { Spacing } from '../../../design/spacing';
 
 // Mirrors the constant defined in SpeedDial.tsx
-const FAB_EDGE_INSET = Spacing.xl;
+const FAB_EDGE_INSET = Spacing.xxxl;
 
 // jest.mock calls are hoisted above these imports by babel-plugin-jest-hoist
 // regardless of source order (see Fab.test.tsx / Skeleton.test.tsx for the

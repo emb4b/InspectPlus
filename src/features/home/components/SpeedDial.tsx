@@ -24,10 +24,11 @@ const RISE_DISTANCE = 12;
 // Exits run faster than entrances — a dismissal shouldn't make the user wait
 // for the same choreography they already sat through on the way in.
 const CLOSE_DURATION = Math.round(Duration.short * (2 / 3));
-// Clearance from the footer stack. Deliberately more than the usual
-// Spacing.lg gutter: the FAB is a one-handed target in the field, and at
-// 16dp it read as crowded against the footer bar on device.
-const FAB_EDGE_INSET = Spacing.xl;
+// Clearance from the footer stack. Deliberately well beyond the usual
+// Spacing.lg gutter: the FAB is a one-handed target used in the field, and
+// at 16dp then 24dp it still read as crowded against the bottom edge on
+// device.
+const FAB_EDGE_INSET = Spacing.xxxl;
 
 interface SpeedDialProps {
   // How far AppChrome's measured footer stack (the active screen's own
