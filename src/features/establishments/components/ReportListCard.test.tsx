@@ -48,6 +48,35 @@ const proseTexts = (r: Renderer) => {
   return r.root.findAllByType(Text).filter((n) => !glyphs.has(n));
 };
 
+// This task made the control number resolve to Colors.textMuted too (it now
+// shares the date's exact style), so a bare color-based lookup for the date
+// text would double-match date + control number, on top of the calendar
+// icon's own glyph Text that proseTexts() already excludes. The control
+// number is already locatable unambiguously by its own text content
+// (item.controlNo), so excluding it here narrows the remaining color match
+// back down to exactly one. Throws if zero or more than one candidate
+// remains — same zero-or-multiple guard as findIconWrap/findReportIcon
+// below.
+const findDateText = (r: Renderer, excluding?: TestRenderer.ReactTestInstance) => {
+  const matches = proseTexts(r).filter(
+    (n) => flattenStyle(n.props.style).color === Colors.textMuted && n !== excluding,
+  );
+  if (matches.length === 0) {
+    throw new Error('No date Text found: expected a prose Text with color === Colors.textMuted');
+  }
+  if (matches.length > 1) {
+    throw new Error(`Expected 1 date Text but found ${matches.length}; the locator is not sufficiently specific`);
+  }
+  return matches[0];
+};
+
+// RN defaults allowFontScaling to true when the prop is omitted entirely, as
+// the date Text does — normalizing through this lets the control number's
+// explicit FONT_SCALING.content and the date's implicit default be compared
+// as equal.
+const resolvedAllowFontScaling = (n: TestRenderer.ReactTestInstance | undefined): boolean =>
+  (n?.props.allowFontScaling as boolean | undefined) ?? true;
+
 // Locate the report-icon wrap View by its resolved shape styles (width 38 /
 // height 38 / borderRadius 8 — unique to this element in ReportListCard).
 // Throws if zero or more than one match is found, per the Card/Badge
@@ -172,6 +201,72 @@ const findContentChildren = (r: Renderer) => {
   // TouchableOpacity element, never bare text — so this cast is safe.
   const hostLayer = matches[0].children[0] as TestRenderer.ReactTestInstance;
   return hostLayer.children as TestRenderer.ReactTestInstance[];
+};
+
+// Locates dateRow's own direct children via the calendar icon's parent —
+// throws on zero-or-multiple calendar icons so a structural change upstream
+// fails loudly here rather than silently returning the wrong row.
+const findDateRowChildren = (r: Renderer): TestRenderer.ReactTestInstance[] => {
+  const calendarIcons = r.root.findAllByType(Ionicons).filter((n) => n.props.name === 'calendar-outline');
+  if (calendarIcons.length === 0) {
+    throw new Error('No calendar-outline Ionicons found: expected exactly one in the date row');
+  }
+  if (calendarIcons.length > 1) {
+    throw new Error(`Expected 1 calendar-outline Ionicons but found ${calendarIcons.length}; the locator is not sufficiently specific`);
+  }
+  return calendarIcons[0].parent!.children as TestRenderer.ReactTestInstance[];
+};
+
+// The pricetag icon and the control-number text are glued together inside a
+// shared container (`controlNoGroup`). This locates that container by two
+// properties that are stable across a change of *alignment technique* —
+// its structural position as a direct child of dateRow, and the fact that
+// it (uniquely, among dateRow's children) contains the pricetag icon —
+// rather than by the alignment mechanism itself (e.g. a specific style
+// value like marginLeft: 'auto' or flexGrow: 1). That mechanism is exactly
+// what this task changed once already (marginLeft: 'auto' -> flexGrow +
+// justifyContent), and a locator pinned to it would have silently stopped
+// finding anything the moment the mechanism changed again. Throws on
+// zero-or-multiple matches, same convention as findIconWrap/findCheckbox
+// above.
+const findControlNoGroup = (r: Renderer) => {
+  const rowChildren = findDateRowChildren(r);
+  const matches = rowChildren.filter((c) =>
+    c.findAllByType(Ionicons).some((n) => n.props.name === 'pricetag-outline'),
+  );
+  if (matches.length === 0) {
+    throw new Error('No control-number group found among dateRow children: expected one containing the pricetag icon');
+  }
+  if (matches.length > 1) {
+    throw new Error(`Expected 1 control-number group among dateRow children but found ${matches.length}; the locator is not sufficiently specific`);
+  }
+  return matches[0];
+};
+
+// The group is found via a style-shape match (like findIconWrap), so it's
+// the composite View instance, one level above the host layer that actually
+// holds its real JSX children — same "host layer" indirection documented on
+// findContentChildren above.
+const groupChildren = (group: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] =>
+  (group.children[0] as TestRenderer.ReactTestInstance).children as TestRenderer.ReactTestInstance[];
+
+// The invariant two earlier attempts both broke: the control-number text
+// must be able to SHRINK (so a long value still truncates) but must NEVER
+// GROW. A growing child (flexGrow: 1, or the `flex: 1` shorthand that
+// implies it) claims 100% of controlNoGroup's width for itself, leaving
+// justifyContent: 'flex-end' on the group zero free space to distribute —
+// so the text renders flush against the group's (and row's) START instead
+// of its end, while every other assertion in this suite (the group's own
+// flexGrow/justifyContent, the text's presence, its order in the row) stays
+// green. react-test-renderer performs no Yoga layout (see the IMPORTANT
+// CAVEAT below), so it can only prove the *styling contract* — never that
+// Yoga actually renders the text at the row's end — which is exactly why
+// this assertion is framed as an invariant on that contract (must shrink,
+// must not grow) rather than pinned to one spelling of it.
+const expectShrinksButNeverGrows = (style: Record<string, unknown>) => {
+  expect(style.flexShrink).toBe(1);
+  expect(style.flexGrow).toBeUndefined();
+  expect(style.flex).toBeUndefined();
 };
 
 const baseItem: AllReportItem = {
@@ -649,13 +744,11 @@ describe('ReportListCard sync flag placement', () => {
 
 describe('ReportListCard date + control number row', () => {
   // Combining the two previously-separate lines is the point of this task —
-  // this asserts real row MEMBERSHIP (both nodes appear as siblings in the
-  // calendar icon's own parent's `.children`), which is exactly what would
-  // fail if the control number were split back onto its own line below the
-  // date row, unlike a bare "both render somewhere" presence check. Mirrors
-  // EstablishmentReportsSection.test.tsx's equivalent assertion, which this
-  // task's reference implementation already established.
-  it('renders the date and control number as siblings of the same row, not on separate lines', () => {
+  // this asserts real row MEMBERSHIP: the date sits directly in dateRow,
+  // and the control number is reachable through its own end-aligned group
+  // (also a direct child of dateRow), rather than either being split back
+  // onto its own line below the row.
+  it('renders the date directly in the row and the control number inside its own end-aligned group, not on separate lines', () => {
     const r = render(
       <ReportListCard item={baseItem} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
     );
@@ -664,58 +757,45 @@ describe('ReportListCard date + control number row', () => {
     const rowChildren = calendarIcon!.parent!.children;
 
     const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === baseItem.controlNo);
-    const dateText = proseTexts(r).find((n) => flattenStyle(n.props.style).color === Colors.textMuted);
+    const dateText = findDateText(r, controlNoText);
+    const group = findControlNoGroup(r);
 
     expect(dateText).toBeDefined();
     expect(controlNoText).toBeDefined();
     expect(rowChildren).toContain(dateText);
-    expect(rowChildren).toContain(controlNoText);
+    expect(rowChildren).toContain(group);
+    // The control number itself is no longer a direct child of dateRow —
+    // it's nested one level deeper, inside the group — but it is still
+    // reachable through it, which is what "same row" now means.
+    expect(rowChildren).not.toContain(controlNoText);
+    expect(group.findAllByType(Text)).toContain(controlNoText);
   });
 
-  it('keeps the control number opted out of OS font scaling and now truncating to a single line', () => {
+  // The bug this task fixes: the control number used to sit immediately
+  // after the date. This asserts the actual ORDER of dateRow's real
+  // children — the calendar icon and date first, the control-number group
+  // last — which is exactly what would fail if the control number went
+  // back to sitting right after the date instead of being pushed to the
+  // end of the row.
+  it('places the date first and the control-number group last in the date row', () => {
     const r = render(
       <ReportListCard item={baseItem} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
     );
+    const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
+    const rowChildren = calendarIcon!.parent!.children;
     const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === baseItem.controlNo);
-    expect(controlNoText?.props.allowFontScaling).toBe(FONT_SCALING.tabular);
-    expect(controlNoText?.props.numberOfLines).toBe(1);
-    expect(controlNoText?.props.ellipsizeMode).toBe('tail');
-    // Fixed-format identifier: the monospace family is semantic, not
-    // decorative, and must survive the typography fix below untouched.
-    expect(flattenStyle(controlNoText?.props.style).fontFamily).toBe('monospace');
+    const dateText = findDateText(r, controlNoText);
+    const group = findControlNoGroup(r);
+
+    expect(rowChildren[0]).toBe(calendarIcon);
+    expect(rowChildren[1]).toBe(dateText);
+    expect(rowChildren[rowChildren.length - 1]).toBe(group);
   });
 
-  // The bug this task fixes: the date and control number now sit side by
-  // side on one row but used to resolve two different sizes/lineHeights
-  // (Type.label vs Type.caption), so they didn't share a baseline. Asserting
-  // a direct comparison between the two resolved values — rather than each
-  // pinned separately to a token — is what keeps this test failing if either
-  // side drifts back out of sync, independent of which token wins.
-  it("resolves the control number's fontSize and lineHeight to exactly match the date's, so they share a baseline", () => {
-    const r = render(
-      <ReportListCard item={baseItem} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
-    );
-    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === baseItem.controlNo);
-    const dateText = proseTexts(r).find((n) => flattenStyle(n.props.style).color === Colors.textMuted);
-    const dateStyle = flattenStyle(dateText?.props.style);
-    const controlNoStyle = flattenStyle(controlNoText?.props.style);
-
-    expect(controlNoStyle.fontSize).toBe(dateStyle.fontSize);
-    expect(controlNoStyle.lineHeight).toBe(dateStyle.lineHeight);
-
-    // Colour is what keeps the date reading as primary and the control
-    // number as secondary now that size no longer does that job — they must
-    // not have been flattened to the same colour along the way.
-    expect(controlNoStyle.color).not.toBe(dateStyle.color);
-    expect(dateStyle.color).toBe(Colors.textMuted);
-    expect(controlNoStyle.color).toBe(Colors.textLight);
-  });
-
-  // The second bug this task fixes: the control number had no icon of its
-  // own, unlike the date's calendar-outline. pricetag-outline is the same
-  // glyph InspectionReportHeader.tsx already uses for a control number
-  // elsewhere in the app.
-  it('renders a decorative pricetag-outline icon immediately before the control number text', () => {
+  // The pricetag icon must travel with the control number as one unit — the
+  // real trap this guards against is the icon being stranded mid-row while
+  // only the text gets pushed to the end.
+  it('renders the pricetag icon inside the same container as the control-number text, so it cannot be stranded mid-row', () => {
     const r = render(
       <ReportListCard item={baseItem} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
     );
@@ -724,6 +804,18 @@ describe('ReportListCard date + control number row', () => {
     const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === baseItem.controlNo);
     expect(pricetagIcon).toBeDefined();
     expect(controlNoText).toBeDefined();
+
+    const group = findControlNoGroup(r);
+    const children = groupChildren(group);
+    expect(children).toContain(pricetagIcon);
+    expect(children).toContain(controlNoText);
+
+    // Immediately before the control number text, mirroring how the
+    // calendar icon precedes the date at the start of the row.
+    const iconIndex = children.indexOf(pricetagIcon!);
+    const textIndex = children.indexOf(controlNoText!);
+    expect(iconIndex).toBeGreaterThanOrEqual(0);
+    expect(textIndex).toBe(iconIndex + 1);
 
     // Decorative: the control number text right beside it already carries
     // the meaning, so this icon must stay out of the accessibility tree —
@@ -735,19 +827,64 @@ describe('ReportListCard date + control number row', () => {
     expect(pricetagIcon?.props.size).toBe(calendarIcon?.props.size);
     expect(pricetagIcon?.props.color).toBe(calendarIcon?.props.color);
 
-    // Immediately before the control number text, mirroring how the
-    // calendar icon precedes the date, within the shared date row.
-    const rowChildren = calendarIcon!.parent!.children;
-    const iconIndex = rowChildren.indexOf(pricetagIcon!);
-    const textIndex = rowChildren.indexOf(controlNoText!);
-    expect(iconIndex).toBeGreaterThanOrEqual(0);
-    expect(textIndex).toBe(iconIndex + 1);
-
-    // Never squeezed by a long control number sharing the row.
+    // Never squeezed within the group.
     expect(flattenStyle(pricetagIcon?.props.style).flexShrink).toBe(0);
   });
 
-  it('never lets a long control number push the urgency badge out of the row or clip the date', () => {
+  // This task's fix: the control number used to opt out of OS font scaling
+  // (FONT_SCALING.tabular) because it sat alone on its own line, where an
+  // over-long value would overflow. It now shares the date row, and
+  // numberOfLines={1}/ellipsizeMode="tail" (asserted below) make it truncate
+  // instead of overflow — the truncation is what protects the row now, so
+  // the control number no longer needs a scaling opt-out and instead scales
+  // with the OS font exactly like the date.
+  it('keeps the control number truncating to a single line, now scaling with the OS font exactly like the date', () => {
+    const r = render(
+      <ReportListCard item={baseItem} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === baseItem.controlNo);
+    const dateText = findDateText(r, controlNoText);
+    expect(controlNoText?.props.numberOfLines).toBe(1);
+    expect(controlNoText?.props.ellipsizeMode).toBe('tail');
+    // Compared against the date's own resolved value (not a separate token
+    // pin) so this keeps failing if either side drifts back out of sync.
+    expect(resolvedAllowFontScaling(controlNoText)).toBe(resolvedAllowFontScaling(dateText));
+    expect(resolvedAllowFontScaling(controlNoText)).toBe(true);
+    // Also pins the actual prop to the named policy token, confirming the
+    // source switched to FONT_SCALING.content specifically (not just some
+    // other truthy value that happens to match the date's default).
+    expect(controlNoText?.props.allowFontScaling).toBe(FONT_SCALING.content);
+  });
+
+  // The bug this task fixes: the date and control number now sit side by
+  // side on one row but used to resolve two different sizes/lineHeights
+  // (Type.label vs Type.caption), and different colours/families on top of
+  // that. Asserting direct comparisons between the two resolved values —
+  // rather than each pinned separately to a token — is what keeps this test
+  // failing if either side drifts back out of sync, independent of which
+  // token wins.
+  it("resolves the control number's fontSize, lineHeight, color and font family to exactly match the date's", () => {
+    const r = render(
+      <ReportListCard item={baseItem} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === baseItem.controlNo);
+    const dateText = findDateText(r, controlNoText);
+    const dateStyle = flattenStyle(dateText?.props.style);
+    const controlNoStyle = flattenStyle(controlNoText?.props.style);
+
+    expect(controlNoStyle.fontSize).toBe(dateStyle.fontSize);
+    expect(controlNoStyle.lineHeight).toBe(dateStyle.lineHeight);
+
+    // The two are meant to read as one style now that they share a row —
+    // colour and font family (no more 'monospace' override) both now match
+    // the date's exactly, instead of the date/control-number colour
+    // distinction the row used to carry.
+    expect(controlNoStyle.color).toBe(dateStyle.color);
+    expect(controlNoStyle.color).toBe(Colors.textMuted);
+    expect(controlNoStyle.fontFamily).toBe(dateStyle.fontFamily);
+  });
+
+  it('never lets a long control number push the urgency badge out of the row, clip the date, or dislodge the group from the end of the row', () => {
     const longControlNo = 'CTRL-2026-0000001-EXTREMELY-LONG-CONTROL-NUMBER-VALUE';
     const item: AllReportItem = {
       ...baseItem,
@@ -759,6 +896,9 @@ describe('ReportListCard date + control number row', () => {
       <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
     );
 
+    const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
+    const rowChildren = calendarIcon!.parent!.children;
+
     // The badge still renders — a long control number sharing the row must
     // not crowd it out.
     const badge = r.root
@@ -767,16 +907,22 @@ describe('ReportListCard date + control number row', () => {
     expect(badge).toBeDefined();
     expect(proseTexts(r).some((n) => n.props.children === 'Overdue')).toBe(true);
 
+    // The control number is the element that shrinks/truncates
+    // (flexShrink: 1, numberOfLines 1) — the date, its icon, and the badge
+    // are pinned (flexShrink: 0) so none of them can be squeezed out by it.
+    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === longControlNo);
+    expect(controlNoText).toBeDefined();
+
     // The date text is still present and untouched — it's the control
-    // number that gives way, not the date.
-    const dateText = proseTexts(r).find((n) => flattenStyle(n.props.style).color === Colors.textMuted);
+    // number that gives way, not the date. Located excluding the control
+    // number, since both now resolve to Colors.textMuted (this task's fix).
+    const dateText = findDateText(r, controlNoText);
     expect(dateText).toBeDefined();
 
-    // The control number is the element that shrinks/truncates (flex: 1,
-    // numberOfLines 1) — the date, its icon, and the badge are pinned
-    // (flexShrink: 0) so none of them can be squeezed out by it.
-    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === longControlNo);
-    expect(flattenStyle(controlNoText?.props.style).flex).toBe(1);
+    // Must shrink to truncate, but must never grow — see
+    // expectShrinksButNeverGrows above for why a growing child would defeat
+    // the group's flex-end alignment.
+    expectShrinksButNeverGrows(flattenStyle(controlNoText?.props.style));
     expect(controlNoText?.props.numberOfLines).toBe(1);
     expect(flattenStyle(dateText?.props.style).flexShrink).toBe(0);
     expect(flattenStyle(badge?.props.style).flexShrink).toBe(0);
@@ -784,6 +930,102 @@ describe('ReportListCard date + control number row', () => {
     const pricetagIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'pricetag-outline');
     expect(pricetagIcon).toBeDefined();
     expect(flattenStyle(pricetagIcon?.props.style).flexShrink).toBe(0);
+
+    // Even a value long enough to force truncation must not reorder the
+    // row: date (with its icon) first, badge next, the control-number
+    // group still last.
+    const group = findControlNoGroup(r);
+    expect(rowChildren[0]).toBe(calendarIcon);
+    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(badge!));
+    expect(rowChildren.indexOf(badge!)).toBeLessThan(rowChildren.indexOf(group));
+    expect(rowChildren[rowChildren.length - 1]).toBe(group);
+  });
+
+  // The flip side of the long-control-number test above: a short value must
+  // not fall back to sitting right after the date either — the group's
+  // flexGrow: 1 + justifyContent: 'flex-end' keeps it pinned to the end of
+  // the row regardless of how little space it actually needs.
+  //
+  // IMPORTANT CAVEAT: react-test-renderer performs no Yoga/flexbox layout
+  // at all — flattenStyle() below only confirms the *styling contract*
+  // (which properties are declared and with what values), never that Yoga
+  // actually resolves them into the group sitting flush against the row's
+  // right edge on a real device. That gap is exactly what let BOTH earlier
+  // attempts ship looking done while pixel-identical to no alignment at
+  // all: first marginLeft: 'auto' (a no-op alongside the row's own `gap` on
+  // some RN versions), then flex: 1 on the control-number text itself (which
+  // grows to fill controlNoGroup, leaving flex-end nothing to push against)
+  // — every style-applied assertion in this file passed both times.
+  // expectShrinksButNeverGrows below closes the second gap specifically by
+  // pinning the *contract* the text must satisfy; confirming the group truly
+  // lands at the end of the row (with visible empty space between it and
+  // the date/badge for a short value like this one) still requires a real
+  // device or simulator check, not this suite.
+  it('keeps a short control number at the end of the row (right-aligned), not sitting immediately after the date', () => {
+    const item: AllReportItem = {
+      ...baseItem,
+      status: 'draft',
+      date: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
+      controlNo: 'C-1',
+    };
+    const r = render(
+      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+
+    const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
+    const rowChildren = calendarIcon!.parent!.children;
+    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === 'C-1');
+    const dateText = findDateText(r, controlNoText);
+    const badge = r.root
+      .findAll((n) => (n.type as any)?.name === 'View' || n.type === View)
+      .find((n) => flattenStyle(n.props.style).backgroundColor === Colors.hazwaste.badgeBg);
+    const group = findControlNoGroup(r);
+
+    // The mechanism: the group grows to claim the row's remaining space
+    // (flexGrow: 1) and right-aligns its own children within that space
+    // (justifyContent: 'flex-end'), regardless of the control number's own
+    // width. Asserted as the pair that together express "end-aligned",
+    // rather than pinning a single property name — so a future swap of
+    // *which* flex properties accomplish this doesn't reflexively break
+    // this test the way the marginLeft: 'auto' pin did.
+    const groupStyle = flattenStyle(group.props.style);
+    expect(groupStyle.flexGrow).toBe(1);
+    expect(groupStyle.justifyContent).toBe('flex-end');
+
+    // This is exactly the scenario the flex: 1 regression broke: a short
+    // value doesn't need to truncate, but a growing text still consumes all
+    // of the group's width regardless, defeating flex-end. Pinning the
+    // group's own contract (above) isn't enough on its own — see
+    // expectShrinksButNeverGrows above.
+    expectShrinksButNeverGrows(flattenStyle(controlNoText?.props.style));
+
+    expect(rowChildren[0]).toBe(calendarIcon);
+    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(badge!));
+    expect(rowChildren.indexOf(badge!)).toBeLessThan(rowChildren.indexOf(group));
+    expect(rowChildren[rowChildren.length - 1]).toBe(group);
+  });
+
+  it('renders the urgency badge between the date and the control-number group when present', () => {
+    const item: AllReportItem = {
+      ...baseItem,
+      status: 'draft',
+      date: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
+    };
+    const r = render(
+      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
+    const rowChildren = calendarIcon!.parent!.children;
+    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === item.controlNo);
+    const dateText = findDateText(r, controlNoText);
+    const badge = r.root
+      .findAll((n) => (n.type as any)?.name === 'View' || n.type === View)
+      .find((n) => flattenStyle(n.props.style).backgroundColor === Colors.hazwaste.badgeBg);
+    const group = findControlNoGroup(r);
+    expect(badge).toBeDefined();
+
+    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(badge!));
+    expect(rowChildren.indexOf(badge!)).toBeLessThan(rowChildren.indexOf(group));
   });
 
   it("falls back to 'No control number yet' when controlNo is null", () => {

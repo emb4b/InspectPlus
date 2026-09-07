@@ -137,37 +137,6 @@ const ReportRow: React.FC<{
               <View style={styles.dateRow}>
                 <Ionicons name="calendar-outline" size={10} color={Colors.textMuted} />
                 <Text style={styles.date}>{formatDate(item.date)}</Text>
-                {/* Decorative: the control number text right beside it
-                    already carries the meaning, so it stays out of the
-                    accessibility tree — same treatment as Button.tsx's own
-                    icons. Matches the calendar icon's size/color so both
-                    icons in this row read as one family; flexShrink: 0 keeps
-                    it from being squeezed by a long control number, same as
-                    the date and urgency badge. */}
-                <Ionicons
-                  name="pricetag-outline"
-                  size={10}
-                  color={Colors.textMuted}
-                  style={styles.controlNoIcon}
-                  importantForAccessibility="no"
-                />
-                {/* Fixed-format monospace: OS font scaling blows it past the
-                    row width, so it opts out per the FONT_SCALING policy —
-                    matches ReportListCard's controlNo. Shares this row with
-                    the date; flexShrink+numberOfLines let it truncate first
-                    so a long control number can't clip the date or push an
-                    urgency badge off the row. Sized and line-heighted
-                    identically to the date (Type.label) so the two share one
-                    baseline now that they sit side by side; Colors.textLight
-                    (vs. the date's Colors.textMuted) is what keeps the date
-                    reading as primary and the control number as secondary. */}
-                <Text
-                  style={styles.controlNo}
-                  allowFontScaling={FONT_SCALING.tabular}
-                  numberOfLines={1}
-                  ellipsizeMode="tail">
-                  {item.controlNo || 'No control number yet'}
-                </Text>
                 {urgency !== 'none' && (
                   <View
                     style={[
@@ -188,6 +157,70 @@ const ReportRow: React.FC<{
                     </Text>
                   </View>
                 )}
+                {/* The pricetag icon and control number travel together as
+                    one unit, pushed to the end of the row by flexGrow: 1 +
+                    justifyContent: 'flex-end' on the group (below) rather
+                    than sitting right after the date — the date, its icon,
+                    and the urgency badge all stay put at the start via
+                    their own flexShrink: 0. dateRow's existing `gap` still
+                    guarantees a minimum separation from the badge even when
+                    the group is short enough that it wouldn't otherwise
+                    need the room. (An earlier version of this used
+                    marginLeft: 'auto' instead, which reads as "push me to
+                    the end" but silently no-ops in Yoga on some RN
+                    versions when the parent row also declares `gap` — the
+                    row rendered pixel-identical to no alignment at all,
+                    passing every unit test because they only asserted the
+                    style prop was applied, never that the group actually
+                    moved. flexGrow + justifyContent doesn't depend on that
+                    auto-margin/gap interaction at all.) */}
+                <View style={styles.controlNoGroup}>
+                  {/* Decorative: the control number text right beside it
+                      already carries the meaning, so it stays out of the
+                      accessibility tree — same treatment as Button.tsx's own
+                      icons. Matches the calendar icon's size/color so both
+                      icons in this row read as one family; flexShrink: 0
+                      keeps it from being squeezed within the group. */}
+                  <Ionicons
+                    name="pricetag-outline"
+                    size={10}
+                    color={Colors.textMuted}
+                    style={styles.controlNoIcon}
+                    importantForAccessibility="no"
+                  />
+                  {/* The control number now shares the date's exact style —
+                      size, line height, colour and font family — rather than
+                      merely matching size, because the two are meant to read
+                      as one even though the group now sits at the opposite
+                      end of the row from the date. FONT_SCALING.tabular (OS
+                      font scaling disabled) existed to protect this text
+                      when it sat alone on its own line with no truncation;
+                      it now carries numberOfLines={1}/ellipsizeMode="tail"
+                      below, so an over-long value truncates rather than
+                      overflowing — that's what protects the row now, so the
+                      scaling opt-out would only reintroduce a new
+                      inconsistency (the date growing under a large system
+                      font while this stayed fixed). It switches to
+                      FONT_SCALING.content, the same scaling behavior as the
+                      date. flexShrink: 1 below (plus the group's own
+                      flexShrink: 1/minWidth: 0) still makes this the element
+                      that truncates first, so a long control number still
+                      can't clip the date or push the urgency badge off the
+                      row — matches ReportListCard's controlNo. It
+                      deliberately carries no flexGrow: a growing child would
+                      claim all of controlNoGroup's width for itself, leaving
+                      justifyContent: 'flex-end' on the group nothing to push
+                      against — the exact bug this task fixes. textAlign:
+                      'right' below is a second line of defence in case this
+                      Text's box is ever wider than its content. */}
+                  <Text
+                    style={styles.controlNo}
+                    allowFontScaling={FONT_SCALING.content}
+                    numberOfLines={1}
+                    ellipsizeMode="tail">
+                    {item.controlNo || 'No control number yet'}
+                  </Text>
+                </View>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={16} color={Colors.textLight} />
@@ -369,25 +402,54 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   controlNo: {
-    // Matches the date's Type.label size/lineHeight exactly so the two sit
-    // on a shared baseline now that they're side by side on one row — a
-    // mismatched size read fine when the control number was a subordinate
-    // line beneath the date, but not beside it. Colors.textLight (vs. the
-    // date's Colors.textMuted) is now what keeps the date leading and the
-    // control number secondary.
+    // Identical to the date's style below — size, line height, colour and
+    // font family — now that the two share one row and are meant to read as
+    // one, even though the group sits at the opposite end from the date.
+    // There is no fontFamily override here (it used to be 'monospace'):
+    // dropping it leaves this on the same default family as the date, which
+    // is what "same font style" means for this row.
     fontSize: Type.label.fontSize,
     lineHeight: Type.label.lineHeight,
-    color: Colors.textLight,
-    fontFamily: 'monospace',
-    // Shares the date row rather than sitting on its own line below it; it's
-    // the one that shrinks/truncates so a long value can't clip the date or
-    // shove the urgency badge off the row.
-    flex: 1,
+    color: Colors.textMuted,
+    // Must SHRINK (so a long value truncates within controlNoGroup, together
+    // with numberOfLines/ellipsizeMode above) but must NEVER GROW. flex: 1
+    // here was the actual bug: it's shorthand for flexGrow: 1 too, so the
+    // text grew to fill controlNoGroup completely, leaving
+    // justifyContent: 'flex-end' on the group zero free space to distribute
+    // — the text rendered flush against the group's (and row's) start
+    // instead of its end. flexShrink: 1 alone keeps the truncation without
+    // reintroducing that growth. textAlign: 'right' is a second line of
+    // defence: even if this Text's box ever ends up wider than its content
+    // for some other reason, the glyphs still sit right-aligned inside it.
+    flexShrink: 1,
     minWidth: 0,
+    textAlign: 'right',
   },
   // Never squeezed by a long control number sharing the row — same
   // flexShrink: 0 guard as the date and urgency badge.
   controlNoIcon: {
     flexShrink: 0,
+  },
+  // Glues the pricetag icon and control number text together as one unit
+  // and pushes that unit to the end of dateRow by growing to fill the row's
+  // remaining space (flexGrow: 1) and right-aligning its own children
+  // (justifyContent: 'flex-end') — dateRow deliberately keeps
+  // flexDirection: 'row' rather than justifyContent: 'space-between', which
+  // would also spread the date, icon and badge apart. flexShrink: 1 plus
+  // minWidth: 0 (rather than the default flexShrink: 0 every other dateRow
+  // child pins explicitly) let this group give way when a long control
+  // number would otherwise overflow the row, so controlNo's own flex: 1/
+  // numberOfLines still get a chance to truncate it instead of the row
+  // overflowing. The icon and text stay adjacent (only the `gap` above
+  // separates them) so flex-end carries them to the row's end together —
+  // the icon can't be stranded mid-row on its own.
+  controlNoGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: Spacing.xs,
+    flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
 });
