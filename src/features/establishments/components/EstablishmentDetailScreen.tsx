@@ -58,12 +58,6 @@ export const EstablishmentDetailScreen: React.FC<EstablishmentDetailScreenProps>
     }, [estabId]),
   );
 
-  const handleEdit = useGuardedPress(
-    useCallback(() => {
-      router.push({ pathname: '/establishment/edit', params: { estabId } });
-    }, [estabId]),
-  );
-
   // The native Stack doesn't remount this screen when navigating back to
   // it, so without this the card/info sections — and the reports list below
   // them — would keep showing stale data after saving/submitting a report
@@ -180,11 +174,12 @@ export const EstablishmentDetailScreen: React.FC<EstablishmentDetailScreenProps>
           establishment={establishment}
           inspectorLabel={inspectorLabel}
           onAddReport={handleAddReport}
-          onEdit={canManageEstablishment ? handleEdit : undefined}
         />
 
         <EstablishmentInfoSections
           establishment={establishment}
+          canEdit={canManageEstablishment}
+          onSaved={refetch}
           onUpdatePermits={canManageEstablishment ? handleUpdatePermits : undefined}
         />
 

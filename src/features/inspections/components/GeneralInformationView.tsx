@@ -34,10 +34,12 @@ interface GeneralInformationViewProps {
 
 // The report's own establishmentSnapshot fields can drift from the live
 // establishments row two ways: someone edits the master record later (from
-// EditEstablishmentScreen), or someone edits this report's copy directly via
-// patchEstablishmentSnapshot below. Neither write path touches the other, so
-// nothing keeps them in sync — this just surfaces the drift rather than
-// resolving or hiding it, per the report acting as a point-in-time record.
+// one of the establishment detail screen's own editable sections — see
+// EstablishmentInfoSections), or someone edits this report's copy directly
+// via patchEstablishmentSnapshot below. Neither write path touches the
+// other, so nothing keeps them in sync — this just surfaces the drift
+// rather than resolving or hiding it, per the report acting as a
+// point-in-time record.
 function valuesDiffer(a: string, b: string): boolean {
   if (a === b) return false;
   const na = Number(a);

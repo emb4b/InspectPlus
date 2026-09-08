@@ -9,10 +9,6 @@ describe('isFabRoute', () => {
     expect(isFabRoute('/establishment/abc-123')).toBe(true);
   });
 
-  it('hides the FAB on the establishment edit form — the easy one to get wrong', () => {
-    expect(isFabRoute('/establishment/edit')).toBe(false);
-  });
-
   it('hides the FAB on inspection forms, new and existing', () => {
     expect(isFabRoute('/inspection/new')).toBe(false);
     expect(isFabRoute('/inspection/some-id')).toBe(false);
@@ -27,9 +23,8 @@ describe('isFabRoute', () => {
     expect(isFabRoute('/settings')).toBe(false);
   });
 
-  // An establishment id could itself be the literal string "edit" only via
-  // this one route; anything with more path segments past the id is not a
-  // detail screen at all, so it must not slip through as a false positive.
+  // Anything with more path segments past the id is not a detail screen at
+  // all, so it must not slip through as a false positive.
   it('does not treat a nested path under an establishment id as a detail screen', () => {
     expect(isFabRoute('/establishment/abc-123/edit')).toBe(false);
   });

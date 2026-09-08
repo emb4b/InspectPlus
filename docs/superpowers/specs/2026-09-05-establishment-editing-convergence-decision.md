@@ -1,7 +1,14 @@
 # Decision: converge establishment editing on the report's granular model
 
-Status: decided, not yet implemented. Belongs to its own branch, to be
-started after `feature/modern-ui-harmony` merges.
+Status: implemented on `feature/establishment-editing-convergence`.
+`/establishment/edit`, `EditEstablishmentScreen` and `editEstablishmentForm`
+are retired; `EstablishmentInfoSections` now carries four independently
+editable sections (Establishment Details, Key Personnel, Pollution Control
+Officer, Product Lines) via `useEditableSection` + `SectionEditActions`,
+saving through the new `patchEstablishmentRecord`. DENR Permits is
+unchanged — still a read-only section with a stubbed Edit action, since no
+editing flow for it existed before this convergence and building one is a
+separate, larger feature (permit add/remove, not just field edits).
 
 ## The inconsistency
 

@@ -1,6 +1,5 @@
 import { database, collections } from '../../db/database';
 import { GeneralInfoFormState } from './types';
-import type { EditEstablishmentFormState } from '../establishments/editEstablishmentForm';
 import { notifySyncDataChanged } from '../../services/sync/syncEvents';
 
 // Preserves a still-unsynced establishment's 'pending_create' status across
@@ -27,10 +26,10 @@ function valuesEqual(a: unknown, b: unknown): boolean {
 }
 
 // Every establishment "content" field either write path (quick-create/report
-// save, or the Edit Establishment screen) can touch — the union of
-// createEstablishmentRecord's and updateEstablishmentRecord's field sets.
-// Used both to build the last-synced snapshot (see watermelonAdapter.ts) and
-// to diff a proposed edit against it below.
+// save, or one of the establishment detail screen's editable sections) can
+// touch — the union of createEstablishmentRecord's and every section's field
+// set. Used both to build the last-synced snapshot (see watermelonAdapter.ts)
+// and to diff a proposed edit against it below.
 export const ESTABLISHMENT_CONTENT_FIELDS = [
   'name', 'formerName', 'addressLine', 'barangay', 'city', 'province',
   'geoLat', 'geoLng', 'natureOfBusiness', 'psicCode', 'product', 'yearEstablished',
@@ -170,68 +169,41 @@ export async function createEstablishmentRecord({
   });
 }
 
-interface UpdateEstablishmentArgs {
+interface PatchEstablishmentArgs {
   estabId: string;
-  form: EditEstablishmentFormState;
+  fields: Partial<Record<EstablishmentContentField, unknown>>;
 }
 
-// Used by the Edit Establishment screen. Same field-mapping conventions as
-// createEstablishmentRecord — must be called inside a database.write, it
-// doesn't open its own. Only sets the fields the edit form manages; geoLat/
-// geoLng/denrPermits/isArchived/deviceId/inspectorUid/createdAt are left as-is.
-// Only actually writes (and flags the record for sync) if the submitted
-// form differs from what's already stored — saving an edit screen with no
-// real changes shouldn't mark an otherwise-untouched establishment pending.
-export async function updateEstablishmentRecord({ estabId, form }: UpdateEstablishmentArgs): Promise<void> {
+// Used by every independently-editable FormSection on the establishment
+// detail screen (see useEditableSection) — patches only the fields that
+// section owns, so saving one section can never clobber an in-flight edit
+// on another. geoLat/geoLng/denrPermits/isArchived/deviceId/inspectorUid/
+// createdAt are never among `fields`; no section currently edits them.
+// Opens its own database.write and notifies other screens the same way
+// archiveEstablishmentRecord does, since this is always called standalone
+// from a section's Save button rather than composed into a larger
+// transaction.
+export async function patchEstablishmentRecord({ estabId, fields }: PatchEstablishmentArgs): Promise<void> {
   const now = new Date().toISOString();
-  const productLines = form.productLines
-    .filter(p => p.product_line?.trim())
-    .map(p => ({
-      product_line: p.product_line ?? '',
-      ecc_production_rate: p.ecc_production_rate ?? '',
-      actual_production_rate: p.actual_production_rate ?? '',
-    }));
+  let wasDirty = false;
 
-  const estabRecord = await collections.establishments.find(estabId);
-  const nextFields = {
-    name: form.name,
-    formerName: form.includeFormerName ? form.formerName || null : null,
-    addressLine: form.addressLine,
-    barangay: form.barangay,
-    city: form.city,
-    province: form.province,
-    natureOfBusiness: form.natureOfBusiness,
-    psicCode: form.psicCode || null,
-    product: form.product || null,
-    yearEstablished: form.yearEstablished ? Number(form.yearEstablished) : null,
-    operatingStatus: form.operatingStatus,
-    operatingHoursDay: form.operatingHoursDay ? Number(form.operatingHoursDay) : null,
-    operatingDaysWeek: form.operatingDaysWeek ? Number(form.operatingDaysWeek) : null,
-    operatingDaysYear: form.operatingDaysYear ? Number(form.operatingDaysYear) : null,
-    operatingStatusSince: form.operatingStatusSince || null,
-    ownerName: form.ownerName,
-    managingHeadName: form.managingHeadName,
-    contactPersonName: form.contactPersonName,
-    contactPersonPosition: form.contactPersonPosition,
-    phoneFax: form.phoneFax,
-    email: form.email,
-    pcoName: form.pcoName || null,
-    pcoAccreditationNo: form.pcoAccreditationNo || null,
-    pcoEffectivity: form.pcoEffectivity || null,
-    productLines,
-  } as const;
+  await database.write(async () => {
+    const estabRecord = await collections.establishments.find(estabId);
+    const resolved = resolveEstablishmentContentEdit(
+      estabRecord as unknown as Record<string, unknown> & { syncState: string; lastSyncedSnapshot?: string | null },
+      fields,
+    );
+    if (!resolved.isDirty) return;
+    wasDirty = true;
 
-  const resolved = resolveEstablishmentContentEdit(
-    estabRecord as unknown as Record<string, unknown> & { syncState: string; lastSyncedSnapshot?: string | null },
-    nextFields,
-  );
-  if (!resolved.isDirty) return;
-
-  await estabRecord.update(rec => {
-    Object.assign(rec, nextFields);
-    rec.updatedAt = now;
-    rec.syncState = resolved.syncState;
+    await estabRecord.update(rec => {
+      Object.assign(rec, fields);
+      rec.updatedAt = now;
+      rec.syncState = resolved.syncState;
+    });
   });
+
+  if (wasDirty) notifySyncDataChanged();
 }
 
 // "Delete" for establishments means archive, not a hard delete: the remote
