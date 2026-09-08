@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppText } from '../../../components/AppText';
 import { Button } from '../../../components/Button';
 import { EmptyState } from '../../../components/EmptyState';
+import { UrgencyBadge, URGENCY_BADGE_RESERVED_TOP } from '../../../components/UrgencyBadge';
 import { REPORT_TYPE_DISPLAY, ReportDataKey } from '../../../constants/reportTypeDisplay';
 import { Colors } from '../../../design/colors';
 import { Duration } from '../../../design/motion';
@@ -118,13 +119,18 @@ const ReportRow: React.FC<{
           <TouchableOpacity
             style={[
               styles.row,
-              urgency === 'overdue' && styles.rowOverdue,
-              urgency === 'due-soon' && styles.rowDueSoon,
+              urgency.level === 'overdue' && styles.rowOverdue,
+              urgency.level === 'due-soon' && styles.rowDueSoon,
+              // The corner chip sits in the row's own top padding band, so
+              // the band has to grow to make room for it.
+              urgency.level !== 'none' && styles.rowFlagged,
             ]}
             onPress={handlePress}
             activeOpacity={0.75}
             accessibilityRole="button"
             accessibilityLabel={item.title}>
+            <UrgencyBadge urgency={urgency} />
+
             <View style={[styles.iconWrap, { backgroundColor: display?.bgColor ?? Colors.bgLight }]}>
               <Ionicons
                 name={display?.icon ?? 'document-outline'}
@@ -137,35 +143,15 @@ const ReportRow: React.FC<{
               <View style={styles.dateRow}>
                 <Ionicons name="calendar-outline" size={10} color={Colors.textMuted} />
                 <Text style={styles.date}>{formatDate(item.date)}</Text>
-                {urgency !== 'none' && (
-                  <View
-                    style={[
-                      styles.urgencyBadge,
-                      { backgroundColor: urgency === 'overdue' ? Colors.hazwaste.badgeBg : Colors.warning.badgeBg },
-                    ]}>
-                    <Ionicons
-                      name="alert-circle"
-                      size={9}
-                      color={urgency === 'overdue' ? Colors.hazwaste.badgeText : Colors.warning.text}
-                    />
-                    <Text
-                      style={[
-                        styles.urgencyBadgeText,
-                        { color: urgency === 'overdue' ? Colors.hazwaste.badgeText : Colors.warning.text },
-                      ]}>
-                      {urgency === 'overdue' ? 'Overdue' : 'Due soon'}
-                    </Text>
-                  </View>
-                )}
                 {/* The pricetag icon and control number travel together as
                     one unit, pushed to the end of the row by flexGrow: 1 +
                     justifyContent: 'flex-end' on the group (below) rather
-                    than sitting right after the date — the date, its icon,
-                    and the urgency badge all stay put at the start via
-                    their own flexShrink: 0. dateRow's existing `gap` still
-                    guarantees a minimum separation from the badge even when
-                    the group is short enough that it wouldn't otherwise
-                    need the room. (An earlier version of this used
+                    than sitting right after the date — the date and its icon
+                    stay put at the start via their own flexShrink: 0.
+                    dateRow's existing `gap` still guarantees a minimum
+                    separation from the date even when the group is short
+                    enough that it wouldn't otherwise need the room. (An
+                    earlier version of this used
                     marginLeft: 'auto' instead, which reads as "push me to
                     the end" but silently no-ops in Yoga on some RN
                     versions when the parent row also declares `gap` — the
@@ -351,6 +337,11 @@ const styles = StyleSheet.create({
     borderColor: Colors.hazwaste.border,
     backgroundColor: Colors.hazwaste.bg,
   },
+  // Reserves the band the corner chip occupies, so it can never overlap the
+  // title sharing that corner.
+  rowFlagged: {
+    paddingTop: URGENCY_BADGE_RESERVED_TOP,
+  },
   iconWrap: {
     width: 38,
     height: 38,
@@ -383,23 +374,6 @@ const styles = StyleSheet.create({
     lineHeight: Type.label.lineHeight,
     color: Colors.textMuted,
     flexShrink: 0,
-  },
-  urgencyBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: Spacing.xxs,
-    borderRadius: Radius.pill,
-    marginLeft: Spacing.xs,
-    // Never squeezed by a long control number sharing the row — it's the
-    // control number that truncates, not this badge.
-    flexShrink: 0,
-  },
-  urgencyBadgeText: {
-    fontSize: Type.caption.fontSize,
-    lineHeight: Type.caption.lineHeight,
-    fontWeight: '700',
   },
   controlNo: {
     // Identical to the date's style below — size, line height, colour and

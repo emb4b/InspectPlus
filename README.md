@@ -48,7 +48,16 @@ EXPO_PUBLIC_SUPABASE_URL=<your-supabase-url>
 EXPO_PUBLIC_SUPABASE_ANON_KEY=<your-supabase-anon-key>
 ```
 
-Non-secret, per-environment config (cache durations, sync intervals, etc.) lives in `src/core/config/env.*.ts`.
+Non-secret, per-environment config (cache durations, sync intervals, etc.) lives in `src/core/config/env.*.ts`. Any of those defaults can be overridden per install by adding its variable to `.env` — a value that isn't a number (or is left blank) is ignored in favour of the default:
+
+```
+# How long a draft report may sit after its inspection date before the
+# report lists flag it. Days. Defaults: 14 and 30.
+EXPO_PUBLIC_DUE_SOON_DAYS=14
+EXPO_PUBLIC_OVERDUE_DAYS=30
+```
+
+A draft crosses into "Due in N days" at `DUE_SOON_DAYS` and into "Overdue by N days" at `OVERDUE_DAYS`, counting from its inspection date; submitted reports are never flagged. See `src/utils/reportUrgency.ts`.
 
 ### Install & run
 

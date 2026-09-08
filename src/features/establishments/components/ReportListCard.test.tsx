@@ -4,7 +4,10 @@ import { GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import TestRenderer from 'react-test-renderer';
 import { ReportListCard } from './ReportListCard';
+import { URGENCY_BADGE_RESERVED_TOP } from '../../../components/UrgencyBadge';
 import { Colors } from '../../../design/colors';
+import { Radius } from '../../../design/radius';
+import { Spacing } from '../../../design/spacing';
 import { FONT_SCALING } from '../../../design/typography';
 import { REPORT_TYPE_DISPLAY, ReportDataKey } from '../../../constants/reportTypeDisplay';
 import type { AllReportItem } from '../hooks/useEstablishment';
@@ -884,7 +887,7 @@ describe('ReportListCard date + control number row', () => {
     expect(controlNoStyle.fontFamily).toBe(dateStyle.fontFamily);
   });
 
-  it('never lets a long control number push the urgency badge out of the row, clip the date, or dislodge the group from the end of the row', () => {
+  it('never lets a long control number clip the date or dislodge the group from the end of the row', () => {
     const longControlNo = 'CTRL-2026-0000001-EXTREMELY-LONG-CONTROL-NUMBER-VALUE';
     const item: AllReportItem = {
       ...baseItem,
@@ -899,17 +902,11 @@ describe('ReportListCard date + control number row', () => {
     const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
     const rowChildren = calendarIcon!.parent!.children;
 
-    // The badge still renders — a long control number sharing the row must
-    // not crowd it out.
-    const badge = r.root
-      .findAll((n) => (n.type as any)?.name === 'View' || n.type === View)
-      .find((n) => flattenStyle(n.props.style).backgroundColor === Colors.hazwaste.badgeBg);
-    expect(badge).toBeDefined();
-    expect(proseTexts(r).some((n) => n.props.children === 'Overdue')).toBe(true);
-
     // The control number is the element that shrinks/truncates
-    // (flexShrink: 1, numberOfLines 1) — the date, its icon, and the badge
-    // are pinned (flexShrink: 0) so none of them can be squeezed out by it.
+    // (flexShrink: 1, numberOfLines 1) — the date and its icon are pinned
+    // (flexShrink: 0) so neither can be squeezed out by it. The urgency badge
+    // is no longer part of this row at all: it moved to the card's corner,
+    // which is what took the pressure off this row in the first place.
     const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === longControlNo);
     expect(controlNoText).toBeDefined();
 
@@ -925,19 +922,16 @@ describe('ReportListCard date + control number row', () => {
     expectShrinksButNeverGrows(flattenStyle(controlNoText?.props.style));
     expect(controlNoText?.props.numberOfLines).toBe(1);
     expect(flattenStyle(dateText?.props.style).flexShrink).toBe(0);
-    expect(flattenStyle(badge?.props.style).flexShrink).toBe(0);
 
     const pricetagIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'pricetag-outline');
     expect(pricetagIcon).toBeDefined();
     expect(flattenStyle(pricetagIcon?.props.style).flexShrink).toBe(0);
 
     // Even a value long enough to force truncation must not reorder the
-    // row: date (with its icon) first, badge next, the control-number
-    // group still last.
+    // row: date (with its icon) first, the control-number group still last.
     const group = findControlNoGroup(r);
     expect(rowChildren[0]).toBe(calendarIcon);
-    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(badge!));
-    expect(rowChildren.indexOf(badge!)).toBeLessThan(rowChildren.indexOf(group));
+    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(group));
     expect(rowChildren[rowChildren.length - 1]).toBe(group);
   });
 
@@ -976,9 +970,6 @@ describe('ReportListCard date + control number row', () => {
     const rowChildren = calendarIcon!.parent!.children;
     const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === 'C-1');
     const dateText = findDateText(r, controlNoText);
-    const badge = r.root
-      .findAll((n) => (n.type as any)?.name === 'View' || n.type === View)
-      .find((n) => flattenStyle(n.props.style).backgroundColor === Colors.hazwaste.badgeBg);
     const group = findControlNoGroup(r);
 
     // The mechanism: the group grows to claim the row's remaining space
@@ -1000,32 +991,8 @@ describe('ReportListCard date + control number row', () => {
     expectShrinksButNeverGrows(flattenStyle(controlNoText?.props.style));
 
     expect(rowChildren[0]).toBe(calendarIcon);
-    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(badge!));
-    expect(rowChildren.indexOf(badge!)).toBeLessThan(rowChildren.indexOf(group));
+    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(group));
     expect(rowChildren[rowChildren.length - 1]).toBe(group);
-  });
-
-  it('renders the urgency badge between the date and the control-number group when present', () => {
-    const item: AllReportItem = {
-      ...baseItem,
-      status: 'draft',
-      date: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
-    };
-    const r = render(
-      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
-    );
-    const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
-    const rowChildren = calendarIcon!.parent!.children;
-    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === item.controlNo);
-    const dateText = findDateText(r, controlNoText);
-    const badge = r.root
-      .findAll((n) => (n.type as any)?.name === 'View' || n.type === View)
-      .find((n) => flattenStyle(n.props.style).backgroundColor === Colors.hazwaste.badgeBg);
-    const group = findControlNoGroup(r);
-    expect(badge).toBeDefined();
-
-    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(badge!));
-    expect(rowChildren.indexOf(badge!)).toBeLessThan(rowChildren.indexOf(group));
   });
 
   it("falls back to 'No control number yet' when controlNo is null", () => {
@@ -1034,5 +1001,113 @@ describe('ReportListCard date + control number row', () => {
       <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
     );
     expect(r.root.findAllByType(Text).some((n) => n.props.children === 'No control number yet')).toBe(true);
+  });
+});
+
+// The urgency badge used to live inline in the date row, competing with the
+// date and the control number for a single line's width. It is now a corner
+// chip pinned to the card itself, shared with EstablishmentReportsSection via
+// the UrgencyBadge component.
+describe('ReportListCard urgency corner badge', () => {
+  const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  // Radius.pill alone would also match the Draft/Submitted Badge; only the
+  // urgency chip positions itself absolutely.
+  const findCornerBadge = (r: Renderer) => {
+    const views = r.root.findAll((n) => (n.type as any)?.name === 'View' || n.type === View);
+    const matches = views.filter((n) => {
+      const flattened = flattenStyle(n.props.style);
+      return flattened.position === 'absolute' && flattened.borderRadius === Radius.pill;
+    });
+    if (matches.length > 1) {
+      throw new Error(`Expected at most 1 corner badge but found ${matches.length}`);
+    }
+    return matches[0];
+  };
+
+  it('pins the badge to the card rather than threading it through the date row', () => {
+    const item: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(45) };
+    const r = render(
+      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+
+    const badge = findCornerBadge(r);
+    expect(badge).toBeDefined();
+
+    // Inside the card surface...
+    expect(findCard(r, item).findAll((n) => n === badge)).toHaveLength(1);
+    // ...but no longer one of the date row's own children.
+    const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
+    expect(calendarIcon!.parent!.children).not.toContain(badge);
+  });
+
+  it('counts the days past the deadline in the label', () => {
+    const item: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(45) };
+    const r = render(
+      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    expect(proseTexts(r).some((n) => n.props.children === 'Overdue by 15 days')).toBe(true);
+  });
+
+  it('counts the days of runway left for a due-soon draft', () => {
+    const item: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(15) };
+    const r = render(
+      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    expect(proseTexts(r).some((n) => n.props.children === 'Due in 15 days')).toBe(true);
+  });
+
+  it('reserves top padding on a flagged card so the chip never lands on the title row', () => {
+    const flagged: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(45) };
+    const r = render(
+      <ReportListCard item={flagged} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    expect(flattenStyle(findCard(r, flagged).props.style).paddingTop).toBe(URGENCY_BADGE_RESERVED_TOP);
+  });
+
+  it('leaves an unflagged card on its usual padding', () => {
+    const calm: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(2) };
+    const r = render(
+      <ReportListCard item={calm} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    expect(findCornerBadge(r)).toBeUndefined();
+    const style = flattenStyle(findCard(r, calm).props.style);
+    // No reserved band, and the card keeps its uniform padding.
+    expect(style.paddingTop).toBeUndefined();
+    expect(style.padding).toBe(Spacing.md);
+  });
+
+  it('still tints the whole card by urgency level', () => {
+    const overdue: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(45) };
+    const overdueCard = flattenStyle(
+      findCard(
+        render(
+          <ReportListCard item={overdue} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+        ),
+        overdue,
+      ).props.style,
+    );
+    expect(overdueCard.borderColor).toBe(Colors.hazwaste.border);
+    expect(overdueCard.backgroundColor).toBe(Colors.hazwaste.bg);
+
+    const dueSoon: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(15) };
+    const dueSoonCard = flattenStyle(
+      findCard(
+        render(
+          <ReportListCard item={dueSoon} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+        ),
+        dueSoon,
+      ).props.style,
+    );
+    expect(dueSoonCard.borderColor).toBe(Colors.warning.border);
+    expect(dueSoonCard.backgroundColor).toBe(Colors.warning.bg);
+  });
+
+  it('shows no badge for a submitted report however old it is', () => {
+    const item: AllReportItem = { ...baseItem, status: 'submitted', date: daysAgo(400) };
+    const r = render(
+      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    expect(findCornerBadge(r)).toBeUndefined();
   });
 });

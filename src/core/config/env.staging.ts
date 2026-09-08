@@ -3,4 +3,7 @@ export const envConfig = {
   shortCacheMs: 30 * 60 * 1000,
   credentialWindowMs: 7 * 24 * 60 * 60 * 1000,
   syncIntervalMs: 2 * 60 * 1000,           // 2 minutes
+  // See env.dev.ts — days, not ms.
+  dueSoonDays: 14,
+  overdueDays: 30,
 };

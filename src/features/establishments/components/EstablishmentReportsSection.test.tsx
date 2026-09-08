@@ -4,9 +4,11 @@ import { GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import TestRenderer from 'react-test-renderer';
 import { EstablishmentReportsSection } from './EstablishmentReportsSection';
+import { URGENCY_BADGE_RESERVED_TOP } from '../../../components/UrgencyBadge';
 import { REPORT_TYPE_DISPLAY, ReportDataKey } from '../../../constants/reportTypeDisplay';
 import { Colors } from '../../../design/colors';
 import { Radius } from '../../../design/radius';
+import { Spacing } from '../../../design/spacing';
 import { FONT_SCALING, Type } from '../../../design/typography';
 import type { EstablishmentReportItem } from '../hooks/useEstablishment';
 
@@ -562,17 +564,11 @@ describe('EstablishmentReportsSection date + control number row', () => {
     const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
     const rowChildren = calendarIcon!.parent!.children;
 
-    // The badge still renders — a long control number sharing the row must
-    // not crowd it out.
-    const badge = r.root
-      .findAll((n) => (n.type as any)?.name === 'View' || n.type === View)
-      .find((n) => flattenStyle(n.props.style).backgroundColor === Colors.hazwaste.badgeBg);
-    expect(badge).toBeDefined();
-    expect(proseTexts(r).some((n) => n.props.children === 'Overdue')).toBe(true);
-
     // The control number is the element that shrinks/truncates
-    // (flexShrink: 1, numberOfLines 1) — the date, its icon, and the badge
-    // are pinned (flexShrink: 0) so none of them can be squeezed out by it.
+    // (flexShrink: 1, numberOfLines 1) — the date and its icon are pinned
+    // (flexShrink: 0) so neither can be squeezed out by it. The urgency badge
+    // is no longer part of this row at all: it moved to the row's corner,
+    // which is what took the pressure off this line in the first place.
     const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === longControlNo);
     expect(controlNoText).toBeDefined();
 
@@ -588,19 +584,16 @@ describe('EstablishmentReportsSection date + control number row', () => {
     expectShrinksButNeverGrows(flattenStyle(controlNoText?.props.style));
     expect(controlNoText?.props.numberOfLines).toBe(1);
     expect(flattenStyle(dateText?.props.style).flexShrink).toBe(0);
-    expect(flattenStyle(badge?.props.style).flexShrink).toBe(0);
 
     const pricetagIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'pricetag-outline');
     expect(pricetagIcon).toBeDefined();
     expect(flattenStyle(pricetagIcon?.props.style).flexShrink).toBe(0);
 
     // Even a value long enough to force truncation must not reorder the
-    // row: date (with its icon) first, badge next, the control-number
-    // group still last.
+    // row: date (with its icon) first, the control-number group still last.
     const group = findControlNoGroup(r);
     expect(rowChildren[0]).toBe(calendarIcon);
-    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(badge!));
-    expect(rowChildren.indexOf(badge!)).toBeLessThan(rowChildren.indexOf(group));
+    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(group));
     expect(rowChildren[rowChildren.length - 1]).toBe(group);
   });
 
@@ -646,9 +639,6 @@ describe('EstablishmentReportsSection date + control number row', () => {
     const rowChildren = calendarIcon!.parent!.children;
     const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === 'C-1');
     const dateText = findDateText(r, controlNoText);
-    const badge = r.root
-      .findAll((n) => (n.type as any)?.name === 'View' || n.type === View)
-      .find((n) => flattenStyle(n.props.style).backgroundColor === Colors.hazwaste.badgeBg);
     const group = findControlNoGroup(r);
 
     // The mechanism: the group grows to claim the row's remaining space
@@ -670,48 +660,16 @@ describe('EstablishmentReportsSection date + control number row', () => {
     expectShrinksButNeverGrows(flattenStyle(controlNoText?.props.style));
 
     expect(rowChildren[0]).toBe(calendarIcon);
-    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(badge!));
-    expect(rowChildren.indexOf(badge!)).toBeLessThan(rowChildren.indexOf(group));
+    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(group));
     expect(rowChildren[rowChildren.length - 1]).toBe(group);
-  });
-
-  it('renders the urgency badge between the date and the control-number group when present', () => {
-    const item: EstablishmentReportItem = {
-      ...baseItem,
-      status: 'draft',
-      date: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
-    };
-    const r = render(
-      <EstablishmentReportsSection
-        reports={[item]}
-        currentUid="uid-1"
-        canManageAll={false}
-        onAddReport={noop}
-        onOpenReport={noop}
-        onDeleteReport={noop}
-      />,
-    );
-    const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
-    const rowChildren = calendarIcon!.parent!.children;
-    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === item.controlNo);
-    const dateText = findDateText(r, controlNoText);
-    const badge = r.root
-      .findAll((n) => (n.type as any)?.name === 'View' || n.type === View)
-      .find((n) => flattenStyle(n.props.style).backgroundColor === Colors.hazwaste.badgeBg);
-    const group = findControlNoGroup(r);
-    expect(badge).toBeDefined();
-
-    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(badge!));
-    expect(rowChildren.indexOf(badge!)).toBeLessThan(rowChildren.indexOf(group));
   });
 });
 
-describe('EstablishmentReportsSection urgency badge token resolution', () => {
+describe('EstablishmentReportsSection urgency corner badge', () => {
   const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-  it('resolves the overdue badge from the hazwaste palette, not the warning one', () => {
-    const item: EstablishmentReportItem = { ...baseItem, status: 'draft', date: daysAgo(31) };
-    const r = render(
+  const renderOne = (item: EstablishmentReportItem) =>
+    render(
       <EstablishmentReportsSection
         reports={[item]}
         currentUid="uid-1"
@@ -721,11 +679,28 @@ describe('EstablishmentReportsSection urgency badge token resolution', () => {
         onDeleteReport={noop}
       />,
     );
-    const badge = r.root
-      .findAll((n) => (n.type as any)?.name === 'View' || n.type === View)
-      .find((n) => flattenStyle(n.props.style).backgroundColor === Colors.hazwaste.badgeBg);
-    expect(badge).toBeDefined();
-    const label = proseTexts(r).find((n) => n.props.children === 'Overdue');
+
+  // Only the urgency chip is both pill-shaped and absolutely positioned; the
+  // swipe-action layer behind the row uses Radius.lg.
+  const findCornerBadge = (r: Renderer) => {
+    const views = r.root.findAll((n) => (n.type as any)?.name === 'View' || n.type === View);
+    const matches = views.filter((n) => {
+      const flattened = flattenStyle(n.props.style);
+      return flattened.position === 'absolute' && flattened.borderRadius === Radius.pill;
+    });
+    if (matches.length > 1) {
+      throw new Error(`Expected at most 1 corner badge but found ${matches.length}`);
+    }
+    return matches[0];
+  };
+
+  it('resolves the overdue badge from the hazwaste palette, not the warning one', () => {
+    const item: EstablishmentReportItem = { ...baseItem, status: 'draft', date: daysAgo(31) };
+    const r = renderOne(item);
+
+    const badge = findCornerBadge(r);
+    expect(flattenStyle(badge.props.style).backgroundColor).toBe(Colors.hazwaste.badgeBg);
+    const label = proseTexts(r).find((n) => n.props.children === 'Overdue by 1 day');
     expect(flattenStyle(label?.props.style).color).toBe(Colors.hazwaste.badgeText);
 
     const rowStyle = flattenStyle(findRow(r, item).props.style);
@@ -735,21 +710,11 @@ describe('EstablishmentReportsSection urgency badge token resolution', () => {
 
   it('resolves the due-soon badge from the warning palette, not the hazwaste one', () => {
     const item: EstablishmentReportItem = { ...baseItem, status: 'draft', date: daysAgo(15) };
-    const r = render(
-      <EstablishmentReportsSection
-        reports={[item]}
-        currentUid="uid-1"
-        canManageAll={false}
-        onAddReport={noop}
-        onOpenReport={noop}
-        onDeleteReport={noop}
-      />,
-    );
-    const badge = r.root
-      .findAll((n) => (n.type as any)?.name === 'View' || n.type === View)
-      .find((n) => flattenStyle(n.props.style).backgroundColor === Colors.warning.badgeBg);
-    expect(badge).toBeDefined();
-    const label = proseTexts(r).find((n) => n.props.children === 'Due soon');
+    const r = renderOne(item);
+
+    const badge = findCornerBadge(r);
+    expect(flattenStyle(badge.props.style).backgroundColor).toBe(Colors.warning.badgeBg);
+    const label = proseTexts(r).find((n) => n.props.children === 'Due in 15 days');
     expect(flattenStyle(label?.props.style).color).toBe(Colors.warning.text);
 
     const rowStyle = flattenStyle(findRow(r, item).props.style);
@@ -757,19 +722,36 @@ describe('EstablishmentReportsSection urgency badge token resolution', () => {
     expect(rowStyle.backgroundColor).toBe(Colors.warning.bg);
   });
 
+  it('pins the badge to the row rather than threading it through the date row', () => {
+    const item: EstablishmentReportItem = { ...baseItem, status: 'draft', date: daysAgo(45) };
+    const r = renderOne(item);
+
+    const badge = findCornerBadge(r);
+    expect(findRow(r, item).findAll((n) => n === badge)).toHaveLength(1);
+
+    const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
+    expect(calendarIcon!.parent!.children).not.toContain(badge);
+  });
+
+  it('reserves top padding on a flagged row so the chip never lands on the title', () => {
+    const flagged: EstablishmentReportItem = { ...baseItem, status: 'draft', date: daysAgo(45) };
+    const r = renderOne(flagged);
+    expect(flattenStyle(findRow(r, flagged).props.style).paddingTop).toBe(URGENCY_BADGE_RESERVED_TOP);
+  });
+
+  it('leaves an unflagged row on its usual padding', () => {
+    const calm: EstablishmentReportItem = { ...baseItem, status: 'draft', date: daysAgo(2) };
+    const r = renderOne(calm);
+    expect(findCornerBadge(r)).toBeUndefined();
+    const style = flattenStyle(findRow(r, calm).props.style);
+    expect(style.paddingTop).toBeUndefined();
+    expect(style.padding).toBe(Spacing.md);
+  });
+
   it('shows no urgency badge for a submitted report regardless of age', () => {
     const item: EstablishmentReportItem = { ...baseItem, status: 'submitted', date: daysAgo(90) };
-    const r = render(
-      <EstablishmentReportsSection
-        reports={[item]}
-        currentUid="uid-1"
-        canManageAll={false}
-        onAddReport={noop}
-        onOpenReport={noop}
-        onDeleteReport={noop}
-      />,
-    );
-    expect(proseTexts(r).some((n) => n.props.children === 'Overdue' || n.props.children === 'Due soon')).toBe(false);
+    const r = renderOne(item);
+    expect(findCornerBadge(r)).toBeUndefined();
   });
 });
 
