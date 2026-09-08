@@ -23,6 +23,11 @@ interface AppTextProps {
   speed?: number;
   pauseDuration?: number;
   gap?: number;
+  // Whether the OS font-size setting resizes this text. Left undefined it
+  // inherits RN's default (true), which is right for prose. Pass
+  // FONT_SCALING.tabular (false) when the text sits in a fixed-width cell
+  // that scaled-up text would clip rather than reflow — see typography.ts.
+  allowFontScaling?: boolean;
   testID?: string;
 }
 
@@ -52,6 +57,7 @@ export const AppText: React.FC<AppTextProps> = ({
   speed,
   pauseDuration,
   gap,
+  allowFontScaling,
   testID,
 }) => {
   if (variant === 'marquee') {
@@ -63,6 +69,7 @@ export const AppText: React.FC<AppTextProps> = ({
         speed={speed}
         pauseDuration={pauseDuration}
         gap={gap}
+        allowFontScaling={allowFontScaling}
         testID={testID}
       />
     );
@@ -70,7 +77,12 @@ export const AppText: React.FC<AppTextProps> = ({
 
   return (
     <View style={containerStyle}>
-      <Text style={style} numberOfLines={variant === 'multiline' ? lines : 1} ellipsizeMode="tail" testID={testID}>
+      <Text
+        style={style}
+        numberOfLines={variant === 'multiline' ? lines : 1}
+        ellipsizeMode="tail"
+        allowFontScaling={allowFontScaling}
+        testID={testID}>
         {text}
       </Text>
     </View>

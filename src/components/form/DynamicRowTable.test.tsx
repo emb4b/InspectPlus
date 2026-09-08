@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import TestRenderer from 'react-test-renderer';
 import { DynamicRowTable, DynamicColumn, DynamicRow } from './DynamicRowTable';
 import { Colors } from '../../design/colors';
-import { Type } from '../../design/typography';
+import { FONT_SCALING, Type } from '../../design/typography';
 
 type Renderer = TestRenderer.ReactTestRenderer;
 
@@ -106,6 +106,63 @@ describe('DynamicRowTable grid uses Type.tabular, never Type.body', () => {
     expect(style.fontSize).toBe(Type.tabular.fontSize);
     expect(style.lineHeight).toBe(Type.tabular.lineHeight);
     expect(style.fontSize).not.toBe(Type.body.fontSize);
+  });
+});
+
+describe('DynamicRowTable grid opts out of OS font scaling', () => {
+  // Type.tabular only holds down the size *this app* asks for. The OS
+  // accessibility font setting multiplies that afterwards, so without an
+  // explicit opt-out a user at 130% still gets the clipped fixed-width
+  // cells the token was written to prevent — the size floor and the
+  // scaling opt-out are two halves of one decision.
+  //
+  // Each assertion below checks the value came from FONT_SCALING.tabular
+  // specifically, and separately that it is neither `undefined` (the
+  // pre-fix state, where the prop was simply absent) nor
+  // FONT_SCALING.content. Asserting against `false` alone would let a
+  // regression that drops the prop entirely slip through only if
+  // `undefined` were falsy-equal, which toBe does not treat as equal —
+  // the explicit undefined check documents that this is the regression
+  // being guarded, rather than leaving it to a reader to infer.
+  const expectOptsOutOfScaling = (allowFontScaling: unknown) => {
+    expect(allowFontScaling).toBe(FONT_SCALING.tabular);
+    expect(allowFontScaling).not.toBeUndefined();
+    expect(allowFontScaling).not.toBe(FONT_SCALING.content);
+  };
+
+  it('opts every header cell out of font scaling', () => {
+    const r = render(<DynamicRowTable columns={columns} rows={rows} onChange={noop} />);
+    const headerCells = findHeaderCells(r);
+    expect(headerCells).toHaveLength(columns.length);
+    headerCells.forEach((n) => expectOptsOutOfScaling(n.props.allowFontScaling));
+  });
+
+  it('opts the typed cell input out of font scaling', () => {
+    const r = render(<DynamicRowTable columns={columns} rows={rows} onChange={noop} />);
+    expectOptsOutOfScaling(findCellInput(r).props.allowFontScaling);
+  });
+
+  it("opts the select cell's displayed value out of font scaling", () => {
+    const r = render(<DynamicRowTable columns={columns} rows={rows} onChange={noop} />);
+    expectOptsOutOfScaling(findSelectCellText(r)?.props.allowFontScaling);
+  });
+
+  // The other half of the boundary. The picker sheet is prose in a
+  // full-width modal, not a fixed-width cell — nothing clips when it grows,
+  // so it must keep honoring the user's font setting. This fails if someone
+  // "fixes" font scaling by blanket-applying the tabular opt-out to the
+  // whole file.
+  it('leaves the option picker sheet scaling with the OS setting', () => {
+    const r = render(<DynamicRowTable columns={columns} rows={rows} onChange={noop} />);
+    TestRenderer.act(() => {
+      findSelectCellTouchable(r)?.props.onPress();
+    });
+    const glyphs = iconGlyphTexts(r);
+    const optionTexts = r.root
+      .findAllByType(Text)
+      .filter((n) => !glyphs.has(n) && flattenStyle(n.props.style).fontSize === Type.bodySm.fontSize);
+    expect(optionTexts.length).toBeGreaterThan(0);
+    optionTexts.forEach((n) => expect(n.props.allowFontScaling).not.toBe(FONT_SCALING.tabular));
   });
 });
 
