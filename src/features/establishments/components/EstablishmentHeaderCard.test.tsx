@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, TouchableOpacity } from 'react-native';
+import { TouchableOpacity } from 'react-native';
 import TestRenderer from 'react-test-renderer';
 import { EstablishmentHeaderCard } from './EstablishmentHeaderCard';
 import type { EstablishmentDTO } from '../types';
@@ -87,19 +87,16 @@ const baseEstablishment: EstablishmentDTO = {
 const noop = () => {};
 
 // The button hierarchy this task establishes: exactly one filled `primary`
-// button per screen, and every section-header action is `sm` `outline`.
-// This card's "Add Report" is the screen's one primary action; its "Edit"
-// sits beside it as a lesser, section-header-style action and must not
-// compete with it in size or fill.
+// button per screen. This card's "Add Report" is the screen's one primary
+// action. The card used to carry a top-level "Edit" beside it too, but
+// establishment editing converged onto the report's granular, per-section
+// model (see docs/superpowers/specs/2026-09-05-establishment-editing-
+// convergence-decision.md) — editing now lives on each FormSection below
+// via its own Edit, not here.
 describe('EstablishmentHeaderCard button hierarchy', () => {
   it('keeps Add Report as the one filled primary action, at md size and full width', () => {
     const r = render(
-      <EstablishmentHeaderCard
-        establishment={baseEstablishment}
-        inspectorLabel="Inspector One"
-        onAddReport={noop}
-        onEdit={noop}
-      />,
+      <EstablishmentHeaderCard establishment={baseEstablishment} inspectorLabel="Inspector One" onAddReport={noop} />,
     );
     const button = findButtonByLabel(r, 'Add Report');
     const style = flattenStyle(button.props.style);
@@ -108,22 +105,7 @@ describe('EstablishmentHeaderCard button hierarchy', () => {
     expect(style.backgroundColor).not.toBe(undefined);
   });
 
-  it('demotes Edit to sm/outline, keeping its label and icon', () => {
-    const r = render(
-      <EstablishmentHeaderCard
-        establishment={baseEstablishment}
-        inspectorLabel="Inspector One"
-        onAddReport={noop}
-        onEdit={noop}
-      />,
-    );
-    const button = findButtonByLabel(r, 'Edit');
-    const style = flattenStyle(button.props.style);
-    expect(style.minHeight).toBe(32); // sm
-    expect(r.root.findAllByType(Text).some((n) => n.props.children === 'Edit')).toBe(true);
-  });
-
-  it('omits Edit entirely when onEdit is not provided', () => {
+  it('renders no top-level Edit control — editing lives on the sections below', () => {
     const r = render(
       <EstablishmentHeaderCard establishment={baseEstablishment} inspectorLabel="Inspector One" onAddReport={noop} />,
     );

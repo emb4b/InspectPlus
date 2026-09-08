@@ -94,7 +94,7 @@ describe('AppChrome footer-height measurement', () => {
   });
 
   // Simulates a screen registering a taller Save/Cancel row through
-  // useScreenFooter (e.g. EditEstablishmentScreen): the wrapper View's
+  // useScreenFooter (e.g. WaterInspectionFormScreen): the wrapper View's
   // measured height grows accordingly, and AppChrome must re-forward the new
   // height rather than latching onto whatever it first measured.
   it('re-measures and updates bottomInset when the footer stack grows taller', () => {

@@ -8,7 +8,7 @@ interface ScreenFooterContextValue {
 const ScreenFooterContext = createContext<ScreenFooterContextValue | null>(null);
 
 // Holds whatever the active screen registers as its bottom action bar (e.g.
-// EditEstablishmentScreen's Cancel/Save Changes row) so AppChrome can render
+// WaterInspectionFormScreen's Cancel/Save row) so AppChrome can render
 // it as a direct sibling of the collapsing header, instead of nested several
 // layers below it inside the Stack. Same immediate parent means both are
 // resolved in the same Yoga layout pass — see useScreenFooter for why that

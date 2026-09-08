@@ -1,22 +1,187 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useRef } from 'react';
+import { View, Text, Switch, TextInput, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../design/colors';
 import { Radius } from '../../../design/radius';
 import { Spacing } from '../../../design/spacing';
 import { Type } from '../../../design/typography';
-import { FormSection, TextField } from '../../../components/form';
+import { FormSection, TextField, SelectField, DateField, DynamicRowTable, focusInput } from '../../../components/form';
+import type { DynamicRow } from '../../../components/form';
 import { AppText } from '../../../components/AppText';
 import { Button } from '../../../components/Button';
-import type { EstablishmentDTO, PermitSnapshotItem } from '../types';
+import { PROVINCE_OPTIONS, getCityOptions, getBarangayOptions } from '../../../constants/provinces';
+import { maskFlexibleDate, isValidFlexibleDate, FLEXIBLE_DATE_HINT, FLEXIBLE_DATE_INVALID_HINT } from '../../../utils/flexibleDate';
+import { useEditableSection } from '../../inspections/hooks/useEditableSection';
+import { SectionEditActions } from '../../inspections/components/SectionEditActions';
+import { patchEstablishmentRecord } from '../../inspections/establishmentPersistence';
+import type { EstablishmentContentField } from '../../inspections/establishmentPersistence';
+import type { EstablishmentDTO, EstablishmentOperatingStatus, PermitSnapshotItem } from '../types';
 
 interface EstablishmentInfoSectionsProps {
   establishment: EstablishmentDTO;
-  // Omitted for an establishment the current inspector doesn't own — see
-  // EstablishmentHeaderCard's onEdit.
+  // False for an establishment the current inspector doesn't own — every
+  // section's Edit control renders nothing instead, matching the report
+  // detail screen's own canEdit gating (see SectionEditActions).
+  canEdit: boolean;
+  // Called after any section successfully saves, so the parent can refetch
+  // and every section (including this one's siblings) picks up the new
+  // live values.
+  onSaved: () => void;
+  // Permits editing hasn't been built yet — this stays a stub the caller
+  // wires up separately, unrelated to the granular editing this file adds
+  // to the other four sections. Omitted for the same ownership reason as
+  // canEdit above.
   onUpdatePermits?: () => void;
 }
 
+const OPERATING_STATUS_OPTIONS = ['Operational', 'Temporarily Close', 'Non-Operational'];
+
+// ── Establishment Details ──────────────────────────────────────────────────
+// Name, location and business-profile fields all live in one section
+// (rather than splitting location out on its own) because handleSave used
+// to validate name/barangay/city/province together and block the save if
+// any was empty — keeping them in a single section keeps that validation
+// local to one save. See docs/superpowers/specs/2026-09-05-establishment-
+// editing-convergence-decision.md.
+
+interface DetailsFields {
+  name: string;
+  includeFormerName: boolean;
+  formerName: string;
+  addressLine: string;
+  barangay: string;
+  city: string;
+  province: string;
+  natureOfBusiness: string;
+  psicCode: string;
+  product: string;
+  yearEstablished: string;
+  operatingStatus: EstablishmentOperatingStatus;
+  operatingHoursDay: string;
+  operatingDaysWeek: string;
+  operatingDaysYear: string;
+  operatingStatusSince: string;
+}
+
+function toDetailsFields(e: EstablishmentDTO): DetailsFields {
+  return {
+    name: e.name,
+    includeFormerName: !!e.formerName,
+    formerName: e.formerName ?? '',
+    addressLine: e.addressLine,
+    barangay: e.barangay,
+    city: e.city,
+    province: e.province,
+    natureOfBusiness: e.natureOfBusiness,
+    psicCode: e.psicCode ?? '',
+    product: e.product ?? '',
+    yearEstablished: e.yearEstablished != null ? String(e.yearEstablished) : '',
+    operatingStatus: e.operatingStatus,
+    operatingHoursDay: e.operatingHoursDay != null ? String(e.operatingHoursDay) : '',
+    operatingDaysWeek: e.operatingDaysWeek != null ? String(e.operatingDaysWeek) : '',
+    operatingDaysYear: e.operatingDaysYear != null ? String(e.operatingDaysYear) : '',
+    operatingStatusSince: e.operatingStatusSince ?? '',
+  };
+}
+
+function fromDetailsFields(f: DetailsFields): Partial<Record<EstablishmentContentField, unknown>> {
+  return {
+    name: f.name,
+    formerName: f.includeFormerName ? f.formerName.trim() || null : null,
+    addressLine: f.addressLine,
+    barangay: f.barangay,
+    city: f.city,
+    province: f.province,
+    natureOfBusiness: f.natureOfBusiness,
+    psicCode: f.psicCode || null,
+    product: f.product || null,
+    yearEstablished: f.yearEstablished ? Number(f.yearEstablished) : null,
+    operatingStatus: f.operatingStatus,
+    operatingHoursDay: f.operatingHoursDay ? Number(f.operatingHoursDay) : null,
+    operatingDaysWeek: f.operatingDaysWeek ? Number(f.operatingDaysWeek) : null,
+    operatingDaysYear: f.operatingDaysYear ? Number(f.operatingDaysYear) : null,
+    operatingStatusSince: f.operatingStatusSince || null,
+  };
+}
+
+// ── Key Personnel ────────────────────────────────────────────────────────
+
+interface PersonnelFields {
+  ownerName: string;
+  managingHeadName: string;
+  contactPersonName: string;
+  contactPersonPosition: string;
+  phoneFax: string;
+  email: string;
+}
+
+function toPersonnelFields(e: EstablishmentDTO): PersonnelFields {
+  return {
+    ownerName: e.ownerName,
+    managingHeadName: e.managingHeadName,
+    contactPersonName: e.contactPersonName,
+    contactPersonPosition: e.contactPersonPosition,
+    phoneFax: e.phoneFax,
+    email: e.email,
+  };
+}
+
+function fromPersonnelFields(f: PersonnelFields): Partial<Record<EstablishmentContentField, unknown>> {
+  return {
+    ownerName: f.ownerName,
+    managingHeadName: f.managingHeadName,
+    contactPersonName: f.contactPersonName,
+    contactPersonPosition: f.contactPersonPosition,
+    phoneFax: f.phoneFax,
+    email: f.email,
+  };
+}
+
+// ── Pollution Control Officer ────────────────────────────────────────────
+
+interface PcoFields {
+  pcoName: string;
+  pcoAccreditationNo: string;
+  pcoEffectivity: string;
+}
+
+function toPcoFields(e: EstablishmentDTO): PcoFields {
+  return {
+    pcoName: e.pcoName ?? '',
+    pcoAccreditationNo: e.pcoAccreditationNo ?? '',
+    pcoEffectivity: e.pcoEffectivity ?? '',
+  };
+}
+
+function fromPcoFields(f: PcoFields): Partial<Record<EstablishmentContentField, unknown>> {
+  return {
+    pcoName: f.pcoName || null,
+    pcoAccreditationNo: f.pcoAccreditationNo || null,
+    pcoEffectivity: f.pcoEffectivity || null,
+  };
+}
+
+// ── Product Lines ─────────────────────────────────────────────────────────
+
+function toProductLinesFields(e: EstablishmentDTO): DynamicRow[] {
+  return e.productLines.length
+    ? e.productLines.map(p => ({ ...p }))
+    : [{ product_line: '', ecc_production_rate: '', actual_production_rate: '' }];
+}
+
+function fromProductLinesFields(rows: DynamicRow[]): Partial<Record<EstablishmentContentField, unknown>> {
+  return {
+    productLines: rows
+      .filter(r => r.product_line?.trim())
+      .map(r => ({
+        product_line: r.product_line ?? '',
+        ecc_production_rate: r.ecc_production_rate ?? '',
+        actual_production_rate: r.actual_production_rate ?? '',
+      })),
+  };
+}
+
+// ── DENR Permits (unchanged — read-only pending its own editing flow) ─────
 // denrPermits is a flat array of freeform entries — one card per entry,
 // matching how the report form's General Information tab
 // (GeneralInformationTab.tsx) edits this same array.
@@ -46,121 +211,353 @@ const PermitCard: React.FC<{ permit: PermitSnapshotItem }> = ({ permit }) => (
   </View>
 );
 
+// ── Section components ───────────────────────────────────────────────────
+// Each section owns its own useEditableSection call and refs, and is
+// wrapped in React.memo — matching GeneralInformationView's convention on
+// the report side, so editing a field in one section only re-renders that
+// section, not its siblings.
+
+interface DetailsSectionProps {
+  establishment: EstablishmentDTO;
+  canEdit: boolean;
+  onSaved: () => void;
+}
+
+const DetailsSection = React.memo(function DetailsSection({ establishment, canEdit, onSaved }: DetailsSectionProps) {
+  const formerNameRef = useRef<TextInput>(null);
+  const addressRef = useRef<TextInput>(null);
+  const natureRef = useRef<TextInput>(null);
+  const psicRef = useRef<TextInput>(null);
+  const productRef = useRef<TextInput>(null);
+  const yearRef = useRef<TextInput>(null);
+  const hoursRef = useRef<TextInput>(null);
+  const daysWeekRef = useRef<TextInput>(null);
+  const daysYearRef = useRef<TextInput>(null);
+  const sinceRef = useRef<TextInput>(null);
+
+  const details = useEditableSection<DetailsFields>({
+    value: toDetailsFields(establishment),
+    onSave: async fields => {
+      if (!fields.name.trim() || !fields.barangay.trim() || !fields.city.trim() || !fields.province.trim()) {
+        throw new Error('Establishment Name, Barangay, City, and Province are required.');
+      }
+      await patchEstablishmentRecord({ estabId: establishment.estabId, fields: fromDetailsFields(fields) });
+      onSaved();
+    },
+  });
+
+  const isNonOperational = details.draft.operatingStatus !== 'Operational';
+
+  return (
+    <FormSection
+      icon="business-outline"
+      title="Establishment Details"
+      headerRight={
+        <SectionEditActions
+          editing={details.editing}
+          saving={details.saving}
+          onStartEdit={details.startEdit}
+          onCancel={details.cancel}
+          onSave={details.save}
+          canEdit={canEdit}
+        />
+      }>
+      <View style={styles.row}>
+        <TextField label="Establishment Name" value={details.draft.name} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, name: v }))} textCase="upper" required={details.editing} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(formerNameRef.current)} />
+      </View>
+      {details.editing && (
+        <View style={styles.switchRow}>
+          <Switch
+            value={details.draft.includeFormerName}
+            onValueChange={includeFormerName => details.setDraft(d => ({ ...d, includeFormerName }))}
+            trackColor={{ false: Colors.border, true: Colors.greenLight }}
+            thumbColor={Colors.white}
+          />
+          <Text style={styles.switchLabel}>Include former establishment name</Text>
+        </View>
+      )}
+      {(details.editing ? details.draft.includeFormerName : !!details.draft.formerName) && (
+        <View style={styles.row}>
+          <TextField ref={formerNameRef} label="Former Establishment Name" value={details.draft.formerName} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, formerName: v }))} textCase="upper" placeholder="—" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(addressRef.current)} />
+        </View>
+      )}
+      <View style={styles.row}>
+        <TextField ref={addressRef} label="Address" value={details.draft.addressLine} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, addressLine: v }))} placeholder="Street / building / lot no. (if known)" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(natureRef.current)} />
+      </View>
+      <View style={styles.row}>
+        {details.editing ? (
+          <SelectField
+            label="Province"
+            value={details.draft.province}
+            options={PROVINCE_OPTIONS}
+            onSelect={v => details.setDraft(d => ({ ...d, province: v, city: '', barangay: '' }))}
+            required
+          />
+        ) : (
+          <TextField label="Province" value={details.draft.province || '—'} readOnly />
+        )}
+        {details.editing ? (
+          <SelectField
+            label="City / Municipality"
+            value={details.draft.city}
+            options={getCityOptions(details.draft.province)}
+            onSelect={v => details.setDraft(d => ({ ...d, city: v, barangay: '' }))}
+            placeholder={details.draft.province ? 'Select…' : 'Select province first'}
+            disabled={!details.draft.province}
+            required
+          />
+        ) : (
+          <TextField label="City / Municipality" value={details.draft.city || '—'} readOnly />
+        )}
+      </View>
+      <View style={styles.row}>
+        {details.editing ? (
+          <SelectField
+            label="Barangay"
+            value={details.draft.barangay}
+            options={getBarangayOptions(details.draft.province, details.draft.city)}
+            onSelect={v => details.setDraft(d => ({ ...d, barangay: v }))}
+            placeholder={details.draft.city ? 'Select…' : 'Select city/municipality first'}
+            disabled={!details.draft.city}
+            required
+          />
+        ) : (
+          <TextField label="Barangay" value={details.draft.barangay || '—'} readOnly />
+        )}
+      </View>
+      <View style={styles.row}>
+        {/* Latitude/Longitude are never part of this draft — no section
+            currently edits them (see patchEstablishmentRecord), so they
+            stay read-only regardless of details.editing. */}
+        <TextField label="Latitude" value={establishment.geoLat != null ? String(establishment.geoLat) : '—'} readOnly />
+        <TextField label="Longitude" value={establishment.geoLng != null ? String(establishment.geoLng) : '—'} readOnly />
+      </View>
+      <View style={styles.row}>
+        <TextField ref={natureRef} label="Nature of Business" value={details.draft.natureOfBusiness} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, natureOfBusiness: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(psicRef.current)} />
+        <TextField ref={psicRef} label="PSIC Code" value={details.draft.psicCode} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, psicCode: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(productRef.current)} />
+      </View>
+      <View style={styles.row}>
+        <TextField ref={productRef} label="Product" value={details.draft.product} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, product: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(yearRef.current)} />
+        <TextField ref={yearRef} label="Year Established" value={details.draft.yearEstablished} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, yearEstablished: v }))} keyboardType="numeric" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(isNonOperational ? sinceRef.current : hoursRef.current)} />
+      </View>
+      <View style={styles.row}>
+        {details.editing ? (
+          <SelectField
+            label="Status of Operation"
+            value={details.draft.operatingStatus}
+            options={OPERATING_STATUS_OPTIONS}
+            onSelect={v => details.setDraft(d => ({ ...d, operatingStatus: v as EstablishmentOperatingStatus }))}
+          />
+        ) : (
+          <TextField label="Status of Operation" value={details.draft.operatingStatus || '—'} readOnly />
+        )}
+      </View>
+      {isNonOperational ? (
+        <View style={styles.row}>
+          <TextField
+            ref={sinceRef}
+            label="Closed / Non-Operational Since"
+            value={details.draft.operatingStatusSince}
+            readOnly={!details.editing}
+            onChangeText={raw => details.setDraft(d => ({ ...d, operatingStatusSince: maskFlexibleDate(raw) }))}
+            textCase="none"
+            placeholder="mm-dd-yyyy, mm-yyyy, or yyyy"
+            hint={details.editing ? (isValidFlexibleDate(details.draft.operatingStatusSince) ? FLEXIBLE_DATE_HINT : FLEXIBLE_DATE_INVALID_HINT) : undefined}
+            keyboardType="numbers-and-punctuation"
+            returnKeyType="done"
+          />
+        </View>
+      ) : (
+        <View style={styles.row3}>
+          <TextField ref={hoursRef} label="Operating Hours/Day" value={details.draft.operatingHoursDay} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, operatingHoursDay: v }))} keyboardType="numeric" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(daysWeekRef.current)} />
+          <TextField ref={daysWeekRef} label="Operating Days/Week" value={details.draft.operatingDaysWeek} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, operatingDaysWeek: v }))} keyboardType="numeric" returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(daysYearRef.current)} />
+          <TextField ref={daysYearRef} label="Operating Days/Year" value={details.draft.operatingDaysYear} readOnly={!details.editing} onChangeText={v => details.setDraft(d => ({ ...d, operatingDaysYear: v }))} keyboardType="numeric" returnKeyType="done" />
+        </View>
+      )}
+      {details.error && <Text style={styles.errorText}>{details.error}</Text>}
+    </FormSection>
+  );
+});
+
+interface PersonnelSectionProps {
+  establishment: EstablishmentDTO;
+  canEdit: boolean;
+  onSaved: () => void;
+}
+
+const PersonnelSection = React.memo(function PersonnelSection({ establishment, canEdit, onSaved }: PersonnelSectionProps) {
+  const headRef = useRef<TextInput>(null);
+  const contactRef = useRef<TextInput>(null);
+  const contactPositionRef = useRef<TextInput>(null);
+  const phoneRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+
+  const personnel = useEditableSection<PersonnelFields>({
+    value: toPersonnelFields(establishment),
+    onSave: async fields => {
+      await patchEstablishmentRecord({ estabId: establishment.estabId, fields: fromPersonnelFields(fields) });
+      onSaved();
+    },
+  });
+
+  return (
+    <FormSection
+      icon="person-outline"
+      title="Key Personnel"
+      headerRight={
+        <SectionEditActions
+          editing={personnel.editing}
+          saving={personnel.saving}
+          onStartEdit={personnel.startEdit}
+          onCancel={personnel.cancel}
+          onSave={personnel.save}
+          canEdit={canEdit}
+        />
+      }>
+      <View style={styles.row}>
+        <TextField label="Owner" value={personnel.draft.ownerName} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, ownerName: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(headRef.current)} />
+        <TextField ref={headRef} label="Managing Head / Plant Manager" value={personnel.draft.managingHeadName} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, managingHeadName: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(contactRef.current)} />
+      </View>
+      <View style={styles.row}>
+        <TextField ref={contactRef} label="Contact Person" value={personnel.draft.contactPersonName} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, contactPersonName: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(contactPositionRef.current)} />
+        <TextField ref={contactPositionRef} label="Contact Person Position" value={personnel.draft.contactPersonPosition} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, contactPersonPosition: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(phoneRef.current)} />
+      </View>
+      <View style={styles.row}>
+        <TextField ref={phoneRef} label="Phone / Fax" value={personnel.draft.phoneFax} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, phoneFax: v }))} returnKeyType="next" blurOnSubmit={false} onSubmitEditing={() => focusInput(emailRef.current)} />
+        <TextField ref={emailRef} label="Email Address" value={personnel.draft.email} readOnly={!personnel.editing} onChangeText={v => personnel.setDraft(d => ({ ...d, email: v }))} textCase="none" keyboardType="email-address" returnKeyType="done" />
+      </View>
+      {personnel.error && <Text style={styles.errorText}>{personnel.error}</Text>}
+    </FormSection>
+  );
+});
+
+interface PcoSectionProps {
+  establishment: EstablishmentDTO;
+  canEdit: boolean;
+  onSaved: () => void;
+}
+
+const PcoSection = React.memo(function PcoSection({ establishment, canEdit, onSaved }: PcoSectionProps) {
+  const pco = useEditableSection<PcoFields>({
+    value: toPcoFields(establishment),
+    onSave: async fields => {
+      await patchEstablishmentRecord({ estabId: establishment.estabId, fields: fromPcoFields(fields) });
+      onSaved();
+    },
+  });
+
+  return (
+    <FormSection
+      icon="leaf-outline"
+      title="Pollution Control Officer"
+      headerRight={
+        <SectionEditActions
+          editing={pco.editing}
+          saving={pco.saving}
+          onStartEdit={pco.startEdit}
+          onCancel={pco.cancel}
+          onSave={pco.save}
+          canEdit={canEdit}
+        />
+      }>
+      <View style={styles.row}>
+        <TextField label="PCO Full Name" value={pco.draft.pcoName} readOnly={!pco.editing} onChangeText={v => pco.setDraft(d => ({ ...d, pcoName: v }))} returnKeyType="next" />
+        <TextField label="PCO Accreditation No." value={pco.draft.pcoAccreditationNo} readOnly={!pco.editing} onChangeText={v => pco.setDraft(d => ({ ...d, pcoAccreditationNo: v }))} returnKeyType="next" />
+      </View>
+      <View style={styles.row}>
+        {pco.editing ? (
+          <DateField label="PCO Accreditation Effectivity" value={pco.draft.pcoEffectivity} onChange={v => pco.setDraft(d => ({ ...d, pcoEffectivity: v }))} />
+        ) : (
+          <TextField label="PCO Accreditation Effectivity" value={pco.draft.pcoEffectivity || '—'} readOnly />
+        )}
+      </View>
+      {pco.error && <Text style={styles.errorText}>{pco.error}</Text>}
+    </FormSection>
+  );
+});
+
+interface ProductLinesSectionProps {
+  establishment: EstablishmentDTO;
+  canEdit: boolean;
+  onSaved: () => void;
+}
+
+const ProductLinesSection = React.memo(function ProductLinesSection({ establishment, canEdit, onSaved }: ProductLinesSectionProps) {
+  const productLines = useEditableSection<DynamicRow[]>({
+    value: toProductLinesFields(establishment),
+    onSave: async rows => {
+      await patchEstablishmentRecord({ estabId: establishment.estabId, fields: fromProductLinesFields(rows) });
+      onSaved();
+    },
+  });
+
+  return (
+    <FormSection
+      icon="cube-outline"
+      title="Product Lines"
+      headerRight={
+        <SectionEditActions
+          editing={productLines.editing}
+          saving={productLines.saving}
+          onStartEdit={productLines.startEdit}
+          onCancel={productLines.cancel}
+          onSave={productLines.save}
+          canEdit={canEdit}
+        />
+      }>
+      {productLines.editing ? (
+        <DynamicRowTable
+          columns={[
+            { key: 'product_line', label: 'Product Line', width: 160, placeholder: 'e.g. Bottled Beer' },
+            { key: 'ecc_production_rate', label: 'Declared Rate', width: 110, placeholder: '—' },
+            { key: 'actual_production_rate', label: 'Actual Rate', width: 110, placeholder: '—' },
+          ]}
+          rows={productLines.draft}
+          onChange={rows => productLines.setDraft(rows)}
+          addLabel="Add Row"
+        />
+      ) : establishment.productLines.length === 0 ? (
+        <Text style={styles.emptyText}>No product lines on record.</Text>
+      ) : (
+        <View style={styles.table}>
+          <View style={styles.tableHeaderRow}>
+            <Text style={[styles.tableHeaderCell, styles.colProduct]}>Product Line</Text>
+            <Text style={[styles.tableHeaderCell, styles.colRate]}>Declared Rate</Text>
+            <Text style={[styles.tableHeaderCell, styles.colRate]}>Actual Rate</Text>
+          </View>
+          {establishment.productLines.map((line, i) => (
+            <View key={i} style={styles.tableRow}>
+              <AppText
+                variant="marquee"
+                text={line.product_line || '—'}
+                style={styles.tableCell}
+                containerStyle={styles.colProduct}
+              />
+              <Text style={[styles.tableCell, styles.colRate]}>{line.ecc_production_rate || '—'}</Text>
+              <Text style={[styles.tableCell, styles.colRate]}>{line.actual_production_rate || '—'}</Text>
+            </View>
+          ))}
+        </View>
+      )}
+      {productLines.error && <Text style={styles.errorText}>{productLines.error}</Text>}
+    </FormSection>
+  );
+});
+
 export const EstablishmentInfoSections: React.FC<EstablishmentInfoSectionsProps> = ({
   establishment,
+  canEdit,
+  onSaved,
   onUpdatePermits,
 }) => {
   const permits = establishment.denrPermits;
 
   return (
     <View>
-      <FormSection icon="business-outline" title="Establishment Details">
-        <View style={styles.row}>
-          <TextField label="Establishment Name" value={establishment.name || '—'} readOnly />
-          <TextField label="Former Establishment Name" value={establishment.formerName || '—'} readOnly />
-        </View>
-        <View style={styles.row}>
-          <TextField label="Address" value={establishment.addressLine || '—'} readOnly />
-          <TextField label="Barangay" value={establishment.barangay || '—'} readOnly />
-        </View>
-        <View style={styles.row}>
-          <TextField label="City / Municipality" value={establishment.city || '—'} readOnly />
-          <TextField label="Province" value={establishment.province || '—'} readOnly />
-        </View>
-        <View style={styles.row}>
-          <TextField label="Nature of Business" value={establishment.natureOfBusiness || '—'} readOnly />
-          <TextField label="PSIC Code" value={establishment.psicCode || '—'} readOnly />
-        </View>
-        <View style={styles.row}>
-          <TextField
-            label="Latitude"
-            value={establishment.geoLat != null ? String(establishment.geoLat) : '—'}
-            readOnly
-          />
-          <TextField
-            label="Longitude"
-            value={establishment.geoLng != null ? String(establishment.geoLng) : '—'}
-            readOnly
-          />
-        </View>
-        <View style={styles.row}>
-          <TextField label="Status of Operation" value={establishment.operatingStatus || '—'} readOnly />
-        </View>
-        {establishment.operatingStatus !== 'Operational' ? (
-          <View style={styles.row}>
-            <TextField label="Closed / Non-Operational Since" value={establishment.operatingStatusSince || '—'} readOnly />
-          </View>
-        ) : (
-          <View style={styles.row3}>
-            <TextField
-              label="Operating Hours/Day"
-              value={establishment.operatingHoursDay != null ? String(establishment.operatingHoursDay) : '—'}
-              readOnly
-            />
-            <TextField
-              label="Operating Days/Week"
-              value={establishment.operatingDaysWeek != null ? String(establishment.operatingDaysWeek) : '—'}
-              readOnly
-            />
-            <TextField
-              label="Operating Days/Year"
-              value={establishment.operatingDaysYear != null ? String(establishment.operatingDaysYear) : '—'}
-              readOnly
-            />
-          </View>
-        )}
-      </FormSection>
-
-      <FormSection icon="person-outline" title="Key Personnel">
-        <View style={styles.row}>
-          <TextField label="Owner" value={establishment.ownerName || '—'} readOnly />
-          <TextField label="Managing Head / Plant Manager" value={establishment.managingHeadName || '—'} readOnly />
-        </View>
-        <View style={styles.row}>
-          <TextField label="Contact Person" value={establishment.contactPersonName || '—'} readOnly />
-          <TextField label="Contact Person Position" value={establishment.contactPersonPosition || '—'} readOnly />
-        </View>
-        <View style={styles.row}>
-          <TextField label="Phone / Fax" value={establishment.phoneFax || '—'} readOnly />
-          <TextField label="Email Address" value={establishment.email || '—'} readOnly />
-        </View>
-      </FormSection>
-
-      <FormSection icon="leaf-outline" title="Pollution Control Officer">
-        <View style={styles.row}>
-          <TextField label="PCO Full Name" value={establishment.pcoName || '—'} readOnly />
-          <TextField label="PCO Accreditation No." value={establishment.pcoAccreditationNo || '—'} readOnly />
-        </View>
-        <View style={styles.row}>
-          <TextField label="PCO Accreditation Effectivity" value={establishment.pcoEffectivity || '—'} readOnly />
-        </View>
-      </FormSection>
-
-      <FormSection icon="cube-outline" title="Product Lines">
-        {establishment.productLines.length === 0 ? (
-          <Text style={styles.emptyText}>No product lines on record.</Text>
-        ) : (
-          <View style={styles.table}>
-            <View style={styles.tableHeaderRow}>
-              <Text style={[styles.tableHeaderCell, styles.colProduct]}>Product Line</Text>
-              <Text style={[styles.tableHeaderCell, styles.colRate]}>Declared Rate</Text>
-              <Text style={[styles.tableHeaderCell, styles.colRate]}>Actual Rate</Text>
-            </View>
-            {establishment.productLines.map((line, i) => (
-              <View key={i} style={styles.tableRow}>
-                <AppText
-                  variant="marquee"
-                  text={line.product_line || '—'}
-                  style={styles.tableCell}
-                  containerStyle={styles.colProduct}
-                />
-                <Text style={[styles.tableCell, styles.colRate]}>{line.ecc_production_rate || '—'}</Text>
-                <Text style={[styles.tableCell, styles.colRate]}>{line.actual_production_rate || '—'}</Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </FormSection>
+      <DetailsSection establishment={establishment} canEdit={canEdit} onSaved={onSaved} />
+      <PersonnelSection establishment={establishment} canEdit={canEdit} onSaved={onSaved} />
+      <PcoSection establishment={establishment} canEdit={canEdit} onSaved={onSaved} />
+      <ProductLinesSection establishment={establishment} canEdit={canEdit} onSaved={onSaved} />
 
       <FormSection
         icon="document-outline"
@@ -192,6 +589,23 @@ const styles = StyleSheet.create({
   row3: {
     flexDirection: 'row',
     gap: Spacing.md,
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  switchLabel: {
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
+    color: Colors.textPrimary,
+  },
+  errorText: {
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
+    color: Colors.conflict,
+    marginTop: Spacing.xs,
   },
   emptyText: {
     fontSize: Type.label.fontSize,
