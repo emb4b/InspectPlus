@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../design/colors';
 import { Radius } from '../../design/radius';
 import { Spacing } from '../../design/spacing';
-import { Type } from '../../design/typography';
+import { FONT_SCALING, Type } from '../../design/typography';
 import { focusInput } from './focusInput';
 import { AppText } from '../AppText';
 import { AddRowButton } from '../AddRowButton';
@@ -96,9 +96,24 @@ export const DynamicRowTable: React.FC<DynamicRowTableProps> = ({
     <View style={styles.wrap}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View style={{ minWidth: totalWidth }}>
+          {/* Every text node in this grid opts out of OS font scaling
+              (FONT_SCALING.tabular). Type.tabular already holds the size
+              down to 12 for these fixed-width columns, but that only
+              controls the size *this app* asks for — the OS accessibility
+              font setting multiplies it afterwards, so a user at 130%
+              would get exactly the clipped cells the token exists to
+              prevent. The size floor and the scaling opt-out are two
+              halves of the same decision; neither works alone. The columns
+              are fixed pixel widths inside a horizontal ScrollView, so
+              scaled-up text cannot reflow out of its own cell — it can
+              only clip. Prose elsewhere in this file (the picker sheet
+              below) is not in a fixed-width box and keeps scaling. */}
           <View style={styles.headerRow}>
             {columns.map(col => (
-              <Text key={col.key} style={[styles.headerCell, { width: col.width }]}>
+              <Text
+                key={col.key}
+                style={[styles.headerCell, { width: col.width }]}
+                allowFontScaling={FONT_SCALING.tabular}>
                 {col.label}
               </Text>
             ))}
@@ -124,6 +139,7 @@ export const DynamicRowTable: React.FC<DynamicRowTableProps> = ({
                           text={row[col.key] || col.placeholder || '—'}
                           style={styles.selectCellText}
                           containerStyle={styles.selectCellTextContainer}
+                          allowFontScaling={FONT_SCALING.tabular}
                         />
                         <Ionicons name="chevron-down" size={12} color={Colors.textMuted} />
                       </TouchableOpacity>
@@ -131,6 +147,7 @@ export const DynamicRowTable: React.FC<DynamicRowTableProps> = ({
                       <TextInput
                         ref={el => { cellRefs.current[key] = el; }}
                         style={styles.cellInput}
+                        allowFontScaling={FONT_SCALING.tabular}
                         value={row[col.key] ?? ''}
                         onChangeText={text => updateCell(rowIndex, col.key, text)}
                         placeholder={col.placeholder}

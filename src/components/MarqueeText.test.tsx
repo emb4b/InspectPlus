@@ -1,4 +1,5 @@
 import React from 'react';
+import { Text } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { MarqueeText } from './MarqueeText';
 
@@ -76,5 +77,62 @@ describe('MarqueeText overflow detection', () => {
     // containerWidth is still 0, so overflow is not yet knowable — it must not
     // start looping on the strength of the content width alone.
     expect(isClipped(r)).toBe(true);
+  });
+});
+
+describe('MarqueeText font scaling', () => {
+  // The probe is what decides whether this marquee scrolls at all, so it has
+  // to scale exactly like the visible copy. If the probe scaled and the
+  // visible text did not (or the reverse), the measured content width would
+  // describe a string that is never rendered, and the overflow check would be
+  // made against the wrong size — a marquee that scrolls text which actually
+  // fits, or clips text that actually overflows. Asserting across *every*
+  // Text node rather than naming them individually is what makes that
+  // parity the property under test, and means a Text added later to either
+  // branch is covered without anyone remembering to extend this.
+  const allTextNodes = (r: Renderer) => r.root.findAllByType(Text);
+
+  const expectEveryTextScaling = (r: Renderer, expected: boolean | undefined) => {
+    const nodes = allTextNodes(r);
+    expect(nodes.length).toBeGreaterThan(0);
+    nodes.forEach(n => expect(n.props.allowFontScaling).toBe(expected));
+  };
+
+  it('threads allowFontScaling to the probe and the clipped copy alike', () => {
+    let r!: Renderer;
+    act(() => { r = TestRenderer.create(<MarqueeText text="ACME CORP" allowFontScaling={false} />); });
+
+    layout(r, 200);
+    report(r, 80);
+
+    expect(isClipped(r)).toBe(true);
+    expectEveryTextScaling(r, false);
+  });
+
+  it('threads allowFontScaling to the probe and both scrolling copies alike', () => {
+    let r!: Renderer;
+    act(() => {
+      r = TestRenderer.create(<MarqueeText text="A VERY LONG ESTABLISHMENT NAME" allowFontScaling={false} />);
+    });
+
+    layout(r, 100);
+    report(r, 400);
+
+    expect(isClipped(r)).toBe(false);
+    // Probe + the two looped copies.
+    expect(allTextNodes(r)).toHaveLength(3);
+    expectEveryTextScaling(r, false);
+  });
+
+  it("leaves scaling to React Native's default when the prop is not passed", () => {
+    let r!: Renderer;
+    act(() => { r = TestRenderer.create(<MarqueeText text="ACME CORP" />); });
+
+    layout(r, 200);
+    report(r, 80);
+
+    // Undefined, not `true` — passing an explicit value here would override
+    // a caller that sets allowFontScaling on a parent Text.
+    expectEveryTextScaling(r, undefined);
   });
 });

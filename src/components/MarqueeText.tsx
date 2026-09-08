@@ -19,6 +19,13 @@ interface MarqueeTextProps {
   pauseDuration?: number;
   // Space between the looped copy and its repeat, so the seam doesn't read as text running together.
   gap?: number;
+  // Passed through to every Text below — including the off-screen probe.
+  // The probe is what decides whether this marquee scrolls at all, so it
+  // has to scale exactly like the visible copy: if the probe scaled and the
+  // visible text didn't (or vice versa), the measured content width would
+  // describe text that is never rendered, and the overflow check would be
+  // made against the wrong string size.
+  allowFontScaling?: boolean;
   testID?: string;
 }
 
@@ -53,6 +60,7 @@ export const MarqueeText: React.FC<MarqueeTextProps> = ({
   speed = DEFAULT_SPEED,
   pauseDuration = DEFAULT_PAUSE_MS,
   gap = DEFAULT_GAP,
+  allowFontScaling,
   testID,
 }) => {
   const [containerWidth, setContainerWidth] = useState(0);
@@ -126,7 +134,7 @@ export const MarqueeText: React.FC<MarqueeTextProps> = ({
         onContentSizeChange={handleContentSizeChange}
         importantForAccessibility="no-hide-descendants"
         accessibilityElementsHidden>
-        <Text style={style} numberOfLines={1}>
+        <Text style={style} numberOfLines={1} allowFontScaling={allowFontScaling}>
           {text}
         </Text>
       </ScrollView>
@@ -141,18 +149,24 @@ export const MarqueeText: React.FC<MarqueeTextProps> = ({
           {/* Only the first copy is exposed to accessibility — the second
               exists purely so the loop has something to scroll into, and
               would otherwise read the same value twice. */}
-          <Text style={[style, styles.copy, { width: contentWidth }]} numberOfLines={1}>{text}</Text>
+          <Text
+            style={[style, styles.copy, { width: contentWidth }]}
+            numberOfLines={1}
+            allowFontScaling={allowFontScaling}>
+            {text}
+          </Text>
           <View style={{ width: gap }} />
           <Text
             style={[style, styles.copy, { width: contentWidth }]}
             numberOfLines={1}
+            allowFontScaling={allowFontScaling}
             importantForAccessibility="no-hide-descendants"
             accessibilityElementsHidden>
             {text}
           </Text>
         </Animated.View>
       ) : (
-        <Text style={style} numberOfLines={1} ellipsizeMode="tail">
+        <Text style={style} numberOfLines={1} ellipsizeMode="tail" allowFontScaling={allowFontScaling}>
           {text}
         </Text>
       )}
