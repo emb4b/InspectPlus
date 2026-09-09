@@ -25,20 +25,36 @@ insert into public.establishments (
   now() - interval '1 minute', now() - interval '1 minute', 'pending', 'device-a'
 );
 
+-- Scoped to this test's own fixture row rather than the length of the whole
+-- array: pull_changes returns everything visible to the caller, so counting
+-- the entire payload silently asserted that the database is empty apart from
+-- this file. That holds in CI (which resets before running) but breaks against
+-- any database with real rows in it, and the failure looks like a bug in
+-- pull_changes rather than in the test.
 select is(
-  jsonb_array_length(public.pull_changes(0)->'changes'->'establishments'->'created'),
+  (
+    select count(*)::int
+    from jsonb_array_elements(
+      public.pull_changes(0)->'changes'->'establishments'->'created'
+    ) as pulled
+    where pulled->>'estab_id' = 'est-a'
+  ),
   1,
-  'pull_changes returns one establishment row for initial sync'
+  'pull_changes returns this establishment row for initial sync'
 );
 
 select is(
-  jsonb_array_length(
-    public.pull_changes(
-      floor(extract(epoch from now()) * 1000)::bigint
-    )->'changes'->'establishments'->'created'
+  (
+    select count(*)::int
+    from jsonb_array_elements(
+      public.pull_changes(
+        floor(extract(epoch from now()) * 1000)::bigint
+      )->'changes'->'establishments'->'created'
+    ) as pulled
+    where pulled->>'estab_id' = 'est-a'
   ),
   0,
-  'pull_changes returns no establishment rows for current timestamp'
+  'pull_changes does not return this establishment row for current timestamp'
 );
 
 select * from finish();

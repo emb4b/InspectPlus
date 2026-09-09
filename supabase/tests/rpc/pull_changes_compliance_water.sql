@@ -58,20 +58,36 @@ insert into public.compliance_water (
   'Initial water recommendation'
 );
 
+-- Scoped to this test's own fixture row rather than the length of the whole
+-- array: pull_changes returns everything visible to the caller, so counting
+-- the entire payload silently asserted that the database is empty apart from
+-- this file. That holds in CI (which resets before running) but breaks against
+-- any database with real rows in it, and the failure looks like a bug in
+-- pull_changes rather than in the test.
 select is(
-  jsonb_array_length(public.pull_changes(0)->'changes'->'compliance_water'->'created'),
+  (
+    select count(*)::int
+    from jsonb_array_elements(
+      public.pull_changes(0)->'changes'->'compliance_water'->'created'
+    ) as pulled
+    where pulled->>'compliance_id' = 'water-a'
+  ),
   1,
-  'pull_changes returns one compliance_water row for initial sync'
+  'pull_changes returns this compliance_water row for initial sync'
 );
 
 select is(
-  jsonb_array_length(
-    public.pull_changes(
-      floor(extract(epoch from now()) * 1000)::bigint
-    )->'changes'->'compliance_water'->'created'
+  (
+    select count(*)::int
+    from jsonb_array_elements(
+      public.pull_changes(
+        floor(extract(epoch from now()) * 1000)::bigint
+      )->'changes'->'compliance_water'->'created'
+    ) as pulled
+    where pulled->>'compliance_id' = 'water-a'
   ),
   0,
-  'pull_changes returns no compliance_water rows for current timestamp'
+  'pull_changes does not return this compliance_water row for current timestamp'
 );
 
 select * from finish();
