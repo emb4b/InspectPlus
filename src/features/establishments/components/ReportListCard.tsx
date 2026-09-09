@@ -5,7 +5,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { Ionicons } from '@expo/vector-icons';
 import { AppText } from '../../../components/AppText';
 import { Badge } from '../../../components/Badge';
-import { UrgencyBadge } from '../../../components/UrgencyBadge';
+import { UrgencyRibbon } from '../../../components/UrgencyRibbon';
 import { REPORT_TYPE_DISPLAY, ReportDataKey } from '../../../constants/reportTypeDisplay';
 import { Colors } from '../../../design/colors';
 import { Duration } from '../../../design/motion';
@@ -165,6 +165,15 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
             accessibilityRole={selectable ? 'checkbox' : 'button'}
             accessibilityLabel={`${item.title} for ${item.estabName}`}
             accessibilityState={selectable ? { checked: selected } : undefined}>
+            {/* Wraps the card's top-left corner. It clips itself rather than
+                asking the card for overflow:'hidden', which would fight the
+                Android elevation in Elevation.raised.
+
+                Suppressed in selection mode: the checkbox takes that corner,
+                and the band's diagonal crosses it. Urgency is still carried
+                there by the card's own border and background tint. */}
+            {!selectable && <UrgencyRibbon urgency={urgency} />}
+
             {selectable && (
               <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
                 {selected && <Ionicons name="checkmark" size={14} color={Colors.textWhite} />}
@@ -187,19 +196,13 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
                   style={styles.title}
                   containerStyle={styles.titleContainer}
                 />
-                {/* One badge, one slot. A flagged report is always a draft —
-                    getReportUrgency never flags a submitted one — so an
-                    urgency chip alongside a "Draft" chip said the same thing
-                    twice while costing the row width the title needs. */}
-                {urgency.level !== 'none' ? (
-                  <UrgencyBadge urgency={urgency} />
-                ) : (
-                  item.status && (
-                    <Badge
-                      label={isSubmitted ? 'Submitted' : 'Draft'}
-                      tone={isSubmitted ? 'success' : 'warning'}
-                    />
-                  )
+                {/* Filing status only — urgency moved to the corner ribbon,
+                    so this slot no longer has to say two things at once. */}
+                {item.status && (
+                  <Badge
+                    label={isSubmitted ? 'Submitted' : 'Draft'}
+                    tone={isSubmitted ? 'success' : 'warning'}
+                  />
                 )}
               </View>
 

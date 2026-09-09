@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppText } from '../../../components/AppText';
 import { Button } from '../../../components/Button';
 import { EmptyState } from '../../../components/EmptyState';
-import { UrgencyBadge } from '../../../components/UrgencyBadge';
+import { UrgencyRibbon } from '../../../components/UrgencyRibbon';
 import { REPORT_TYPE_DISPLAY, ReportDataKey } from '../../../constants/reportTypeDisplay';
 import { Colors } from '../../../design/colors';
 import { Duration } from '../../../design/motion';
@@ -126,6 +126,10 @@ const ReportRow: React.FC<{
             activeOpacity={0.75}
             accessibilityRole="button"
             accessibilityLabel={item.title}>
+            {/* See ReportListCard — same corner treatment, same reason for
+                clipping inside the SVG rather than on the row. */}
+            <UrgencyRibbon urgency={urgency} />
+
             <View style={[styles.iconWrap, { backgroundColor: display?.bgColor ?? Colors.bgLight }]}>
               <Ionicons
                 name={display?.icon ?? 'document-outline'}
@@ -134,19 +138,7 @@ const ReportRow: React.FC<{
               />
             </View>
             <View style={styles.content}>
-              {/* The urgency chip shares the title's line rather than taking
-                  a band of its own above the row — matches ReportListCard's
-                  titleRow, minus the Draft/Submitted chip this row has never
-                  shown. */}
-              <View style={styles.titleRow}>
-                <AppText
-                  variant="marquee"
-                  text={item.title}
-                  style={styles.title}
-                  containerStyle={styles.titleContainer}
-                />
-                <UrgencyBadge urgency={urgency} />
-              </View>
+              <AppText variant="marquee" text={item.title} style={styles.title} />
               <View style={styles.dateRow}>
                 <Ionicons name="calendar-outline" size={10} color={Colors.textMuted} />
                 <Text style={styles.date}>{formatDate(item.date)}</Text>
@@ -355,16 +347,6 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     minWidth: 0,
-  },
-  // Mirrors ReportListCard's titleRow so the two lists' rows stay aligned.
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: Spacing.sm,
-  },
-  titleContainer: {
-    flex: 1,
   },
   // Matches ReportListCard's "title" token choice.
   title: {

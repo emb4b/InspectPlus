@@ -3,9 +3,9 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import TestRenderer from 'react-test-renderer';
+import { Text as SvgText } from 'react-native-svg';
 import { ReportListCard } from './ReportListCard';
 import { Colors } from '../../../design/colors';
-import { Radius } from '../../../design/radius';
 import { Spacing } from '../../../design/spacing';
 import { FONT_SCALING } from '../../../design/typography';
 import { REPORT_TYPE_DISPLAY, ReportDataKey } from '../../../constants/reportTypeDisplay';
@@ -1012,11 +1012,10 @@ describe('ReportListCard date + control number row', () => {
   });
 });
 
-// The urgency badge used to live inline in the date row, competing with the
-// date and the control number for a single line's width. It is now a corner
-// chip pinned to the card itself, shared with EstablishmentReportsSection via
-// the UrgencyBadge component.
-describe('ReportListCard urgency badge', () => {
+// Urgency used to render as a chip inside the card — first inline in the date
+// row, then in the title row's badge slot. It is now a banner wrapping the
+// card's top-left corner, which handed the badge slot back to filing status.
+describe('ReportListCard urgency ribbon', () => {
   const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
   const renderCard = (item: AllReportItem) =>
@@ -1024,63 +1023,81 @@ describe('ReportListCard urgency badge', () => {
       <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
     );
 
-  // The urgency chip and the Draft/Submitted Badge share one slot and are
-  // deliberately the same shape — and a due-soon chip resolves the very same
-  // warning palette as the Draft chip — so neither shape nor colour can tell
-  // them apart. Only UrgencyBadge carries accessibility props (it spells its
-  // abbreviated label out for screen readers); Badge.tsx sets none.
-  const findUrgencyBadge = (r: Renderer) => {
+  // The ribbon's wrapper is the only node in the card declaring an explicit
+  // accessibilityRole of 'text' — Badge.tsx sets no accessibility props at
+  // all, so this cannot collide with the Draft/Submitted chip.
+  const findRibbon = (r: Renderer) => {
     const views = r.root.findAll((n) => (n.type as any)?.name === 'View' || n.type === View);
-    const matches = views.filter((n) => {
-      const flattened = flattenStyle(n.props.style);
-      return flattened.borderRadius === Radius.pill && n.props.accessibilityRole === 'text';
-    });
+    const matches = views.filter((n) => n.props.accessibilityRole === 'text');
     if (matches.length > 1) {
-      throw new Error(`Expected at most 1 urgency badge but found ${matches.length}`);
+      throw new Error(`Expected at most 1 ribbon but found ${matches.length}`);
     }
     return matches[0];
   };
 
-  const badgeLabels = (r: Renderer) => proseTexts(r).map((n) => n.props.children);
+  const bandLabel = (r: Renderer) => r.root.findByType(SvgText).props.children;
+  const chipLabels = (r: Renderer) => proseTexts(r).map((n) => n.props.children);
 
-  it('renders the badge in the title row, not the date row', () => {
-    const item: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(45) };
-    const r = renderCard(item);
-
-    const badge = findUrgencyBadge(r);
-    expect(badge).toBeDefined();
-
-    // It lives inside the title row — the same row that holds the report
-    // title and, on an unflagged card, the Draft/Submitted chip.
-    // justifyContent 'space-between' is unique to that row within the card.
-    // Asserted as containment rather than a direct parent link because RN's
-    // View is a forwardRef around its own host layer, so the styled node and
-    // the badge are never adjacent in the fiber tree (see findContentChildren
-    // above for the same caveat).
-    const titleRows = r.root
-      .findAll((n) => (n.type as any)?.name === 'View' || n.type === View)
-      .filter((n) => flattenStyle(n.props.style).justifyContent === 'space-between');
-    expect(titleRows.length).toBeGreaterThan(0);
-    expect(titleRows.some((row) => row.findAll((n) => n === badge).length === 1)).toBe(true);
-
-    // And it is nowhere near the date row, which is what it used to crowd.
-    const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
-    expect(calendarIcon!.parent!.children).not.toContain(badge);
-  });
-
-  it('counts the days past the deadline compactly', () => {
+  it('wraps the corner with an abbreviated overdue count', () => {
     const r = renderCard({ ...baseItem, status: 'draft', date: daysAgo(45) });
-    expect(badgeLabels(r)).toContain('15d overdue');
+    expect(findRibbon(r)).toBeDefined();
+    expect(bandLabel(r)).toBe('15d late');
   });
 
-  it('counts the days of runway left compactly', () => {
+  it('abbreviates remaining runway the same way', () => {
     const r = renderCard({ ...baseItem, status: 'draft', date: daysAgo(15) });
-    expect(badgeLabels(r)).toContain('Due in 15d');
+    expect(bandLabel(r)).toBe('15d left');
   });
 
-  // The point of the whole change: the badge used to sit in a reserved band
-  // of top padding, which made every flagged card taller than a calm one for
-  // no informational gain.
+  it('spells the label out in full for screen readers', () => {
+    const r = renderCard({ ...baseItem, status: 'draft', date: daysAgo(45) });
+    expect(findRibbon(r).props.accessibilityLabel).toBe('Overdue by 15 days');
+  });
+
+  // The ribbon carries urgency, so the badge slot no longer has to say two
+  // things at once — a flagged draft shows both, in different places.
+  it('keeps the Draft chip alongside the ribbon', () => {
+    const r = renderCard({ ...baseItem, status: 'draft', date: daysAgo(45) });
+    expect(findRibbon(r)).toBeDefined();
+    expect(chipLabels(r)).toContain('Draft');
+  });
+
+  // The checkbox occupies the same corner in selection mode and the band's
+  // diagonal would cross it. The card's own tint still carries urgency there.
+  it('suppresses the ribbon in selection mode, where the checkbox takes that corner', () => {
+    const item: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(45) };
+    const r = render(
+      <ReportListCard
+        item={item}
+        currentUid="uid-1"
+        canManageAll={false}
+        onPress={noop}
+        onEdit={noop}
+        onDelete={noop}
+        selectable
+        onToggleSelect={noop}
+      />,
+    );
+    expect(findRibbon(r)).toBeUndefined();
+    // ...but the card still reads as overdue.
+    const cardStyle = flattenStyle(findCard(r, item).props.style);
+    expect(cardStyle.borderColor).toBe(Colors.hazwaste.border);
+  });
+
+  it('shows no ribbon on a draft that is not flagged', () => {
+    const r = renderCard({ ...baseItem, status: 'draft', date: daysAgo(2) });
+    expect(findRibbon(r)).toBeUndefined();
+    expect(chipLabels(r)).toContain('Draft');
+  });
+
+  it('shows no ribbon on a submitted report, however old', () => {
+    const r = renderCard({ ...baseItem, status: 'submitted', date: daysAgo(400) });
+    expect(findRibbon(r)).toBeUndefined();
+    expect(chipLabels(r)).toContain('Submitted');
+  });
+
+  // The ribbon is an absolutely positioned overlay, so it must not push the
+  // card open the way the reserved padding band it replaced used to.
   it('costs a flagged card no extra height over a calm one', () => {
     const flagged: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(45) };
     const calm: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(2) };
@@ -1093,51 +1110,15 @@ describe('ReportListCard urgency badge', () => {
     expect(flaggedStyle.padding).toBe(calmStyle.padding);
   });
 
-  // A flagged report can only be a draft, so showing both chips said the same
-  // thing twice and cost the title row width it did not have.
-  it('replaces the Draft chip rather than sitting beside it', () => {
-    const r = renderCard({ ...baseItem, status: 'draft', date: daysAgo(45) });
-    const labels = badgeLabels(r);
-    expect(labels).toContain('15d overdue');
-    expect(labels).not.toContain('Draft');
-  });
-
-  it('keeps the Draft chip on a draft that is not flagged', () => {
-    const r = renderCard({ ...baseItem, status: 'draft', date: daysAgo(2) });
-    expect(findUrgencyBadge(r)).toBeUndefined();
-    expect(badgeLabels(r)).toContain('Draft');
-  });
-
-  it('keeps the Submitted chip on a submitted report, however old', () => {
-    const r = renderCard({ ...baseItem, status: 'submitted', date: daysAgo(400) });
-    expect(findUrgencyBadge(r)).toBeUndefined();
-    expect(badgeLabels(r)).toContain('Submitted');
-  });
-
   it('still tints the whole card by urgency level', () => {
     const overdue: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(45) };
-    const overdueCard = flattenStyle(
-      findCard(
-        render(
-          <ReportListCard item={overdue} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
-        ),
-        overdue,
-      ).props.style,
-    );
+    const overdueCard = flattenStyle(findCard(renderCard(overdue), overdue).props.style);
     expect(overdueCard.borderColor).toBe(Colors.hazwaste.border);
     expect(overdueCard.backgroundColor).toBe(Colors.hazwaste.bg);
 
     const dueSoon: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(15) };
-    const dueSoonCard = flattenStyle(
-      findCard(
-        render(
-          <ReportListCard item={dueSoon} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
-        ),
-        dueSoon,
-      ).props.style,
-    );
+    const dueSoonCard = flattenStyle(findCard(renderCard(dueSoon), dueSoon).props.style);
     expect(dueSoonCard.borderColor).toBe(Colors.warning.border);
     expect(dueSoonCard.backgroundColor).toBe(Colors.warning.bg);
   });
-
 });
