@@ -30,6 +30,26 @@ jest.mock('react-native-keyboard-controller', () => ({
 
 const PROMPT = "Select the establishment's current wastewater treatment system:";
 const OTHER_LABEL = 'Others (specify)';
+const FORM_NOTE = 'Subsections B-E will be marked as not applicable.';
+const VIEW_NOTE = 'Subsections B-E are marked as not applicable.';
+
+// Every rendered string in render order, so a test can assert what sits
+// below what rather than merely that both are present.
+function textSequence(json: unknown, acc: string[] = []): string[] {
+  if (json == null) return acc;
+  if (typeof json === 'string') {
+    acc.push(json);
+    return acc;
+  }
+  if (Array.isArray(json)) {
+    json.forEach(n => textSequence(n, acc));
+    return acc;
+  }
+  if (typeof json === 'object') {
+    textSequence((json as { children?: unknown }).children, acc);
+  }
+  return acc;
+}
 
 const wastewaterPollutionTab = buildWaterReportTabs().find(t => t.key === 'wastewaterpollution')!;
 
@@ -57,6 +77,25 @@ function renderForm(value: WaterComplianceFormState, onChange: (v: WaterComplian
 
 const checkbox = (tree: renderer.ReactTestRenderer, label: string) =>
   tree.root.find(n => n.type === CheckboxRow && n.props.label === label);
+
+const renderSectionForOrder = (
+  hasWwtp: boolean | null,
+  nonWwtpTreatment: Record<string, unknown> = {},
+) => {
+  let tree!: renderer.ReactTestRenderer;
+  act(() => {
+    tree = renderer.create(
+      <TreatmentSystemTypeSection
+        complianceId="c1"
+        hasWwtp={hasWwtp}
+        nonWwtpTreatment={nonWwtpTreatment}
+        canEdit
+        onSaved={() => {}}
+      />,
+    );
+  });
+  return tree;
+};
 
 // ── The control itself ───────────────────────────────────────────────────────
 
@@ -252,5 +291,43 @@ describe('Non-WWTP treatment system field (edit screen, section 5A)', () => {
       await tree.root.find(n => n.props?.onSave != null && n.props?.onStartEdit != null).props.onSave();
     });
     expect(mockPatches).toEqual([expect.objectContaining({ hasWwtp: true, nonWwtpTreatment: {} })]);
+  });
+});
+
+
+// ── Where the not-applicable remark sits ─────────────────────────────────────
+
+describe('5A keeps the not-applicable remark at the foot of the subsection', () => {
+  // The remark is a consequence of the answer, not part of asking it - it
+  // reports what choosing "No" does to subsections B-E. Sitting between the
+  // radio and the treatment checkboxes, it split one question in half; at
+  // the foot it reads as the closing note it is. Both screens place it the
+  // same way, so an inspector and a reviewer see the same subsection.
+  it('puts it below the whole block on the create form', () => {
+    const seq = textSequence(
+      renderForm({ ...emptyWaterComplianceForm(), hasWwtp: 'no', nonWwtpSystems: ['Others'] }).toJSON(),
+    );
+    expect(seq).toContain(FORM_NOTE);
+    expect(seq.indexOf(FORM_NOTE)).toBeGreaterThan(seq.indexOf(PROMPT));
+    expect(seq.indexOf(FORM_NOTE)).toBeGreaterThan(seq.indexOf(OTHER_LABEL));
+  });
+
+  it('puts it below the checkboxes while editing on the report screen', () => {
+    const tree = renderSectionForOrder(false, {});
+    act(() => {
+      tree.root.find(n => n.props?.onStartEdit != null).props.onStartEdit();
+    });
+    const seq = textSequence(tree.toJSON());
+    expect(seq).toContain(VIEW_NOTE);
+    expect(seq.indexOf(VIEW_NOTE)).toBeGreaterThan(seq.indexOf(PROMPT));
+    expect(seq.indexOf(VIEW_NOTE)).toBeGreaterThan(seq.lastIndexOf('Others'));
+  });
+
+  it('puts it below the recorded value when reading the report screen', () => {
+    const seq = textSequence(
+      renderSectionForOrder(false, { systems: ['Septic Tank'], other: '' }).toJSON(),
+    );
+    expect(seq).toContain(VIEW_NOTE);
+    expect(seq.indexOf(VIEW_NOTE)).toBeGreaterThan(seq.indexOf('Treatment System'));
   });
 });

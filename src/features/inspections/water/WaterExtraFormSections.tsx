@@ -244,7 +244,6 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
             <RadioGroup label="Has WWTP?" options={YES_NO} value={value.hasWwtp} onChange={v => set('hasWwtp', v as 'yes' | 'no')} />
             {value.hasWwtp === 'no' && (
               <>
-                <Text style={styles.emptyText}>Subsections B-E will be marked as not applicable.</Text>
                 {/* No WWTP doesn't mean no treatment - this is where the
                     septic tank or oil/water separator actually gets
                     recorded. Hidden rather than cleared when Has WWTP flips
@@ -269,6 +268,11 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                     returnKeyType="done"
                   />
                 )}
+                {/* Last, not first: the remark reports a consequence of the
+                    answer above rather than being part of asking it, so it
+                    closes the subsection instead of splitting the question
+                    from the systems that answer it. */}
+                <Text style={styles.emptyText}>Subsections B-E will be marked as not applicable.</Text>
               </>
             )}
           </FormSection>

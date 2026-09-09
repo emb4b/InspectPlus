@@ -325,7 +325,6 @@ export const TreatmentSystemTypeSection: React.FC<{
       )}
       {section.draft.hasWwtp === false && (
         <>
-          <Text style={sharedStyles.emptyText}>Subsections B-E are marked as not applicable.</Text>
           {section.editing ? (
             <>
               <Text style={sharedStyles.subTitle}>{NON_WWTP_TREATMENT_PROMPT}</Text>
@@ -353,6 +352,8 @@ export const TreatmentSystemTypeSection: React.FC<{
               readOnly
             />
           )}
+          {/* Last, not first - see the matching note on the create form. */}
+          <Text style={sharedStyles.emptyText}>Subsections B-E are marked as not applicable.</Text>
         </>
       )}
       {section.error && <Text style={styles.errorText}>{section.error}</Text>}
