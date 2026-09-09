@@ -60,6 +60,25 @@ export const ABSTRACTED_WATER_SOURCE_SPECIFICS: Record<string, string[]> = {
 export const abstractedWaterSourceSpecifics = (row: Record<string, string>): string[] =>
   ABSTRACTED_WATER_SOURCE_SPECIFICS[row.source] ?? [];
 
+// Section 5A's follow-up, asked only when the establishment has no WWTP.
+// A site can run more than one of these at once - a septic tank for
+// domestic waste and a separator on the motor pool is an ordinary pairing -
+// so these are checkboxes, not a single choice.
+export const NON_WWTP_TREATMENT_OTHERS = 'Others';
+
+export const NON_WWTP_TREATMENT_OPTIONS = [
+  'Septic Tank',
+  'Oil and Water Separator (OWS)',
+  NON_WWTP_TREATMENT_OTHERS,
+];
+
+// Shared by the create form and the edit screen so the question an
+// inspector answers reads identically to the one a reviewer sees.
+export const NON_WWTP_TREATMENT_PROMPT =
+  "Select the establishment's current wastewater treatment system:";
+
+export const NON_WWTP_TREATMENT_OTHER_LABEL = 'Others (specify)';
+
 export const WWTP_TYPE_OPTIONS = ['Physical', 'Biological', 'Chemical', 'Combined', 'Others'];
 
 export const WWTP_CONDITION_OPTIONS = [

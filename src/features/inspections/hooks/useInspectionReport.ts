@@ -72,6 +72,7 @@ export interface WaterComplianceView {
   wastewaterSources: Record<string, unknown>[];
   abstractedWaterQuality: Record<string, unknown>[];
   hasWwtp: boolean | null;
+  nonWwtpTreatment: Record<string, unknown>;
   wwtpType: string | null;
   // wwtpDetails/wwtpComponents/samplingPoints/dpConditions are written by
   // the create flow (WaterInspectionFormScreen -> useReportFormState) using
@@ -249,6 +250,7 @@ export function useInspectionReport(reportId: string | undefined): UseInspection
               wastewaterSources: c.wastewaterSources ?? [],
               abstractedWaterQuality: c.abstractedWaterQuality ?? [],
               hasWwtp: c.hasWwtp,
+              nonWwtpTreatment: c.nonWwtpTreatment ?? {},
               wwtpType: c.wwtpType,
               wwtpDetails: c.wwtpDetails ?? [],
               wwtpComponents: c.wwtpComponents ?? [],

@@ -44,6 +44,13 @@ import { schemaMigrations, addColumns, createTable, unsafeExecuteSql } from '@no
 // only added columns to existing tables.
 //
 // v10 -> v11: attachments gains an optional inspector-entered caption.
+//
+// v11 -> v12: compliance_water gains nonWwtpTreatment - what an
+// establishment without a WWTP actually treats its wastewater with (septic
+// tank, oil/water separator, or free text), asked in section 5A once
+// "Has WWTP?" is answered no. Existing rows get NULL, which the model's
+// asObject decoder reads as {} - correct, since no inspection before this
+// was ever asked the question.
 export const migrations = schemaMigrations({
   migrations: [
     {
@@ -135,6 +142,15 @@ export const migrations = schemaMigrations({
         addColumns({
           table: 'attachments',
           columns: [{ name: 'caption', type: 'string', isOptional: true }],
+        }),
+      ],
+    },
+    {
+      toVersion: 12,
+      steps: [
+        addColumns({
+          table: 'compliance_water',
+          columns: [{ name: 'nonWwtpTreatment', type: 'string', isOptional: true }],
         }),
       ],
     },

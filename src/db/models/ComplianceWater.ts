@@ -22,6 +22,9 @@ export class ComplianceWater extends Model {
 
   // ── WWTP ─────────────────────────────────────────────────────────────────────
   @field('hasWwtp')                          hasWwtp!: boolean | null;
+  // { systems: string[], other: string } - only populated when hasWwtp is
+  // false; a report with a WWTP stores {} here. See nonWwtpTreatmentForSave.
+  @json('nonWwtpTreatment', asObject)        nonWwtpTreatment!: Record<string, any>;
   // wwtpType: 'Physical' | 'Biological' | 'Chemical' | 'Others'
   @field('wwtpType')                         wwtpType!: string | null;
   // Each item: { outlet_no, wwtp_detail, date_of_installation,

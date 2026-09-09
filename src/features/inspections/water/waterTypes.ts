@@ -1,5 +1,5 @@
 import type { DynamicRow, ChecklistValue, YnValue } from '../../../components/form';
-import { DAO_2005_10_CHECKLIST } from './waterChecklistData';
+import { DAO_2005_10_CHECKLIST, NON_WWTP_TREATMENT_OTHERS } from './waterChecklistData';
 
 export interface WwtpDetailCard {
   outletNo: string;
@@ -59,6 +59,11 @@ export interface WaterComplianceFormState {
   wastewaterSources: DynamicRow[];
   abstractedWaterQuality: DynamicRow[];
   hasWwtp: 'yes' | 'no' | null;
+  // Only meaningful on the "no" branch, but kept in state regardless so
+  // toggling Has WWTP doesn't destroy the answer - see
+  // nonWwtpTreatmentForSave for where the record stops being that lenient.
+  nonWwtpSystems: string[];
+  nonWwtpOther: string;
   wwtpType: string;
   wwtpDetails: WwtpDetailCard[];
   wwtpComponents: WwtpComponentCard[];
@@ -124,6 +129,8 @@ export function emptyWaterComplianceForm(): WaterComplianceFormState {
     wastewaterSources: [{ use_type: '', consumed_m3_day: '', generated_m3_day: '', outlet_info: '' }],
     abstractedWaterQuality: [{ source: '', specify: '', bod_cod: '', tss: '', avfp: '', heavy_metal: '' }],
     hasWwtp: null,
+    nonWwtpSystems: [],
+    nonWwtpOther: '',
     wwtpType: '',
     wwtpDetails: [],
     wwtpComponents: [],
@@ -143,4 +150,47 @@ export function emptyWaterComplianceForm(): WaterComplianceFormState {
     otherObservations: '',
     remarksRecommendations: '',
   };
+}
+
+// What section 5A's treatment-system answer contributes to the record.
+export interface NonWwtpTreatment {
+  systems: string[];
+  other: string;
+}
+
+// The boundary between a forgiving form and a strict record. The form keeps
+// a selection alive while an inspector toggles "Has WWTP?" back and forth,
+// so an accidental Yes costs nothing; the stored report is not that
+// lenient, because a report describing both a WWTP and a septic tank leaves
+// a reader no way to tell which one is real. Same reason the free text is
+// dropped unless Others is actually ticked - text stranded by an untick
+// would otherwise contradict the boxes beside it.
+// The rule itself, shared by the create form and the edit screen so a
+// report saved from either one stores the same thing.
+export function nonWwtpTreatmentFor(
+  hasNoWwtp: boolean,
+  systems: string[],
+  other: string,
+): NonWwtpTreatment | Record<string, never> {
+  if (!hasNoWwtp) return {};
+  return {
+    systems,
+    other: systems.includes(NON_WWTP_TREATMENT_OTHERS) ? other.trim() : '',
+  };
+}
+
+export function nonWwtpTreatmentForSave(
+  form: WaterComplianceFormState,
+): NonWwtpTreatment | Record<string, never> {
+  return nonWwtpTreatmentFor(form.hasWwtp === 'no', form.nonWwtpSystems, form.nonWwtpOther);
+}
+
+// One line summarising the answer for read-only views, folding the free
+// text into the Others tick it belongs to rather than showing an orphaned
+// "Others" beside a separate box.
+export function describeNonWwtpTreatment(systems: string[], other: string): string {
+  if (systems.length === 0) return '—';
+  return systems
+    .map(s => (s === NON_WWTP_TREATMENT_OTHERS && other ? `${s}: ${other}` : s))
+    .join(', ');
 }

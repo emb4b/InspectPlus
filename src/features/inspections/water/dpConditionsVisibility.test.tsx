@@ -43,6 +43,7 @@ function baseCompliance(): WaterComplianceView {
     waterSources: [],
     wastewaterSources: [],
     abstractedWaterQuality: [],
+    nonWwtpTreatment: {},
     hasWwtp: null,
     wwtpType: null,
     wwtpDetails: [],

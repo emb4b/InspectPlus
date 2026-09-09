@@ -2,6 +2,8 @@ import React, { useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
+import { Spacing } from '../../../design/spacing';
+import { Type } from '../../../design/typography';
 import {
   FormSection,
   TextField,
@@ -22,6 +24,10 @@ import {
   WASTEWATER_USE_TYPES,
   ABSTRACTED_WATER_SOURCES,
   abstractedWaterSourceSpecifics,
+  NON_WWTP_TREATMENT_OPTIONS,
+  NON_WWTP_TREATMENT_OTHERS,
+  NON_WWTP_TREATMENT_PROMPT,
+  NON_WWTP_TREATMENT_OTHER_LABEL,
   WWTP_TYPE_OPTIONS,
   WWTP_CONDITION_OPTIONS,
 } from './waterChecklistData';
@@ -150,6 +156,16 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
     set('dpConditions', value.dpConditions.filter((_, idx) => idx !== i));
   };
 
+  // Appends rather than reordering, so the ticks read in the order the
+  // inspector made them.
+  const toggleNonWwtpSystem = (option: string) => {
+    const has = value.nonWwtpSystems.includes(option);
+    set(
+      'nonWwtpSystems',
+      has ? value.nonWwtpSystems.filter(s => s !== option) : [...value.nonWwtpSystems, option],
+    );
+  };
+
   const toggleDocumentReviewed = (doc: string) => {
     const has = value.documentsReviewed.includes(doc);
     set(
@@ -229,7 +245,37 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
           <FormSection icon="construct-outline" title="A. Type of Wastewater Treatment System">
             <RadioGroup label="Has WWTP?" options={YES_NO} value={value.hasWwtp} onChange={v => set('hasWwtp', v as 'yes' | 'no')} />
             {value.hasWwtp === 'no' && (
-              <Text style={styles.emptyText}>Subsections B-E will be marked as not applicable.</Text>
+              <>
+                {/* No WWTP doesn't mean no treatment - this is where the
+                    septic tank or oil/water separator actually gets
+                    recorded. Hidden rather than cleared when Has WWTP flips
+                    back to yes; nonWwtpTreatmentForSave is what keeps the
+                    stored report consistent. */}
+                <Text style={styles.fieldLabel}>{NON_WWTP_TREATMENT_PROMPT}</Text>
+                {NON_WWTP_TREATMENT_OPTIONS.map(option => (
+                  <CheckboxRow
+                    key={option}
+                    label={option}
+                    checked={value.nonWwtpSystems.includes(option)}
+                    onToggle={() => toggleNonWwtpSystem(option)}
+                  />
+                ))}
+                {value.nonWwtpSystems.includes(NON_WWTP_TREATMENT_OTHERS) && (
+                  <TextField
+                    ref={setRef('nonWwtpOther')}
+                    label={NON_WWTP_TREATMENT_OTHER_LABEL}
+                    value={value.nonWwtpOther}
+                    onChangeText={t => set('nonWwtpOther', t)}
+                    placeholder="e.g. Grease trap"
+                    returnKeyType="done"
+                  />
+                )}
+                {/* Last, not first: the remark reports a consequence of the
+                    answer above rather than being part of asking it, so it
+                    closes the subsection instead of splitting the question
+                    from the systems that answer it. */}
+                <Text style={styles.emptyText}>Subsections B-E will be marked as not applicable.</Text>
+              </>
             )}
           </FormSection>
         );
@@ -862,6 +908,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textMuted,
     fontStyle: 'italic',
+  },
+  // Deliberately identical to RadioGroup's own `label` style (see
+  // components/form/RadioGroup.tsx): the treatment prompt and the
+  // "Has WWTP?" radio above it are two halves of one question, so the
+  // prompt must read as a field label, not as the uppercase section header
+  // `subTitle` would make it. nonWwtpTreatment.test.tsx asserts the two
+  // resolve to the same style in the same render, so they cannot drift.
+  fieldLabel: {
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
+    fontWeight: '700',
+    color: Colors.navy,
+    letterSpacing: 0.3,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
   },
   subTitle: {
     fontSize: 11,
