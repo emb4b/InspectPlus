@@ -113,6 +113,7 @@ const baseEstablishment: EstablishmentDTO = {
   deviceId: 'device-1',
   isArchived: false,
   complianceTags: [],
+  dueReports: null,
 };
 
 const noop = () => {};

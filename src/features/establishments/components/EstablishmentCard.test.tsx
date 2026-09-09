@@ -170,6 +170,7 @@ const baseItem: EstablishmentDTO = {
   deviceId: 'device-1',
   isArchived: false,
   complianceTags: [],
+  dueReports: null,
 };
 
 const noop = () => {};
@@ -436,5 +437,55 @@ describe('EstablishmentCard press behavior (unchanged by this task)', () => {
   it('disables the card TouchableOpacity when no onPress is supplied', () => {
     const r = render(<EstablishmentCard item={baseItem} />);
     expect(findCard(r).props.disabled).toBe(true);
+  });
+});
+
+// The establishment itself is never overdue — its reports are. The badge
+// rides the building icon the way an unread count rides an app icon, and its
+// colour and number carry different things: colour the worst state present,
+// number every flagged report. See summarizeDueReports.
+describe('EstablishmentCard due indicator', () => {
+  const findDueBadge = (r: Renderer) => {
+    const views = r.root.findAll((n) => (n.type as any)?.name === 'View' || n.type === View);
+    const matches = views.filter((n) => n.props.accessibilityRole === 'text');
+    if (matches.length > 1) {
+      throw new Error(`Expected at most 1 due badge but found ${matches.length}`);
+    }
+    return matches[0];
+  };
+
+  it('shows nothing when the establishment has no flagged reports', () => {
+    const r = render(<EstablishmentCard item={{ ...baseItem, dueReports: null }} onPress={noop} />);
+    expect(findDueBadge(r)).toBeUndefined();
+  });
+
+  it('counts every flagged report and takes the overdue hue when any has lapsed', () => {
+    const r = render(
+      <EstablishmentCard item={{ ...baseItem, dueReports: { level: 'overdue', count: 6 } }} onPress={noop} />,
+    );
+    const badge = findDueBadge(r);
+    expect(flattenStyle(badge.props.style).backgroundColor).toBe(Colors.hazwaste.text);
+    expect(badge.props.accessibilityLabel).toBe('6 reports overdue');
+    expect(proseTexts(r).map((n) => n.props.children)).toContain('6');
+  });
+
+  it('takes the due-soon hue when nothing has lapsed yet', () => {
+    const r = render(
+      <EstablishmentCard item={{ ...baseItem, dueReports: { level: 'due-soon', count: 1 } }} onPress={noop} />,
+    );
+    const badge = findDueBadge(r);
+    expect(flattenStyle(badge.props.style).backgroundColor).toBe(Colors.warning.text);
+    expect(badge.props.accessibilityLabel).toBe('1 report due soon');
+  });
+
+  // It has to overhang to read as a count on the icon rather than beside it.
+  it('pins itself over the building icon rather than taking room in the row', () => {
+    const r = render(
+      <EstablishmentCard item={{ ...baseItem, dueReports: { level: 'overdue', count: 2 } }} onPress={noop} />,
+    );
+    const style = flattenStyle(findDueBadge(r).props.style);
+    expect(style.position).toBe('absolute');
+    expect(style.top as number).toBeLessThan(0);
+    expect(style.right as number).toBeLessThan(0);
   });
 });

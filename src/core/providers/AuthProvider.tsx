@@ -8,6 +8,7 @@ import { checkOnline } from '../../utils/network';
 import { runManagedSync } from '../../services/sync/syncOrchestrator';
 import { UpdateRequiredError } from '../../services/sync/appVersionGate';
 import { notifyUpdateRequired } from '../../services/sync/syncEvents';
+import { hydrateUrgencyConfig } from '../../services/config/urgencyConfig';
 
 // If neither the local short-cache nor Supabase's own session check has
 // resolved within this window, stop waiting and show the login screen.
@@ -114,6 +115,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     authService.getCachedRole().then(r => {
       if (r) setRole(r);
     });
+
+    // Same as above, for the cached report-urgency thresholds: a cold start
+    // (offline included) then flags reports with the last known operator
+    // values rather than the build-time defaults. Fire-and-forget like its
+    // siblings — the read is kicked off at boot and resolves long before any
+    // report list mounts, and the next sync corrects it regardless. Never
+    // throws — see urgencyConfig.ts.
+    hydrateUrgencyConfig();
 
     // onAuthStateChange fires once immediately with the client's own
     // current session (an INITIAL_SESSION event — the passive equivalent

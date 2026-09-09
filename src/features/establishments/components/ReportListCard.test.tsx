@@ -3,8 +3,10 @@ import { View, Text, TouchableOpacity } from 'react-native';
 import { GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import TestRenderer from 'react-test-renderer';
+import { Text as SvgText } from 'react-native-svg';
 import { ReportListCard } from './ReportListCard';
 import { Colors } from '../../../design/colors';
+import { Spacing } from '../../../design/spacing';
 import { FONT_SCALING } from '../../../design/typography';
 import { REPORT_TYPE_DISPLAY, ReportDataKey } from '../../../constants/reportTypeDisplay';
 import type { AllReportItem } from '../hooks/useEstablishment';
@@ -17,6 +19,15 @@ import type { AllReportItem } from '../hooks/useEstablishment';
 // babel-plugin-jest-hoist regardless of where they're written, so this
 // still applies before ReportListCard is ever required.
 jest.mock('../../../db/database', () => ({ database: {}, collections: {} }));
+
+// getReportUrgency resolves thresholds through urgencyConfig, which returns
+// the build-time ENV defaults whenever its module-level snapshot has never
+// been hydrated. Nothing in this file mocks or hydrates urgencyConfig, so
+// that unhydrated-snapshot state is what makes these assertions line up with
+// ENV's 14/30 rather than something else. A future test that calls
+// hydrateUrgencyConfig or refreshUrgencyConfig here would leak that snapshot
+// into every other test in this file, since the module holds it in scope
+// shared across the whole suite.
 
 const mockConfirmResolveConflict = jest.fn();
 jest.mock('../../../services/sync/syncConflictResolution', () => ({
@@ -147,9 +158,10 @@ const isPanGestureEnabled = (r: Renderer): boolean =>
   (r.root.findByType(GestureDetector).props as { gesture: { config: { enabled: boolean } } }).gesture
     .config.enabled;
 
-// Checkbox is a 22x22 View with a 4px border radius (CHECKBOX_SIZE /
-// Radius.xs in ReportListCard.tsx) — a shape no other View in the card
-// shares. Same throw-on-zero-or-multiple convention as findIconWrap.
+// The card used to carry a separate 22x22 checkbox View with a 4px radius in
+// front of the type tile. Nothing should match this shape any more — the tile
+// itself is the selection control now — so this locator exists to prove the
+// old element is gone rather than to find it.
 const findCheckboxes = (r: Renderer) => {
   const views = r.root.findAll((n) => (n.type as any)?.name === 'View' || n.type === View);
   return views.filter((n) => {
@@ -158,19 +170,11 @@ const findCheckboxes = (r: Renderer) => {
   });
 };
 
-const findCheckbox = (r: Renderer) => {
-  const matches = findCheckboxes(r);
-  if (matches.length === 0) {
-    throw new Error('No checkbox View found: expected a View with width===22, height===22, borderRadius===4');
-  }
-  if (matches.length > 1) {
-    throw new Error(`Expected 1 checkbox View but found ${matches.length}; the locator is not sufficiently specific`);
-  }
-  return matches[0];
-};
-
+// Matched by name alone: the checkmark now sizes to the tile it sits in, and
+// pinning a size here would break on any future tile resize without anything
+// actually being wrong.
 const findCheckmarkIcons = (r: Renderer) =>
-  r.root.findAllByType(Ionicons).filter((n) => n.props.name === 'checkmark' && n.props.size === 14);
+  r.root.findAllByType(Ionicons).filter((n) => n.props.name === 'checkmark');
 
 // Locate the ordered list of the card body's real JSX children — titleRow,
 // metaRow, dateRow (which now also carries the control number as one of its
@@ -402,65 +406,65 @@ const ownedDraftInspection: AllReportItem = {
 };
 
 describe('ReportListCard selection mode', () => {
-  it('renders no checkbox when not selectable', () => {
+  // Selection used to add a 22px checkbox in front of the report-type tile,
+  // stacking two controls in the leading gutter and growing it from 62px to
+  // 96px. The tile is now the control itself, so the gutter is the same width
+  // in both modes.
+  const renderSelectable = (selected: boolean) =>
+    render(
+      <ReportListCard
+        item={ownedDraftInspection}
+        currentUid="uid-1"
+        canManageAll={false}
+        selectable
+        selected={selected}
+        onPress={noop}
+        onEdit={noop}
+        onDelete={noop}
+        onToggleSelect={noop}
+      />,
+    );
+
+  it('adds no separate checkbox in selection mode — the type tile is the control', () => {
+    expect(findCheckboxes(renderSelectable(false))).toHaveLength(0);
+    expect(findCheckboxes(renderSelectable(true))).toHaveLength(0);
+  });
+
+  it('leaves the tile completely untouched when not selectable', () => {
     const r = render(
       <ReportListCard item={ownedDraftInspection} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
     );
-    expect(findCheckboxes(r)).toHaveLength(0);
-  });
-
-  it('renders a checkbox when selectable', () => {
-    const r = render(
-      <ReportListCard
-        item={ownedDraftInspection}
-        currentUid="uid-1"
-        canManageAll={false}
-        selectable
-        onPress={noop}
-        onEdit={noop}
-        onDelete={noop}
-        onToggleSelect={noop}
-      />,
-    );
-    expect(findCheckbox(r)).toBeDefined();
-  });
-
-  it('renders the checkbox unchecked, distinctly from the checked state, when selected is false', () => {
-    const r = render(
-      <ReportListCard
-        item={ownedDraftInspection}
-        currentUid="uid-1"
-        canManageAll={false}
-        selectable
-        selected={false}
-        onPress={noop}
-        onEdit={noop}
-        onDelete={noop}
-        onToggleSelect={noop}
-      />,
-    );
-    const checkboxStyle = flattenStyle(findCheckbox(r).props.style);
-    expect(checkboxStyle.backgroundColor).not.toBe(Colors.accent);
+    const tile = flattenStyle(findIconWrap(r).props.style);
+    expect(tile.borderWidth).toBeUndefined();
+    expect(tile.backgroundColor).not.toBe(Colors.accent);
     expect(findCheckmarkIcons(r)).toHaveLength(0);
   });
 
-  it('renders the checkbox checked, distinctly from the unchecked state, when selected is true', () => {
-    const r = render(
-      <ReportListCard
-        item={ownedDraftInspection}
-        currentUid="uid-1"
-        canManageAll={false}
-        selectable
-        selected
-        onPress={noop}
-        onEdit={noop}
-        onDelete={noop}
-        onToggleSelect={noop}
-      />,
-    );
-    const checkboxStyle = flattenStyle(findCheckbox(r).props.style);
-    expect(checkboxStyle.backgroundColor).toBe(Colors.accent);
+  // The ring is what the old checkbox wore. Without it an unselected tile in
+  // selection mode is indistinguishable from a normal one, and nothing on the
+  // card says it is tappable state.
+  it('rings the tile but keeps the type glyph when selectable and unselected', () => {
+    const r = renderSelectable(false);
+    const tile = flattenStyle(findIconWrap(r).props.style);
+
+    expect(tile.borderWidth).toBe(1.5);
+    // Not Colors.border — that hairline is close to invisible on a pale type
+    // tint, confirmed on device, and the ring is the only thing saying the
+    // row is pickable.
+    expect(tile.borderColor).toBe(Colors.textLight);
+    expect(tile.backgroundColor).not.toBe(Colors.accent);
+    expect(findCheckmarkIcons(r)).toHaveLength(0);
+    expect(findReportIcon(r)).toBeDefined();
+  });
+
+  it('flips the tile to an accent checkmark when selected', () => {
+    const r = renderSelectable(true);
+    const tile = flattenStyle(findIconWrap(r).props.style);
+
+    expect(tile.backgroundColor).toBe(Colors.accent);
     expect(findCheckmarkIcons(r)).toHaveLength(1);
+    // The ring would double up with the filled state.
+    expect(tile.borderWidth).toBeUndefined();
   });
 
   it('opens the report on press when not selectable, and never touches onToggleSelect', () => {
@@ -884,7 +888,7 @@ describe('ReportListCard date + control number row', () => {
     expect(controlNoStyle.fontFamily).toBe(dateStyle.fontFamily);
   });
 
-  it('never lets a long control number push the urgency badge out of the row, clip the date, or dislodge the group from the end of the row', () => {
+  it('never lets a long control number clip the date or dislodge the group from the end of the row', () => {
     const longControlNo = 'CTRL-2026-0000001-EXTREMELY-LONG-CONTROL-NUMBER-VALUE';
     const item: AllReportItem = {
       ...baseItem,
@@ -899,17 +903,11 @@ describe('ReportListCard date + control number row', () => {
     const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
     const rowChildren = calendarIcon!.parent!.children;
 
-    // The badge still renders — a long control number sharing the row must
-    // not crowd it out.
-    const badge = r.root
-      .findAll((n) => (n.type as any)?.name === 'View' || n.type === View)
-      .find((n) => flattenStyle(n.props.style).backgroundColor === Colors.hazwaste.badgeBg);
-    expect(badge).toBeDefined();
-    expect(proseTexts(r).some((n) => n.props.children === 'Overdue')).toBe(true);
-
     // The control number is the element that shrinks/truncates
-    // (flexShrink: 1, numberOfLines 1) — the date, its icon, and the badge
-    // are pinned (flexShrink: 0) so none of them can be squeezed out by it.
+    // (flexShrink: 1, numberOfLines 1) — the date and its icon are pinned
+    // (flexShrink: 0) so neither can be squeezed out by it. The urgency badge
+    // is no longer part of this row at all: it moved to the card's corner,
+    // which is what took the pressure off this row in the first place.
     const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === longControlNo);
     expect(controlNoText).toBeDefined();
 
@@ -925,19 +923,16 @@ describe('ReportListCard date + control number row', () => {
     expectShrinksButNeverGrows(flattenStyle(controlNoText?.props.style));
     expect(controlNoText?.props.numberOfLines).toBe(1);
     expect(flattenStyle(dateText?.props.style).flexShrink).toBe(0);
-    expect(flattenStyle(badge?.props.style).flexShrink).toBe(0);
 
     const pricetagIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'pricetag-outline');
     expect(pricetagIcon).toBeDefined();
     expect(flattenStyle(pricetagIcon?.props.style).flexShrink).toBe(0);
 
     // Even a value long enough to force truncation must not reorder the
-    // row: date (with its icon) first, badge next, the control-number
-    // group still last.
+    // row: date (with its icon) first, the control-number group still last.
     const group = findControlNoGroup(r);
     expect(rowChildren[0]).toBe(calendarIcon);
-    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(badge!));
-    expect(rowChildren.indexOf(badge!)).toBeLessThan(rowChildren.indexOf(group));
+    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(group));
     expect(rowChildren[rowChildren.length - 1]).toBe(group);
   });
 
@@ -976,9 +971,6 @@ describe('ReportListCard date + control number row', () => {
     const rowChildren = calendarIcon!.parent!.children;
     const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === 'C-1');
     const dateText = findDateText(r, controlNoText);
-    const badge = r.root
-      .findAll((n) => (n.type as any)?.name === 'View' || n.type === View)
-      .find((n) => flattenStyle(n.props.style).backgroundColor === Colors.hazwaste.badgeBg);
     const group = findControlNoGroup(r);
 
     // The mechanism: the group grows to claim the row's remaining space
@@ -1000,32 +992,8 @@ describe('ReportListCard date + control number row', () => {
     expectShrinksButNeverGrows(flattenStyle(controlNoText?.props.style));
 
     expect(rowChildren[0]).toBe(calendarIcon);
-    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(badge!));
-    expect(rowChildren.indexOf(badge!)).toBeLessThan(rowChildren.indexOf(group));
+    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(group));
     expect(rowChildren[rowChildren.length - 1]).toBe(group);
-  });
-
-  it('renders the urgency badge between the date and the control-number group when present', () => {
-    const item: AllReportItem = {
-      ...baseItem,
-      status: 'draft',
-      date: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
-    };
-    const r = render(
-      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
-    );
-    const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
-    const rowChildren = calendarIcon!.parent!.children;
-    const controlNoText = r.root.findAllByType(Text).find((n) => n.props.children === item.controlNo);
-    const dateText = findDateText(r, controlNoText);
-    const badge = r.root
-      .findAll((n) => (n.type as any)?.name === 'View' || n.type === View)
-      .find((n) => flattenStyle(n.props.style).backgroundColor === Colors.hazwaste.badgeBg);
-    const group = findControlNoGroup(r);
-    expect(badge).toBeDefined();
-
-    expect(rowChildren.indexOf(dateText)).toBeLessThan(rowChildren.indexOf(badge!));
-    expect(rowChildren.indexOf(badge!)).toBeLessThan(rowChildren.indexOf(group));
   });
 
   it("falls back to 'No control number yet' when controlNo is null", () => {
@@ -1034,5 +1002,116 @@ describe('ReportListCard date + control number row', () => {
       <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
     );
     expect(r.root.findAllByType(Text).some((n) => n.props.children === 'No control number yet')).toBe(true);
+  });
+});
+
+// Urgency used to render as a chip inside the card — first inline in the date
+// row, then in the title row's badge slot. It is now a banner wrapping the
+// card's top-left corner, which handed the badge slot back to filing status.
+describe('ReportListCard urgency ribbon', () => {
+  const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+
+  const renderCard = (item: AllReportItem) =>
+    render(
+      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+
+  // The ribbon's wrapper is the only node in the card declaring an explicit
+  // accessibilityRole of 'text' — Badge.tsx sets no accessibility props at
+  // all, so this cannot collide with the Draft/Submitted chip.
+  const findRibbon = (r: Renderer) => {
+    const views = r.root.findAll((n) => (n.type as any)?.name === 'View' || n.type === View);
+    const matches = views.filter((n) => n.props.accessibilityRole === 'text');
+    if (matches.length > 1) {
+      throw new Error(`Expected at most 1 ribbon but found ${matches.length}`);
+    }
+    return matches[0];
+  };
+
+  const bandLabel = (r: Renderer) => r.root.findByType(SvgText).props.children;
+  const chipLabels = (r: Renderer) => proseTexts(r).map((n) => n.props.children);
+
+  it('wraps the corner with an abbreviated overdue count', () => {
+    const r = renderCard({ ...baseItem, status: 'draft', date: daysAgo(45) });
+    expect(findRibbon(r)).toBeDefined();
+    expect(bandLabel(r)).toBe('15d late');
+  });
+
+  it('abbreviates remaining runway the same way', () => {
+    const r = renderCard({ ...baseItem, status: 'draft', date: daysAgo(15) });
+    expect(bandLabel(r)).toBe('15d left');
+  });
+
+  it('spells the label out in full for screen readers', () => {
+    const r = renderCard({ ...baseItem, status: 'draft', date: daysAgo(45) });
+    expect(findRibbon(r).props.accessibilityLabel).toBe('Overdue by 15 days');
+  });
+
+  // The ribbon carries urgency, so the badge slot no longer has to say two
+  // things at once — a flagged draft shows both, in different places.
+  it('keeps the Draft chip alongside the ribbon', () => {
+    const r = renderCard({ ...baseItem, status: 'draft', date: daysAgo(45) });
+    expect(findRibbon(r)).toBeDefined();
+    expect(chipLabels(r)).toContain('Draft');
+  });
+
+  // The ribbon was briefly suppressed in selection mode, back when a separate
+  // checkbox sat in this corner and the band crossed it. The type tile is the
+  // selection control now, so the corner is free and the Export tab gets the
+  // same day counts as every other list.
+  it('still shows the ribbon in selection mode', () => {
+    const item: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(45) };
+    const r = render(
+      <ReportListCard
+        item={item}
+        currentUid="uid-1"
+        canManageAll={false}
+        onPress={noop}
+        onEdit={noop}
+        onDelete={noop}
+        selectable
+        onToggleSelect={noop}
+      />,
+    );
+    expect(findRibbon(r)).toBeDefined();
+    expect(bandLabel(r)).toBe('15d late');
+  });
+
+  it('shows no ribbon on a draft that is not flagged', () => {
+    const r = renderCard({ ...baseItem, status: 'draft', date: daysAgo(2) });
+    expect(findRibbon(r)).toBeUndefined();
+    expect(chipLabels(r)).toContain('Draft');
+  });
+
+  it('shows no ribbon on a submitted report, however old', () => {
+    const r = renderCard({ ...baseItem, status: 'submitted', date: daysAgo(400) });
+    expect(findRibbon(r)).toBeUndefined();
+    expect(chipLabels(r)).toContain('Submitted');
+  });
+
+  // The ribbon is an absolutely positioned overlay, so it must not push the
+  // card open the way the reserved padding band it replaced used to.
+  it('costs a flagged card no extra height over a calm one', () => {
+    const flagged: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(45) };
+    const calm: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(2) };
+
+    const flaggedStyle = flattenStyle(findCard(renderCard(flagged), flagged).props.style);
+    const calmStyle = flattenStyle(findCard(renderCard(calm), calm).props.style);
+
+    expect(flaggedStyle.paddingTop).toBeUndefined();
+    expect(flaggedStyle.padding).toBe(Spacing.md);
+    expect(flaggedStyle.padding).toBe(calmStyle.padding);
+  });
+
+  it('still tints the whole card by urgency level', () => {
+    const overdue: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(45) };
+    const overdueCard = flattenStyle(findCard(renderCard(overdue), overdue).props.style);
+    expect(overdueCard.borderColor).toBe(Colors.hazwaste.border);
+    expect(overdueCard.backgroundColor).toBe(Colors.hazwaste.bg);
+
+    const dueSoon: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(15) };
+    const dueSoonCard = flattenStyle(findCard(renderCard(dueSoon), dueSoon).props.style);
+    expect(dueSoonCard.borderColor).toBe(Colors.warning.border);
+    expect(dueSoonCard.backgroundColor).toBe(Colors.warning.bg);
   });
 });

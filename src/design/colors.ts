@@ -31,10 +31,16 @@ export const Colors = {
   borderLight: '#f1f5f9',
 
   // Status / compliance badge colors
+  // Orange is the one hue left that separates cleanly from the other four
+  // report types at glyph size — water's blue, survey's green, eia's violet
+  // and hazwaste's red. It shipped as a neutral grey (the same value as
+  // textMuted), which made air the only type whose tile read as "untyped".
+  // badgeBg/badgeText stay blue: Badge's `info` tone is their only consumer
+  // and has nothing to do with air monitoring.
   air: {
-    bg: '#f9fafb',
-    border: '#d1d5db',
-    text: '#6b7280',
+    bg: '#fff7ed',
+    border: '#fed7aa',
+    text: '#ea580c',
     badgeBg: '#dbeafe',
     badgeText: '#1e40af',
   },

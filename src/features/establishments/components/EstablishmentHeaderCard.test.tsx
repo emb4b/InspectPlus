@@ -1,8 +1,9 @@
 import React from 'react';
-import { TouchableOpacity } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
 import TestRenderer from 'react-test-renderer';
 import { EstablishmentHeaderCard } from './EstablishmentHeaderCard';
 import type { EstablishmentDTO } from '../types';
+import { Colors } from '../../../design/colors';
 
 // EstablishmentHeaderCard's "Sync conflict" pill pulls in confirmResolveConflict
 // -> the WatermelonDB sync adapter chain, which constructs a real SQLiteAdapter
@@ -82,6 +83,7 @@ const baseEstablishment: EstablishmentDTO = {
   deviceId: 'device-1',
   isArchived: false,
   complianceTags: [],
+  dueReports: null,
 };
 
 const noop = () => {};
@@ -112,5 +114,53 @@ describe('EstablishmentHeaderCard button hierarchy', () => {
     expect(
       r.root.findAll((n) => n.type === TouchableOpacity && n.props?.accessibilityLabel === 'Edit'),
     ).toHaveLength(0);
+  });
+});
+
+// The same badge, on the same icon, as the Manage Establishments tile — the
+// list and the detail screen have to teach one thing, not two.
+describe('EstablishmentHeaderCard due indicator', () => {
+  const findDueBadge = (r: Renderer) => {
+    const views = r.root.findAll((n) => (n.type as any)?.name === 'View' || n.type === View);
+    const matches = views.filter((n) => n.props.accessibilityRole === 'text');
+    if (matches.length > 1) {
+      throw new Error(`Expected at most 1 due badge but found ${matches.length}`);
+    }
+    return matches[0];
+  };
+
+  it('shows nothing when the establishment has no flagged reports', () => {
+    const r = render(
+      <EstablishmentHeaderCard
+        establishment={{ ...baseEstablishment, dueReports: null }}
+        inspectorLabel="Inspector One"
+        onAddReport={noop}
+      />,
+    );
+    expect(findDueBadge(r)).toBeUndefined();
+  });
+
+  it('counts every flagged report and takes the overdue hue when any has lapsed', () => {
+    const r = render(
+      <EstablishmentHeaderCard
+        establishment={{ ...baseEstablishment, dueReports: { level: 'overdue', count: 4 } }}
+        inspectorLabel="Inspector One"
+        onAddReport={noop}
+      />,
+    );
+    const badge = findDueBadge(r);
+    expect(flattenStyle(badge.props.style).backgroundColor).toBe(Colors.hazwaste.text);
+    expect(badge.props.accessibilityLabel).toBe('4 reports overdue');
+  });
+
+  it('takes the due-soon hue when nothing has lapsed yet', () => {
+    const r = render(
+      <EstablishmentHeaderCard
+        establishment={{ ...baseEstablishment, dueReports: { level: 'due-soon', count: 2 } }}
+        inspectorLabel="Inspector One"
+        onAddReport={noop}
+      />,
+    );
+    expect(flattenStyle(findDueBadge(r).props.style).backgroundColor).toBe(Colors.warning.text);
   });
 });

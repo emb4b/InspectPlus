@@ -5,6 +5,7 @@ import type {
   PermitSnapshotItem,
   ProductLineItem,
 } from '../../../services/sync/syncTypes';
+import type { DueReportsSummary } from '../../../utils/reportUrgency';
 
 export type { PermitSnapshotItem, ProductLineItem };
 
@@ -76,4 +77,7 @@ export interface EstablishmentDTO {
   isArchived: boolean;
   // Derived — computed from inspection_reports linked to this establishment
   complianceTags: ComplianceTag[];
+  // Derived from the same reports: how many of them are asking for attention
+  // and how badly. Null when none are. See summarizeDueReports.
+  dueReports: DueReportsSummary | null;
 }

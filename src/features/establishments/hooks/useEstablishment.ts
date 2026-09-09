@@ -7,6 +7,7 @@ import { toDisplaySyncStatus } from '../types';
 import { resolveInspectorNames } from '../../../services/inspectorNames';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { REPORT_TYPE_DISPLAY } from '../../../constants/reportTypeDisplay';
+import { summarizeDueReports } from '../../../utils/reportUrgency';
 
 // ── Jurisdiction visibility ─────────────────────────────────────────────────
 // Mirrors the "inspectors can read jurisdiction establishments" and "admins
@@ -195,6 +196,17 @@ async function modelToDTO(model: Establishment): Promise<EstablishmentDTO> {
   });
   if (surveyReports.length > 0) tagSet.add('Survey');
 
+  // The establishment's due indicator counts exactly what its own report list
+  // flags, so both kinds of report are included — and surveys get the same
+  // soft-delete filter the inspection reports above already have, so a
+  // deleted one can't inflate the count.
+  const dueReports = summarizeDueReports([
+    ...reports.map((r: any) => ({ date: r.inspectionDate, status: r.reportStatus })),
+    ...surveyReports
+      .filter((r: any) => !r.deletedAt && r.syncState !== 'pending_delete')
+      .map((r: any) => ({ date: r.inspectionDate, status: r.reportStatus ?? 'draft' })),
+  ]);
+
   return {
     id:                     model.id,
     estabId:                model.estabId,
@@ -233,6 +245,7 @@ async function modelToDTO(model: Establishment): Promise<EstablishmentDTO> {
     deviceId:               model.deviceId,
     isArchived:             model.isArchived,
     complianceTags:         Array.from(tagSet),
+    dueReports,
   };
 }
 

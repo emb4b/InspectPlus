@@ -9,6 +9,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { AppText } from '../../../components/AppText';
+import { DueCountBadge } from '../../../components/DueCountBadge';
 import { Colors } from '../../../design/colors';
 import { Duration } from '../../../design/motion';
 import { Elevation } from '../../../design/elevation';
@@ -160,8 +161,13 @@ export const EstablishmentCard: React.FC<EstablishmentCardProps> = ({
             activeOpacity={onPress ? 0.9 : 1}
             disabled={!onPress}>
             {/* Icon */}
+            {/* The due count rides the building icon the way an unread count
+                rides an app icon: the establishment itself isn't overdue, its
+                reports are, so the badge hangs off the thing that stands for
+                the establishment rather than sitting in the content. */}
             <View style={styles.iconWrap}>
               <Ionicons name="business" size={22} color={Colors.textLight} />
+              <DueCountBadge summary={item.dueReports} style={styles.dueBadge} />
             </View>
 
             {/* Content */}
@@ -298,6 +304,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+  },
+  // Overhangs the icon's top-right so it reads as a count ON the icon rather
+  // than a chip beside it. Nothing here clips: the card sets no overflow.
+  dueBadge: {
+    position: 'absolute',
+    top: -7,
+    right: -10,
   },
   content: {
     flex: 1,

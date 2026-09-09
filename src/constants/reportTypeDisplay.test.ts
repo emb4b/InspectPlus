@@ -89,4 +89,26 @@ describe('REPORT_TYPE_DISPLAY', () => {
   it('hazardous_waste uses the generator flow\'s warning icon for the collapsed bucket', () => {
     expect(REPORT_TYPE_DISPLAY.hazardous_waste.icon).toBe('warning-outline');
   });
+
+  // The card renders each type as a coloured glyph on a tint of its own hue.
+  // That only works as a scanning aid if every type is a saturated hue —
+  // air_monitoring shipped resolving to Colors.textMuted, the same neutral
+  // grey the date text uses, so it read as "no type" rather than "air".
+  const NEUTRALS = [Colors.textPrimary, Colors.textSecondary, Colors.textMuted, Colors.textLight];
+
+  it.each(ALL_DATA_KEYS)('%s uses a saturated glyph colour, not a neutral text token', (key) => {
+    expect(NEUTRALS).not.toContain(REPORT_TYPE_DISPLAY[key].textColor);
+  });
+
+  // Two types sharing a glyph colour would make the tile useless for telling
+  // them apart at a glance, which is the only job it has.
+  it('gives every type a glyph colour distinct from every other type', () => {
+    const glyphColors = ALL_DATA_KEYS.map((key) => REPORT_TYPE_DISPLAY[key].textColor);
+    expect(new Set(glyphColors).size).toBe(ALL_DATA_KEYS.length);
+  });
+
+  it('gives every type a tile background distinct from every other type', () => {
+    const tints = ALL_DATA_KEYS.map((key) => REPORT_TYPE_DISPLAY[key].bgColor);
+    expect(new Set(tints).size).toBe(ALL_DATA_KEYS.length);
+  });
 });

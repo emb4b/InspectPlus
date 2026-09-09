@@ -17,9 +17,11 @@ const baseConfig = configMap[appEnv];
 
 // Lets an env var (e.g. in .env) override a per-environment default without
 // having to touch the TS files — falls back to the TS default when unset or
-// not a valid number.
-function msFromEnv(value: string | undefined, fallback: number): number {
-  if (value === undefined) return fallback;
+// not a valid number. An empty/whitespace-only value counts as unset: Number('')
+// is 0, which would otherwise silently turn `FOO=` in a .env file into a zero
+// threshold rather than the default.
+function numberFromEnv(value: string | undefined, fallback: number): number {
+  if (value === undefined || value.trim() === '') return fallback;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
@@ -32,9 +34,13 @@ export const ENV = {
 
   // Non-secret config from TS files, individually overridable via .env
   ...baseConfig,
-  shortCacheMs:       msFromEnv(process.env.EXPO_PUBLIC_SHORT_CACHE_MS,       baseConfig.shortCacheMs),
-  credentialWindowMs: msFromEnv(process.env.EXPO_PUBLIC_CREDENTIAL_WINDOW_MS, baseConfig.credentialWindowMs),
-  syncIntervalMs:     msFromEnv(process.env.EXPO_PUBLIC_SYNC_INTERVAL_MS,     baseConfig.syncIntervalMs),
+  shortCacheMs:       numberFromEnv(process.env.EXPO_PUBLIC_SHORT_CACHE_MS,       baseConfig.shortCacheMs),
+  credentialWindowMs: numberFromEnv(process.env.EXPO_PUBLIC_CREDENTIAL_WINDOW_MS, baseConfig.credentialWindowMs),
+  syncIntervalMs:     numberFromEnv(process.env.EXPO_PUBLIC_SYNC_INTERVAL_MS,     baseConfig.syncIntervalMs),
+  // Report urgency windows, in days since the inspection date. Tune per
+  // deployment from .env without a rebuild of the TS defaults.
+  dueSoonDays:        numberFromEnv(process.env.EXPO_PUBLIC_DUE_SOON_DAYS,        baseConfig.dueSoonDays),
+  overdueDays:        numberFromEnv(process.env.EXPO_PUBLIC_OVERDUE_DAYS,         baseConfig.overdueDays),
 };
 
 // Export the type so other files can reference it
