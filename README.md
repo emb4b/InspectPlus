@@ -59,10 +59,12 @@ A draft crosses into "Due in N days" at `DUE_SOON_DAYS` and into "Overdue by N d
 
 **These `.env` values are build-time defaults only.** In a running app the
 thresholds come from the `due_soon_days` / `overdue_days` rows in the
-Supabase `app_config` table, refreshed on every sync and cached for offline
-use — so EMB can retune them without a new build. The `.env` values apply
-only until the first successful sync on a fresh install. See
-`src/services/config/urgencyConfig.ts`.
+Supabase `app_config` table, cached for offline use so EMB can retune them
+without a new build. The `.env` values apply only until the first successful
+sync on a fresh install. There is no periodic background sync in this app —
+the refresh happens only at login and on a manual "Sync Now" tap, so a user
+who stays signed in without syncing sees a changed threshold only at their
+next sync. See `src/services/config/urgencyConfig.ts`.
 
 ### Install & run
 

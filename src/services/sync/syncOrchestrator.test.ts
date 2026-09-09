@@ -73,4 +73,11 @@ describe('runManagedSync urgency config refresh', () => {
     await expect(runManagedSync('uid-1')).rejects.toThrow('update required');
     expect(mockedRefreshConfig).not.toHaveBeenCalled();
   });
+
+  it('completes the sync run even if the config refresh rejects', async () => {
+    mockedRefreshConfig.mockRejectedValueOnce(new Error('config read blew up'));
+
+    await expect(runManagedSync('uid-1')).resolves.not.toBeNull();
+    expect(mockedRunFullSync).toHaveBeenCalled();
+  });
 });

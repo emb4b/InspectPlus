@@ -12,6 +12,15 @@ import { Spacing } from '../../../design/spacing';
 import { FONT_SCALING, Type } from '../../../design/typography';
 import type { EstablishmentReportItem } from '../hooks/useEstablishment';
 
+// getReportUrgency resolves thresholds through urgencyConfig, which returns
+// the build-time ENV defaults whenever its module-level snapshot has never
+// been hydrated. Nothing in this file mocks or hydrates urgencyConfig, so
+// that unhydrated-snapshot state is what makes these assertions line up with
+// ENV's 14/30 rather than something else. A future test that calls
+// hydrateUrgencyConfig or refreshUrgencyConfig here would leak that snapshot
+// into every other test in this file, since the module holds it in scope
+// shared across the whole suite.
+
 type Renderer = TestRenderer.ReactTestRenderer;
 
 const render = (element: React.ReactElement) => {

@@ -60,7 +60,10 @@ function parseStored(raw: string | null): UrgencyThresholds | null {
 export async function hydrateUrgencyConfig(): Promise<void> {
   try {
     const stored = parseStored(await AsyncStorage.getItem(STORAGE_KEY));
-    if (stored) snapshot = stored;
+    // Hydration is fire-and-forget from the auth bootstrap and may resolve
+    // after a sync has already refreshed the snapshot, so it must only fill
+    // an empty snapshot — never clobber a fresher value with an older cache.
+    if (stored && !snapshot) snapshot = stored;
   } catch {
     // A storage read failure leaves the ENV defaults in place — never fatal.
   }
@@ -99,6 +102,13 @@ export async function refreshUrgencyConfig(supabase: SupabaseClient): Promise<vo
 
     if (error || !data) return;
 
+    // Unchecked cast: every malformed shape this could let through still
+    // resolves correctly below. A non-array makes numberFromRows's .find
+    // throw, caught by the outer try, leaving the last known values in
+    // place; a row with an unexpected shape yields Number(undefined) ->
+    // NaN, which isValidThresholds rejects, discarding the whole pair. A
+    // runtime guard here could only reproduce that existing fail-open
+    // behaviour.
     const rows = data as ConfigRow[];
     const current = getUrgencyConfig();
     const candidate: UrgencyThresholds = {
@@ -108,6 +118,12 @@ export async function refreshUrgencyConfig(supabase: SupabaseClient): Promise<vo
 
     if (!isValidThresholds(candidate)) return;
 
+    // Adopt into memory before the cache write settles, deliberately: if
+    // AsyncStorage.setItem below fails (e.g. storage full), the operator's
+    // new values still take effect for the rest of this session. The next
+    // cold start would revert to the stale cache until the following sync,
+    // which is the right trade — honour what the operator said now rather
+    // than withholding it until it's durably persisted.
     snapshot = candidate;
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(candidate));
   } catch {

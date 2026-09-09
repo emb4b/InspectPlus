@@ -178,19 +178,28 @@ by `20260901010000_grant_authenticated_select_app_config.sql`.
 The 1.0.x builds in the field cannot honour a changed threshold. The
 policy is therefore:
 
-- Ship this mechanism as **1.1.0**.
-- Do **not** raise `min_supported_app_version` on release. Existing
-  1.0.x builds keep working against the unchanged 14/30 and are not
-  disrupted.
+- Do **not** raise `min_supported_app_version` on the release that ships
+  this mechanism. Existing 1.0.x builds keep working against the
+  unchanged 14/30 and are not disrupted.
 - The first time EMB actually changes a threshold, update
-  `min_supported_app_version` to `1.1.0` **in the same operation** as
-  the `app_config` value change.
+  `min_supported_app_version` to the version that first shipped this
+  mechanism, **in the same operation** as the `app_config` value change.
+  That version number is not yet committed to (`app.json` is still
+  `1.0.3` as of this writing) and should be recorded here once the
+  release that ships this mechanism is cut.
 
 From that moment, 1.0.x users hit `UpdateRequiredError`
 (`appVersionGate.ts:31`) and see the existing "Update required" prompt
 in `HomeHeader.tsx:64`, instead of silently showing urgency flags that
 disagree with the office. A forced update is required only when one is
 genuinely warranted, never merely because a new version exists.
+
+This policy is safe to execute because `assertAppVersionSupported` and
+`refreshUrgencyConfig` fire at adjacent lines in the same sync round trip
+in `runManagedSync` — a client cannot pass the version gate without also
+picking up the refreshed thresholds in that same call. That adjacency is
+load-bearing: a future refactor that separated the two calls could
+reintroduce the gap this policy exists to close.
 
 This policy is operational, not code. It is recorded here because
 nothing in the codebase enforces it.
@@ -217,11 +226,16 @@ its signature and both components keep calling it identically.
 
 ## Risks / open questions carried forward
 
-- **Stale thresholds offline.** An inspector who has not synced for a
-  week computes against week-old values, so two inspectors can
-  transiently disagree about whether the same report is overdue. This is
-  inherent to an offline-first app and is accepted: a deadline policy
-  does not change weekly, and the refresh is attached to every sync run.
+- **Threshold changes propagate only at sync, not periodically.** There
+  is no periodic background sync in this app — `syncIntervalMs` is
+  defined in the env config files but consumed nowhere. A threshold
+  refresh happens only at login and on a manual "Sync Now" tap, so an
+  inspector who stays signed in and never syncs computes against
+  whatever values were resolved at their last sync, potentially for
+  days, and two inspectors can transiently disagree about whether the
+  same report is overdue. This is a property of the propagation model,
+  not a defect: a deadline policy does not change often, and the value
+  is guaranteed fresh as of each user's own last sync.
 - **No operator UI.** Changing a threshold means running SQL against
   `app_config`, the same as raising `min_supported_app_version` today.
   Acceptable while both are rare operator actions; a small admin surface

@@ -200,6 +200,23 @@ describe('refreshUrgencyConfig', () => {
     expect(await AsyncStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 
+  it('discards the whole pair when the other present value does not parse, rather than adopting half of it', async () => {
+    const { getUrgencyConfig, refreshUrgencyConfig } = loadModule();
+
+    await refreshUrgencyConfig(
+      fakeSupabase({
+        data: [
+          { key: 'due_soon_days', value: '14' },
+          { key: 'overdue_days', value: 'never' },
+        ],
+        error: null,
+      }),
+    );
+
+    expect(getUrgencyConfig()).toEqual({ dueSoonDays: ENV.dueSoonDays, overdueDays: ENV.overdueDays });
+    expect(await AsyncStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
   // A sync run awaits this call, so a rejection here would break sync
   // entirely. This is where the spec's "a rejected refresh does not fail the
   // sync run" guarantee lives — the orchestrator relies on it rather than

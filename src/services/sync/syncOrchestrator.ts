@@ -77,7 +77,12 @@ export async function runManagedSync(
   // same app_config table. Fails open inside refreshUrgencyConfig, so it can
   // never break a sync run; the notifySyncDataChanged in the finally below
   // then re-renders any subscribed list against the refreshed values.
-  await refreshUrgencyConfig(supabase);
+  // refreshUrgencyConfig owns that fail-open guarantee and is never expected
+  // to reject — the redundant .catch() here keeps that true at this call
+  // site even if that guarantee ever regressed. Adjacent to the version-gate
+  // call above deliberately: a client must never pass the version check
+  // without also picking up the latest thresholds in the same round trip.
+  await refreshUrgencyConfig(supabase).catch(() => {});
 
   const { skipPush = false, skipPull = false } = options;
 
