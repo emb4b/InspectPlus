@@ -1,5 +1,5 @@
 begin;
-select plan(6);
+select plan(8);
 
 insert into public.user_accounts (
   uid, first_name, last_name, username, password_hash, role, region, province,
@@ -57,6 +57,7 @@ select is(
             "compliance_id": "water-push-001",
             "report_id": "rep-water-push-001",
             "has_wwtp": true,
+            "non_wwtp_treatment": {"systems": ["Septic Tank"], "other": ""},
             "wwtp_type": "Physical",
             "other_observations": "Water observation",
             "remarks_recommendations": "Water recommendation"
@@ -81,6 +82,22 @@ select is(
   'push_changes inserts one compliance_water row'
 );
 
+-- A populated value rather than {}, so this distinguishes the column being
+-- carried from the insert's own coalesce default. push_changes stores what
+-- it is handed; keeping non_wwtp_treatment consistent with has_wwtp is the
+-- client's job (nonWwtpTreatmentFor in
+-- src/features/inspections/water/waterTypes.ts), so the pairing used here
+-- is not itself meaningful.
+select is(
+  (
+    select non_wwtp_treatment
+    from public.compliance_water
+    where compliance_id = 'water-push-001'
+  ),
+  '{"systems": ["Septic Tank"], "other": ""}'::jsonb,
+  'push_changes stores non_wwtp_treatment on a created compliance_water row'
+);
+
 select is(
   public.push_changes(
     '{
@@ -91,6 +108,7 @@ select is(
             "compliance_id": "water-push-001",
             "report_id": "rep-water-push-001",
             "has_wwtp": false,
+            "non_wwtp_treatment": {"systems": ["Others"], "other": "Grease trap"},
             "wwtp_type": "Biological",
             "other_observations": "Updated water observation",
             "remarks_recommendations": "Updated water recommendation"
@@ -112,6 +130,16 @@ select is(
   ),
   'Updated water recommendation',
   'push_changes updates an existing compliance_water row'
+);
+
+select is(
+  (
+    select non_wwtp_treatment
+    from public.compliance_water
+    where compliance_id = 'water-push-001'
+  ),
+  '{"systems": ["Others"], "other": "Grease trap"}'::jsonb,
+  'push_changes overwrites non_wwtp_treatment on an updated compliance_water row'
 );
 
 select is(
