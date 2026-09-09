@@ -133,11 +133,30 @@ needed.
 
 ## Startup hydration
 
-`hydrateUrgencyConfig()` is awaited inside `AuthProvider`'s existing
-bootstrap effect (`src/core/providers/AuthProvider.tsx:81`), which
-already gates the UI behind its `loading` flag until it resolves. This
-guarantees the first render of any report list sees the cached values
-rather than briefly showing `ENV` defaults and then flipping.
+`hydrateUrgencyConfig()` is kicked off inside `AuthProvider`'s existing
+bootstrap effect (`src/core/providers/AuthProvider.tsx:81`), alongside the
+sibling `authService.getCached*()` calls that load the cached full name,
+province, municipalities and role.
+
+That effect is **not** an async function — it fires several independent
+`.then()` chains, and `setLoading(false)` is reached from three separate
+places (`settleOnce` at line 88, the `onAuthStateChange` listener at line
+131, and the boot timeout below them). There is therefore no async body to
+await hydration in, and no single point that gates rendering on it.
+
+Hydration is consequently fire-and-forget, matching the idiom of the
+cached-value loads it sits with. The accepted consequence: a report list
+that somehow rendered before a single AsyncStorage read completed would
+show `ENV` defaults, and nothing would re-render it. In practice the read
+is kicked off at app boot and report lists only mount after
+authentication and navigation to Home, so it resolves first by a wide
+margin.
+
+Restructuring that boot sequence to make the guarantee absolute was
+considered and rejected: it carries documented race conditions and a
+deliberate timeout (see `BOOT_TIMEOUT_MS`), and the failure it would
+prevent is a brief wrong-threshold flash on a first render, not a
+persistent wrong state — the next sync corrects it regardless.
 
 ## Migration
 
