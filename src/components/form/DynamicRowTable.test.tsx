@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, TextInput, TouchableOpacity } from 'react-native';
+import { Modal, Text, TextInput, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import TestRenderer from 'react-test-renderer';
 import { DynamicRowTable, DynamicColumn, DynamicRow } from './DynamicRowTable';
@@ -217,5 +217,241 @@ describe('DynamicRowTable behavior (unchanged by this task)', () => {
       removeBtn.props.onPress();
     });
     expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+describe('DynamicRowTable dependent (cascading) select columns', () => {
+  // A select column whose choices depend on another column in the same
+  // row — the water report's "Quality of Abstracted Water" picks a source
+  // (Surface Water / Ground Water) and then a specific one catered to it.
+  // The cascade lives here rather than at each call site so the create
+  // form and the edit screen cannot drift apart.
+  const SPECIFICS: Record<string, string[]> = {
+    'Surface Water': ['Lake', 'River', 'Seawater'],
+    'Ground Water': ['Deep well'],
+  };
+
+  const cascadingColumns: DynamicColumn[] = [
+    { key: 'source', label: 'Source', width: 120, type: 'select', options: ['Surface Water', 'Ground Water'] },
+    {
+      key: 'specify',
+      label: 'Specify',
+      width: 120,
+      type: 'select',
+      dependsOn: 'source',
+      options: (row) => SPECIFICS[row.source] ?? [],
+      placeholder: 'Select source first',
+    },
+  ];
+
+  // Both select cells share the space-between style the single-select
+  // helper above keys on; findAll keeps them in render order, so index 0
+  // is Source and index 1 is Specify.
+  const selectCells = (r: Renderer) =>
+    r.root.findAll((n) => n.type === TouchableOpacity && flattenStyle(n.props.style).justifyContent === 'space-between');
+
+  // Rows inside the picker sheet are the only touchables with a bottom
+  // border; they render in the order of the resolved options list.
+  const optionRows = (r: Renderer) =>
+    r.root.findAll((n) => n.type === TouchableOpacity && flattenStyle(n.props.style).borderBottomWidth === 1);
+
+  const optionLabels = (r: Renderer): string[] => {
+    const glyphs = iconGlyphTexts(r);
+    return r.root
+      .findAllByType(Text)
+      .filter((n) => !glyphs.has(n) && flattenStyle(n.props.style).fontSize === Type.bodySm.fontSize)
+      .map((n) => n.props.children as string);
+  };
+
+  it("resolves a dependent column's options from the row it belongs to", () => {
+    const r = render(
+      <DynamicRowTable columns={cascadingColumns} rows={[{ source: 'Ground Water', specify: '' }]} onChange={noop} />,
+    );
+    TestRenderer.act(() => {
+      selectCells(r)[1].props.onPress();
+    });
+    expect(optionLabels(r)).toEqual(['Deep well']);
+  });
+
+  it('offers each parent value its own catered options', () => {
+    const r = render(
+      <DynamicRowTable columns={cascadingColumns} rows={[{ source: 'Surface Water', specify: '' }]} onChange={noop} />,
+    );
+    TestRenderer.act(() => {
+      selectCells(r)[1].props.onPress();
+    });
+    expect(optionLabels(r)).toEqual(['Lake', 'River', 'Seawater']);
+  });
+
+  it('clears the dependent cell when its parent column changes', () => {
+    const onChange = jest.fn();
+    const r = render(
+      <DynamicRowTable columns={cascadingColumns} rows={[{ source: 'Surface Water', specify: 'River' }]} onChange={onChange} />,
+    );
+    TestRenderer.act(() => {
+      selectCells(r)[0].props.onPress();
+    });
+    TestRenderer.act(() => {
+      optionRows(r)[1].props.onPress();
+    });
+    expect(onChange).toHaveBeenCalledWith([{ source: 'Ground Water', specify: '' }]);
+  });
+
+  it('leaves the dependent cell alone when its parent is re-picked unchanged', () => {
+    const onChange = jest.fn();
+    const r = render(
+      <DynamicRowTable columns={cascadingColumns} rows={[{ source: 'Surface Water', specify: 'River' }]} onChange={onChange} />,
+    );
+    TestRenderer.act(() => {
+      selectCells(r)[0].props.onPress();
+    });
+    TestRenderer.act(() => {
+      optionRows(r)[0].props.onPress();
+    });
+    expect(onChange).toHaveBeenCalledWith([{ source: 'Surface Water', specify: 'River' }]);
+  });
+
+  it('disables a dependent select cell while its parent has no value', () => {
+    const r = render(
+      <DynamicRowTable columns={cascadingColumns} rows={[{ source: '', specify: '' }]} onChange={noop} />,
+    );
+    expect(selectCells(r)[1].props.disabled).toBe(true);
+    expect(selectCells(r)[0].props.disabled).toBe(false);
+  });
+
+  it('keeps the picker closed when a cell with no resolved options is pressed', () => {
+    const r = render(
+      <DynamicRowTable columns={cascadingColumns} rows={[{ source: '', specify: '' }]} onChange={noop} />,
+    );
+    TestRenderer.act(() => {
+      selectCells(r)[1].props.onPress();
+    });
+    expect(r.root.findByType(Modal).props.visible).toBe(false);
+  });
+});
+
+describe('DynamicRowTable combo columns (typeable dropdowns)', () => {
+  // A combo column is a select you can also type into: the picker offers
+  // the catered values, the input accepts anything else. Section 4C of the
+  // water report needs both — inspectors pick Lake/River/Seawater most
+  // days, but a source the list never anticipated still has to be
+  // recordable.
+  const SPECIFICS: Record<string, string[]> = {
+    'Surface Water': ['Lake', 'River', 'Seawater'],
+    'Ground Water': ['Deep well'],
+  };
+
+  const comboColumns: DynamicColumn[] = [
+    { key: 'source', label: 'Source', width: 130, type: 'combo', options: ['Surface Water', 'Ground Water'], placeholder: 'Select' },
+    {
+      key: 'specify',
+      label: 'Specify',
+      width: 130,
+      type: 'combo',
+      dependsOn: 'source',
+      options: (row) => SPECIFICS[row.source] ?? [],
+      placeholder: 'Select',
+    },
+  ];
+
+  // The chevron that opens the picker is the only touchable inside a combo
+  // cell; findAll keeps the two columns in render order.
+  const chevrons = (r: Renderer) =>
+    r.root.findAll(
+      (n) => n.type === TouchableOpacity && n.findAllByType(Ionicons).some((i) => i.props.name === 'chevron-down'),
+    );
+
+  const optionRows = (r: Renderer) =>
+    r.root.findAll((n) => n.type === TouchableOpacity && flattenStyle(n.props.style).borderBottomWidth === 1);
+
+  it('renders a typeable input holding the cell value', () => {
+    const r = render(
+      <DynamicRowTable columns={comboColumns} rows={[{ source: 'Surface Water', specify: 'River' }]} onChange={noop} />,
+    );
+    const inputs = r.root.findAllByType(TextInput);
+    expect(inputs).toHaveLength(2);
+    expect(inputs[0].props.value).toBe('Surface Water');
+    expect(inputs[1].props.value).toBe('River');
+  });
+
+  it('writes typed text through to the row', () => {
+    const onChange = jest.fn();
+    const r = render(
+      <DynamicRowTable columns={comboColumns} rows={[{ source: '', specify: '' }]} onChange={onChange} />,
+    );
+    TestRenderer.act(() => {
+      r.root.findAllByType(TextInput)[0].props.onChangeText('Irrigation canal');
+    });
+    expect(onChange).toHaveBeenCalledWith([{ source: 'Irrigation canal', specify: '' }]);
+  });
+
+  it('fills the cell from the picker sheet', () => {
+    const onChange = jest.fn();
+    const r = render(
+      <DynamicRowTable columns={comboColumns} rows={[{ source: 'Ground Water', specify: '' }]} onChange={onChange} />,
+    );
+    TestRenderer.act(() => {
+      chevrons(r)[1].props.onPress();
+    });
+    TestRenderer.act(() => {
+      optionRows(r)[0].props.onPress();
+    });
+    expect(onChange).toHaveBeenCalledWith([{ source: 'Ground Water', specify: 'Deep well' }]);
+  });
+
+  it('keeps the input live while the chevron has nothing to offer', () => {
+    const r = render(
+      <DynamicRowTable columns={comboColumns} rows={[{ source: '', specify: '' }]} onChange={noop} />,
+    );
+    expect(chevrons(r)[1].props.disabled).toBe(true);
+    expect(r.root.findAllByType(TextInput)[1].props.editable).not.toBe(false);
+  });
+
+  it('clears the dependent cell when the parent moves to a list that excludes it', () => {
+    const onChange = jest.fn();
+    const r = render(
+      <DynamicRowTable columns={comboColumns} rows={[{ source: 'Surface Water', specify: 'River' }]} onChange={onChange} />,
+    );
+    TestRenderer.act(() => {
+      chevrons(r)[0].props.onPress();
+    });
+    TestRenderer.act(() => {
+      optionRows(r)[1].props.onPress();
+    });
+    expect(onChange).toHaveBeenCalledWith([{ source: 'Ground Water', specify: '' }]);
+  });
+
+  it('preserves a typed dependent value when the parent goes off-list', () => {
+    const onChange = jest.fn();
+    const r = render(
+      <DynamicRowTable columns={comboColumns} rows={[{ source: 'Surface Water', specify: 'Fish pond' }]} onChange={onChange} />,
+    );
+    TestRenderer.act(() => {
+      r.root.findAllByType(TextInput)[0].props.onChangeText('Irrigation canal');
+    });
+    expect(onChange).toHaveBeenCalledWith([{ source: 'Irrigation canal', specify: 'Fish pond' }]);
+  });
+
+  it('preserves the dependent value when the parent still offers it', () => {
+    const onChange = jest.fn();
+    const r = render(
+      <DynamicRowTable columns={comboColumns} rows={[{ source: 'Surface Water', specify: 'River' }]} onChange={onChange} />,
+    );
+    TestRenderer.act(() => {
+      chevrons(r)[0].props.onPress();
+    });
+    TestRenderer.act(() => {
+      optionRows(r)[0].props.onPress();
+    });
+    expect(onChange).toHaveBeenCalledWith([{ source: 'Surface Water', specify: 'River' }]);
+  });
+
+  it('walks "next" from a combo cell to the following cell', () => {
+    const r = render(
+      <DynamicRowTable columns={comboColumns} rows={[{ source: '', specify: '' }]} onChange={noop} />,
+    );
+    const inputs = r.root.findAllByType(TextInput);
+    expect(inputs[0].props.returnKeyType).toBe('next');
+    expect(inputs[1].props.returnKeyType).toBe('done');
   });
 });

@@ -33,6 +33,8 @@ import {
   DOCUMENTS_REVIEWED_OPTIONS,
   WATER_SOURCE_TYPES,
   WASTEWATER_USE_TYPES,
+  ABSTRACTED_WATER_SOURCES,
+  abstractedWaterSourceSpecifics,
   WWTP_TYPE_OPTIONS,
   WWTP_CONDITION_OPTIONS,
 } from './waterChecklistData';
@@ -201,12 +203,23 @@ export const AbstractedWaterQualitySection: React.FC<{
       {section.editing ? (
         <DynamicRowTable
           columns={[
-            { key: 'source', label: 'Source', width: 120, placeholder: 'e.g. Deep well' },
+            // Combo, not select: the two lists cover the sources this office
+            // actually samples, but an inspector who meets one they don't
+            // name still has to be able to write it down.
+            { key: 'source', label: 'Source', width: 130, type: 'combo', options: ABSTRACTED_WATER_SOURCES, placeholder: 'Select' },
+            {
+              key: 'specify',
+              label: 'Specify',
+              width: 130,
+              type: 'combo',
+              dependsOn: 'source',
+              options: abstractedWaterSourceSpecifics,
+              placeholder: 'Select',
+            },
             { key: 'bod_cod', label: 'BOD/COD', width: 90, placeholder: 'mg/L' },
             { key: 'tss', label: 'TSS', width: 80, placeholder: 'mg/L' },
             { key: 'avfp', label: 'AVFP', width: 80, placeholder: 'mg/L' },
             { key: 'heavy_metal', label: 'Heavy Metal', width: 110, placeholder: 'mg/L' },
-            { key: 'specify', label: 'Specify', width: 120, placeholder: 'Details' },
           ]}
           rows={section.draft}
           onChange={rows => section.setDraft(rows)}
@@ -216,6 +229,7 @@ export const AbstractedWaterQualitySection: React.FC<{
         <SimpleTable
           columns={[
             { key: 'source', label: 'Source' },
+            { key: 'specify', label: 'Specify' },
             { key: 'bod_cod', label: 'BOD/COD' },
             { key: 'tss', label: 'TSS' },
             { key: 'heavy_metal', label: 'Heavy Metal' },
