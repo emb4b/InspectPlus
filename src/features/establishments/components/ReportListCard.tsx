@@ -43,7 +43,6 @@ function formatDate(iso: string): string {
 // EstablishmentCard's swipe-actions treatment.
 const ACTION_WIDTH = 72;
 const OPEN_THRESHOLD_RATIO = 0.4;
-const CHECKBOX_SIZE = 22;
 const ICON_BOX = 38;
 
 export const ReportListCard: React.FC<ReportListCardProps> = ({
@@ -58,6 +57,9 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
   onToggleSelect,
 }) => {
   const isSubmitted = item.status === 'submitted';
+  // `selected` is only meaningful inside selection mode — a stray true
+  // outside it must not turn the type tile into a checkmark.
+  const showAsSelected = selectable && selected;
   const urgency = getReportUrgency(item.date, item.status);
   // An unrecognized type still renders — a report written by a newer app
   // version shouldn't produce a blank row on an older one.
@@ -169,22 +171,30 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
                 asking the card for overflow:'hidden', which would fight the
                 Android elevation in Elevation.raised.
 
-                Suppressed in selection mode: the checkbox takes that corner,
-                and the band's diagonal crosses it. Urgency is still carried
-                there by the card's own border and background tint. */}
-            {!selectable && <UrgencyRibbon urgency={urgency} />}
+                It used to be suppressed in selection mode, when a separate
+                checkbox occupied this corner and the band crossed it. The
+                tile is the control now, so the corner is free and the Export
+                tab shows day counts like every other list. */}
+            <UrgencyRibbon urgency={urgency} />
 
-            {selectable && (
-              <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
-                {selected && <Ionicons name="checkmark" size={14} color={Colors.textWhite} />}
-              </View>
-            )}
-
-            <View style={[styles.iconWrap, { backgroundColor: display?.bgColor ?? Colors.bgLight }]}>
+            {/* The type tile doubles as the selection control. A separate
+                checkbox in front of it stacked two controls in the leading
+                gutter, growing it from 62px to 96px on a phone — and the
+                report type is still named by the title beside it, so the
+                glyph can yield to a checkmark while a row is picked. */}
+            <View
+              style={[
+                styles.iconWrap,
+                { backgroundColor: showAsSelected ? Colors.accent : display?.bgColor ?? Colors.bgLight },
+                // The ring the old checkbox wore. Without it an unselected
+                // tile is indistinguishable from a normal one and nothing
+                // says the row is pickable.
+                selectable && !showAsSelected && styles.iconWrapSelectable,
+              ]}>
               <Ionicons
-                name={display?.icon ?? 'document-outline'}
-                size={17}
-                color={display?.textColor ?? Colors.textMuted}
+                name={showAsSelected ? 'checkmark' : display?.icon ?? 'document-outline'}
+                size={showAsSelected ? 20 : 17}
+                color={showAsSelected ? Colors.textWhite : display?.textColor ?? Colors.textMuted}
               />
             </View>
 
@@ -376,19 +386,13 @@ const styles = StyleSheet.create({
     borderColor: Colors.hazwaste.border,
     backgroundColor: Colors.hazwaste.bg,
   },
-  checkbox: {
-    width: CHECKBOX_SIZE,
-    height: CHECKBOX_SIZE,
-    borderRadius: Radius.xs,
+  // Colors.border is too faint here to carry the affordance: on device a
+  // hairline that colour against a pale type tint is close to invisible, and
+  // the ring's whole job is to say "this row is pickable". textLight reads
+  // clearly on every one of the five tints without competing with the glyph.
+  iconWrapSelectable: {
     borderWidth: 1.5,
-    borderColor: Colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  checkboxChecked: {
-    backgroundColor: Colors.accent,
-    borderColor: Colors.accent,
+    borderColor: Colors.textLight,
   },
   iconWrap: {
     width: ICON_BOX,

@@ -158,9 +158,10 @@ const isPanGestureEnabled = (r: Renderer): boolean =>
   (r.root.findByType(GestureDetector).props as { gesture: { config: { enabled: boolean } } }).gesture
     .config.enabled;
 
-// Checkbox is a 22x22 View with a 4px border radius (CHECKBOX_SIZE /
-// Radius.xs in ReportListCard.tsx) — a shape no other View in the card
-// shares. Same throw-on-zero-or-multiple convention as findIconWrap.
+// The card used to carry a separate 22x22 checkbox View with a 4px radius in
+// front of the type tile. Nothing should match this shape any more — the tile
+// itself is the selection control now — so this locator exists to prove the
+// old element is gone rather than to find it.
 const findCheckboxes = (r: Renderer) => {
   const views = r.root.findAll((n) => (n.type as any)?.name === 'View' || n.type === View);
   return views.filter((n) => {
@@ -169,19 +170,11 @@ const findCheckboxes = (r: Renderer) => {
   });
 };
 
-const findCheckbox = (r: Renderer) => {
-  const matches = findCheckboxes(r);
-  if (matches.length === 0) {
-    throw new Error('No checkbox View found: expected a View with width===22, height===22, borderRadius===4');
-  }
-  if (matches.length > 1) {
-    throw new Error(`Expected 1 checkbox View but found ${matches.length}; the locator is not sufficiently specific`);
-  }
-  return matches[0];
-};
-
+// Matched by name alone: the checkmark now sizes to the tile it sits in, and
+// pinning a size here would break on any future tile resize without anything
+// actually being wrong.
 const findCheckmarkIcons = (r: Renderer) =>
-  r.root.findAllByType(Ionicons).filter((n) => n.props.name === 'checkmark' && n.props.size === 14);
+  r.root.findAllByType(Ionicons).filter((n) => n.props.name === 'checkmark');
 
 // Locate the ordered list of the card body's real JSX children — titleRow,
 // metaRow, dateRow (which now also carries the control number as one of its
@@ -413,65 +406,65 @@ const ownedDraftInspection: AllReportItem = {
 };
 
 describe('ReportListCard selection mode', () => {
-  it('renders no checkbox when not selectable', () => {
+  // Selection used to add a 22px checkbox in front of the report-type tile,
+  // stacking two controls in the leading gutter and growing it from 62px to
+  // 96px. The tile is now the control itself, so the gutter is the same width
+  // in both modes.
+  const renderSelectable = (selected: boolean) =>
+    render(
+      <ReportListCard
+        item={ownedDraftInspection}
+        currentUid="uid-1"
+        canManageAll={false}
+        selectable
+        selected={selected}
+        onPress={noop}
+        onEdit={noop}
+        onDelete={noop}
+        onToggleSelect={noop}
+      />,
+    );
+
+  it('adds no separate checkbox in selection mode — the type tile is the control', () => {
+    expect(findCheckboxes(renderSelectable(false))).toHaveLength(0);
+    expect(findCheckboxes(renderSelectable(true))).toHaveLength(0);
+  });
+
+  it('leaves the tile completely untouched when not selectable', () => {
     const r = render(
       <ReportListCard item={ownedDraftInspection} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
     );
-    expect(findCheckboxes(r)).toHaveLength(0);
-  });
-
-  it('renders a checkbox when selectable', () => {
-    const r = render(
-      <ReportListCard
-        item={ownedDraftInspection}
-        currentUid="uid-1"
-        canManageAll={false}
-        selectable
-        onPress={noop}
-        onEdit={noop}
-        onDelete={noop}
-        onToggleSelect={noop}
-      />,
-    );
-    expect(findCheckbox(r)).toBeDefined();
-  });
-
-  it('renders the checkbox unchecked, distinctly from the checked state, when selected is false', () => {
-    const r = render(
-      <ReportListCard
-        item={ownedDraftInspection}
-        currentUid="uid-1"
-        canManageAll={false}
-        selectable
-        selected={false}
-        onPress={noop}
-        onEdit={noop}
-        onDelete={noop}
-        onToggleSelect={noop}
-      />,
-    );
-    const checkboxStyle = flattenStyle(findCheckbox(r).props.style);
-    expect(checkboxStyle.backgroundColor).not.toBe(Colors.accent);
+    const tile = flattenStyle(findIconWrap(r).props.style);
+    expect(tile.borderWidth).toBeUndefined();
+    expect(tile.backgroundColor).not.toBe(Colors.accent);
     expect(findCheckmarkIcons(r)).toHaveLength(0);
   });
 
-  it('renders the checkbox checked, distinctly from the unchecked state, when selected is true', () => {
-    const r = render(
-      <ReportListCard
-        item={ownedDraftInspection}
-        currentUid="uid-1"
-        canManageAll={false}
-        selectable
-        selected
-        onPress={noop}
-        onEdit={noop}
-        onDelete={noop}
-        onToggleSelect={noop}
-      />,
-    );
-    const checkboxStyle = flattenStyle(findCheckbox(r).props.style);
-    expect(checkboxStyle.backgroundColor).toBe(Colors.accent);
+  // The ring is what the old checkbox wore. Without it an unselected tile in
+  // selection mode is indistinguishable from a normal one, and nothing on the
+  // card says it is tappable state.
+  it('rings the tile but keeps the type glyph when selectable and unselected', () => {
+    const r = renderSelectable(false);
+    const tile = flattenStyle(findIconWrap(r).props.style);
+
+    expect(tile.borderWidth).toBe(1.5);
+    // Not Colors.border — that hairline is close to invisible on a pale type
+    // tint, confirmed on device, and the ring is the only thing saying the
+    // row is pickable.
+    expect(tile.borderColor).toBe(Colors.textLight);
+    expect(tile.backgroundColor).not.toBe(Colors.accent);
+    expect(findCheckmarkIcons(r)).toHaveLength(0);
+    expect(findReportIcon(r)).toBeDefined();
+  });
+
+  it('flips the tile to an accent checkmark when selected', () => {
+    const r = renderSelectable(true);
+    const tile = flattenStyle(findIconWrap(r).props.style);
+
+    expect(tile.backgroundColor).toBe(Colors.accent);
     expect(findCheckmarkIcons(r)).toHaveLength(1);
+    // The ring would double up with the filled state.
+    expect(tile.borderWidth).toBeUndefined();
   });
 
   it('opens the report on press when not selectable, and never touches onToggleSelect', () => {
@@ -1062,9 +1055,11 @@ describe('ReportListCard urgency ribbon', () => {
     expect(chipLabels(r)).toContain('Draft');
   });
 
-  // The checkbox occupies the same corner in selection mode and the band's
-  // diagonal would cross it. The card's own tint still carries urgency there.
-  it('suppresses the ribbon in selection mode, where the checkbox takes that corner', () => {
+  // The ribbon was briefly suppressed in selection mode, back when a separate
+  // checkbox sat in this corner and the band crossed it. The type tile is the
+  // selection control now, so the corner is free and the Export tab gets the
+  // same day counts as every other list.
+  it('still shows the ribbon in selection mode', () => {
     const item: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(45) };
     const r = render(
       <ReportListCard
@@ -1078,10 +1073,8 @@ describe('ReportListCard urgency ribbon', () => {
         onToggleSelect={noop}
       />,
     );
-    expect(findRibbon(r)).toBeUndefined();
-    // ...but the card still reads as overdue.
-    const cardStyle = flattenStyle(findCard(r, item).props.style);
-    expect(cardStyle.borderColor).toBe(Colors.hazwaste.border);
+    expect(findRibbon(r)).toBeDefined();
+    expect(bandLabel(r)).toBe('15d late');
   });
 
   it('shows no ribbon on a draft that is not flagged', () => {
