@@ -1,22 +1,19 @@
 import { getReportUrgency } from './reportUrgency';
 
-// The thresholds now come from ENV rather than module-local constants, so the
-// tests drive them through a mutable mock instead of hard-coding 14/30 —
-// that's the whole point of moving them into config. jest.mock factories may
-// only close over out-of-scope names prefixed with `mock`.
-const mockEnv = { dueSoonDays: 14, overdueDays: 30 };
-jest.mock('../core/config/env', () => ({
-  get ENV() {
-    return mockEnv;
-  },
+// The thresholds now come from the config module rather than ENV directly,
+// so the tests drive them through a mutable mock of that module. jest.mock
+// factories may only close over out-of-scope names prefixed with `mock`.
+const mockThresholds = { dueSoonDays: 14, overdueDays: 30 };
+jest.mock('../services/config/urgencyConfig', () => ({
+  getUrgencyConfig: () => mockThresholds,
 }));
 
 const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
 describe('getReportUrgency', () => {
   beforeEach(() => {
-    mockEnv.dueSoonDays = 14;
-    mockEnv.overdueDays = 30;
+    mockThresholds.dueSoonDays = 14;
+    mockThresholds.overdueDays = 30;
   });
 
   it('never flags a submitted report, however old it is', () => {
@@ -45,14 +42,14 @@ describe('getReportUrgency', () => {
     expect(getReportUrgency(daysAgo(30), 'draft')).toEqual({ level: 'overdue', days: 0 });
   });
 
-  it('takes the due-soon threshold from config, not a hard-coded 14', () => {
-    mockEnv.dueSoonDays = 5;
+  it('takes the due-soon threshold from runtime config, not a hard-coded 14', () => {
+    mockThresholds.dueSoonDays = 5;
     // A 6-day-old draft is unflagged under the default 14 but due soon at 5.
     expect(getReportUrgency(daysAgo(6), 'draft')).toEqual({ level: 'due-soon', days: 24 });
   });
 
-  it('takes the overdue threshold from config, not a hard-coded 30', () => {
-    mockEnv.overdueDays = 20;
+  it('takes the overdue threshold from runtime config, not a hard-coded 30', () => {
+    mockThresholds.overdueDays = 20;
     // A 25-day-old draft is only due-soon under the default 30, overdue at 20.
     expect(getReportUrgency(daysAgo(25), 'draft')).toEqual({ level: 'overdue', days: 5 });
   });

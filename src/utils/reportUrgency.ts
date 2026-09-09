@@ -1,4 +1,4 @@
-import { ENV } from '../core/config/env';
+import { getUrgencyConfig } from '../services/config/urgencyConfig';
 
 export type ReportUrgencyLevel = 'overdue' | 'due-soon' | 'none';
 
@@ -15,15 +15,15 @@ const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 // Draft reports that sit too long after the inspection date risk missing
 // filing deadlines. Submitted reports are already filed, so they're never
-// flagged regardless of age. Both windows are configured per environment and
-// overridable from .env — see EXPO_PUBLIC_DUE_SOON_DAYS / EXPO_PUBLIC_OVERDUE_DAYS.
+// flagged regardless of age. Both windows are operator-controlled — see
+// src/services/config/urgencyConfig.ts for how they resolve.
 export function getReportUrgency(dateIso: string, status: string | null): ReportUrgency {
   if (status === 'submitted') return NONE;
 
   const inspectionDate = new Date(dateIso).getTime();
   if (Number.isNaN(inspectionDate)) return NONE;
 
-  const { dueSoonDays, overdueDays } = ENV;
+  const { dueSoonDays, overdueDays } = getUrgencyConfig();
   const daysSince = (Date.now() - inspectionDate) / MS_PER_DAY;
 
   // Floor: the deadline day itself reads as "Overdue", and only a full day
