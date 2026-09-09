@@ -122,7 +122,7 @@ export function emptyWaterComplianceForm(): WaterComplianceFormState {
   return {
     waterSources: [{ source_type: '', daily_m3: '', annual_m3: '', specify: '' }],
     wastewaterSources: [{ use_type: '', consumed_m3_day: '', generated_m3_day: '', outlet_info: '' }],
-    abstractedWaterQuality: [{ source: '', bod_cod: '', tss: '', avfp: '', heavy_metal: '', specify: '' }],
+    abstractedWaterQuality: [{ source: '', specify: '', bod_cod: '', tss: '', avfp: '', heavy_metal: '' }],
     hasWwtp: null,
     wwtpType: '',
     wwtpDetails: [],

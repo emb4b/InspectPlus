@@ -24,7 +24,15 @@ export interface DynamicColumn {
   label: string;
   width: number;
   type?: 'text' | 'number' | 'select';
-  options?: string[];
+  // A function here makes the column's choices depend on the rest of its
+  // own row - the caller receives the row and returns the options catered
+  // to it. Pair it with `dependsOn` so the cascade also knows which
+  // column invalidates this one.
+  options?: string[] | ((row: DynamicRow) => string[]);
+  // Key of the column this one's options are catered to. When that column
+  // changes, this cell is cleared (see updateCell) because the value it
+  // held is no longer among the choices on offer.
+  dependsOn?: string;
   placeholder?: string;
 }
 
@@ -35,6 +43,12 @@ interface DynamicRowTableProps {
   rows: DynamicRow[];
   onChange: (rows: DynamicRow[]) => void;
   addLabel?: string;
+}
+
+// Static `options` and row-dependent ones collapse to one list here, so
+// neither the cell nor the picker sheet has to know which kind it got.
+function resolveOptions(column: DynamicColumn, row: DynamicRow): string[] {
+  return (typeof column.options === 'function' ? column.options(row) : column.options) ?? [];
 }
 
 function emptyRow(columns: DynamicColumn[]): DynamicRow {
@@ -79,7 +93,18 @@ export const DynamicRowTable: React.FC<DynamicRowTableProps> = ({
 
   const updateCell = (rowIndex: number, key: string, value: string) => {
     const next = rows.slice();
-    next[rowIndex] = { ...next[rowIndex], [key]: value };
+    const row = { ...next[rowIndex], [key]: value };
+    // A dependent column's choices are catered to its parent's value, so
+    // changing the parent strands whatever the dependent cell held - it is
+    // no longer on offer. Clear it rather than leave a contradictory pair
+    // behind. Guarded on an actual change so re-picking the same parent
+    // value (an easy accidental tap) doesn't wipe the row's own answer.
+    if (next[rowIndex]?.[key] !== value) {
+      columns.forEach(col => {
+        if (col.dependsOn === key) row[col.key] = '';
+      });
+    }
+    next[rowIndex] = row;
     onChange(next);
   };
 
@@ -124,6 +149,12 @@ export const DynamicRowTable: React.FC<DynamicRowTableProps> = ({
             <View key={rowIndex} style={styles.dataRow}>
               {columns.map(col => {
                 const key = cellKey(rowIndex, col.key);
+                // Empty for a dependent column whose parent is still
+                // unanswered: there is nothing to choose from yet, so the
+                // cell stays inert and shows its placeholder instead of
+                // opening an empty sheet.
+                const options = col.type === 'select' ? resolveOptions(col, row) : [];
+                const canPick = options.length > 0;
                 const isLastFocusable =
                   focusableCells.length > 0 &&
                   focusableCells[focusableCells.length - 1].rowIndex === rowIndex &&
@@ -132,8 +163,9 @@ export const DynamicRowTable: React.FC<DynamicRowTableProps> = ({
                   <View key={col.key} style={[styles.cellWrap, { width: col.width }]}>
                     {col.type === 'select' ? (
                       <TouchableOpacity
-                        style={styles.selectCell}
-                        onPress={() => setPickerFor({ rowIndex, column: col })}>
+                        style={[styles.selectCell, !canPick && styles.selectCellInert]}
+                        disabled={!canPick}
+                        onPress={() => canPick && setPickerFor({ rowIndex, column: col })}>
                         <AppText
                           variant="single"
                           text={row[col.key] || col.placeholder || '—'}
@@ -190,7 +222,7 @@ export const DynamicRowTable: React.FC<DynamicRowTableProps> = ({
           <TouchableOpacity activeOpacity={1} style={styles.sheet} onPress={() => {}}>
             <Text style={styles.sheetTitle}>{pickerFor?.column.label}</Text>
             <FlatList
-              data={pickerFor?.column.options ?? []}
+              data={pickerFor ? resolveOptions(pickerFor.column, rows[pickerFor.rowIndex] ?? {}) : []}
               keyExtractor={item => item}
               renderItem={({ item }) => (
                 <TouchableOpacity
@@ -280,6 +312,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.sm,
     backgroundColor: Colors.white,
+  },
+  // A dependent cell whose parent is still blank. Muted like a disabled
+  // control so the row reads as "answer the column to my left first"
+  // rather than as a field that simply refuses to open.
+  selectCellInert: {
+    backgroundColor: Colors.bgMuted,
+    borderColor: Colors.borderLight,
   },
   // Type.tabular, not Type.body - same fixed-width-column reasoning as
   // headerCell/cellInput. This is the guard: promoting this to Type.body

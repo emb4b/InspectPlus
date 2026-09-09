@@ -20,6 +20,8 @@ import {
   DOCUMENTS_REVIEWED_OPTIONS,
   WATER_SOURCE_TYPES,
   WASTEWATER_USE_TYPES,
+  ABSTRACTED_WATER_SOURCES,
+  abstractedWaterSourceSpecifics,
   WWTP_TYPE_OPTIONS,
   WWTP_CONDITION_OPTIONS,
 } from './waterChecklistData';
@@ -197,12 +199,20 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
           <FormSection icon="flask-outline" title="C. Quality of Abstracted Water">
             <DynamicRowTable
               columns={[
-                { key: 'source', label: 'Source', width: 120, placeholder: 'e.g. Deep well' },
+                { key: 'source', label: 'Source', width: 130, type: 'select', options: ABSTRACTED_WATER_SOURCES, placeholder: 'Select source' },
+                {
+                  key: 'specify',
+                  label: 'Specify',
+                  width: 130,
+                  type: 'select',
+                  dependsOn: 'source',
+                  options: abstractedWaterSourceSpecifics,
+                  placeholder: 'Select source first',
+                },
                 { key: 'bod_cod', label: 'BOD/COD', width: 90, placeholder: 'mg/L' },
                 { key: 'tss', label: 'TSS', width: 80, placeholder: 'mg/L' },
                 { key: 'avfp', label: 'AVFP', width: 80, placeholder: 'mg/L' },
                 { key: 'heavy_metal', label: 'Heavy Metal', width: 110, placeholder: 'mg/L' },
-                { key: 'specify', label: 'Specify', width: 120, placeholder: 'Details' },
               ]}
               rows={value.abstractedWaterQuality}
               onChange={abstractedWaterQuality => set('abstractedWaterQuality', abstractedWaterQuality)}

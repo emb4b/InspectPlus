@@ -37,6 +37,29 @@ export const WASTEWATER_USE_TYPES = [
   'Others',
 ];
 
+// Section 4C (Quality of Abstracted Water) asks where the sampled water was
+// drawn from in two steps: the broad source, then the specific one catered
+// to it. Kept as a category -> options map so DynamicRowTable's `dependsOn`
+// cascade can resolve the second dropdown from the first. Deliberately
+// separate from WATER_SOURCE_TYPES above, which answers a different
+// question in 4A (every supply the site draws on, utilities and recycled
+// water included) - only abstracted water is sampled here.
+export const ABSTRACTED_WATER_SOURCES = ['Surface Water', 'Ground Water'];
+
+export const ABSTRACTED_WATER_SOURCE_SPECIFICS: Record<string, string[]> = {
+  'Surface Water': ['Lake', 'River', 'Seawater'],
+  'Ground Water': ['Deep well'],
+};
+
+// The `options` resolver both 4C tables (create form and edit screen) hand
+// to DynamicRowTable. Shared so the row key the cascade reads from lives in
+// one place rather than being restated at each call site. An unrecognised
+// source - including the free text older reports stored here before this
+// was a dropdown - yields no choices, leaving that cell inert until the
+// source is re-picked.
+export const abstractedWaterSourceSpecifics = (row: Record<string, string>): string[] =>
+  ABSTRACTED_WATER_SOURCE_SPECIFICS[row.source] ?? [];
+
 export const WWTP_TYPE_OPTIONS = ['Physical', 'Biological', 'Chemical', 'Combined', 'Others'];
 
 export const WWTP_CONDITION_OPTIONS = [
