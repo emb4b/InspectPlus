@@ -5,7 +5,7 @@ import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-na
 import { Ionicons } from '@expo/vector-icons';
 import { AppText } from '../../../components/AppText';
 import { Badge } from '../../../components/Badge';
-import { UrgencyBadge, URGENCY_BADGE_RESERVED_TOP } from '../../../components/UrgencyBadge';
+import { UrgencyBadge } from '../../../components/UrgencyBadge';
 import { REPORT_TYPE_DISPLAY, ReportDataKey } from '../../../constants/reportTypeDisplay';
 import { Colors } from '../../../design/colors';
 import { Duration } from '../../../design/motion';
@@ -159,17 +159,12 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
               styles.card,
               urgency.level === 'overdue' && styles.cardOverdue,
               urgency.level === 'due-soon' && styles.cardDueSoon,
-              // The corner chip sits in the card's own top padding band, so
-              // the band has to grow to make room for it.
-              urgency.level !== 'none' && styles.cardFlagged,
             ]}
             onPress={handleCardPress}
             activeOpacity={0.75}
             accessibilityRole={selectable ? 'checkbox' : 'button'}
             accessibilityLabel={`${item.title} for ${item.estabName}`}
             accessibilityState={selectable ? { checked: selected } : undefined}>
-            <UrgencyBadge urgency={urgency} />
-
             {selectable && (
               <View style={[styles.checkbox, selected && styles.checkboxChecked]}>
                 {selected && <Ionicons name="checkmark" size={14} color={Colors.textWhite} />}
@@ -192,11 +187,19 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
                   style={styles.title}
                   containerStyle={styles.titleContainer}
                 />
-                {item.status && (
-                  <Badge
-                    label={isSubmitted ? 'Submitted' : 'Draft'}
-                    tone={isSubmitted ? 'success' : 'warning'}
-                  />
+                {/* One badge, one slot. A flagged report is always a draft —
+                    getReportUrgency never flags a submitted one — so an
+                    urgency chip alongside a "Draft" chip said the same thing
+                    twice while costing the row width the title needs. */}
+                {urgency.level !== 'none' ? (
+                  <UrgencyBadge urgency={urgency} />
+                ) : (
+                  item.status && (
+                    <Badge
+                      label={isSubmitted ? 'Submitted' : 'Draft'}
+                      tone={isSubmitted ? 'success' : 'warning'}
+                    />
+                  )
                 )}
               </View>
 
@@ -369,11 +372,6 @@ const styles = StyleSheet.create({
   cardOverdue: {
     borderColor: Colors.hazwaste.border,
     backgroundColor: Colors.hazwaste.bg,
-  },
-  // Reserves the band the corner chip occupies, so it can never overlap the
-  // title row or the Draft/Submitted badge sharing that corner.
-  cardFlagged: {
-    paddingTop: URGENCY_BADGE_RESERVED_TOP,
   },
   checkbox: {
     width: CHECKBOX_SIZE,

@@ -6,7 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppText } from '../../../components/AppText';
 import { Button } from '../../../components/Button';
 import { EmptyState } from '../../../components/EmptyState';
-import { UrgencyBadge, URGENCY_BADGE_RESERVED_TOP } from '../../../components/UrgencyBadge';
+import { UrgencyBadge } from '../../../components/UrgencyBadge';
 import { REPORT_TYPE_DISPLAY, ReportDataKey } from '../../../constants/reportTypeDisplay';
 import { Colors } from '../../../design/colors';
 import { Duration } from '../../../design/motion';
@@ -121,16 +121,11 @@ const ReportRow: React.FC<{
               styles.row,
               urgency.level === 'overdue' && styles.rowOverdue,
               urgency.level === 'due-soon' && styles.rowDueSoon,
-              // The corner chip sits in the row's own top padding band, so
-              // the band has to grow to make room for it.
-              urgency.level !== 'none' && styles.rowFlagged,
             ]}
             onPress={handlePress}
             activeOpacity={0.75}
             accessibilityRole="button"
             accessibilityLabel={item.title}>
-            <UrgencyBadge urgency={urgency} />
-
             <View style={[styles.iconWrap, { backgroundColor: display?.bgColor ?? Colors.bgLight }]}>
               <Ionicons
                 name={display?.icon ?? 'document-outline'}
@@ -139,7 +134,19 @@ const ReportRow: React.FC<{
               />
             </View>
             <View style={styles.content}>
-              <AppText variant="marquee" text={item.title} style={styles.title} />
+              {/* The urgency chip shares the title's line rather than taking
+                  a band of its own above the row — matches ReportListCard's
+                  titleRow, minus the Draft/Submitted chip this row has never
+                  shown. */}
+              <View style={styles.titleRow}>
+                <AppText
+                  variant="marquee"
+                  text={item.title}
+                  style={styles.title}
+                  containerStyle={styles.titleContainer}
+                />
+                <UrgencyBadge urgency={urgency} />
+              </View>
               <View style={styles.dateRow}>
                 <Ionicons name="calendar-outline" size={10} color={Colors.textMuted} />
                 <Text style={styles.date}>{formatDate(item.date)}</Text>
@@ -337,11 +344,6 @@ const styles = StyleSheet.create({
     borderColor: Colors.hazwaste.border,
     backgroundColor: Colors.hazwaste.bg,
   },
-  // Reserves the band the corner chip occupies, so it can never overlap the
-  // title sharing that corner.
-  rowFlagged: {
-    paddingTop: URGENCY_BADGE_RESERVED_TOP,
-  },
   iconWrap: {
     width: 38,
     height: 38,
@@ -353,6 +355,16 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     minWidth: 0,
+  },
+  // Mirrors ReportListCard's titleRow so the two lists' rows stay aligned.
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+  },
+  titleContainer: {
+    flex: 1,
   },
   // Matches ReportListCard's "title" token choice.
   title: {

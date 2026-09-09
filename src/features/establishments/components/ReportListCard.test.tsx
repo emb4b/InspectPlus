@@ -4,7 +4,6 @@ import { GestureDetector } from 'react-native-gesture-handler';
 import { Ionicons } from '@expo/vector-icons';
 import TestRenderer from 'react-test-renderer';
 import { ReportListCard } from './ReportListCard';
-import { URGENCY_BADGE_RESERVED_TOP } from '../../../components/UrgencyBadge';
 import { Colors } from '../../../design/colors';
 import { Radius } from '../../../design/radius';
 import { Spacing } from '../../../design/spacing';
@@ -1017,73 +1016,102 @@ describe('ReportListCard date + control number row', () => {
 // date and the control number for a single line's width. It is now a corner
 // chip pinned to the card itself, shared with EstablishmentReportsSection via
 // the UrgencyBadge component.
-describe('ReportListCard urgency corner badge', () => {
+describe('ReportListCard urgency badge', () => {
   const daysAgo = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 
-  // Radius.pill alone would also match the Draft/Submitted Badge; only the
-  // urgency chip positions itself absolutely.
-  const findCornerBadge = (r: Renderer) => {
+  const renderCard = (item: AllReportItem) =>
+    render(
+      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+
+  // The urgency chip and the Draft/Submitted Badge share one slot and are
+  // deliberately the same shape — and a due-soon chip resolves the very same
+  // warning palette as the Draft chip — so neither shape nor colour can tell
+  // them apart. Only UrgencyBadge carries accessibility props (it spells its
+  // abbreviated label out for screen readers); Badge.tsx sets none.
+  const findUrgencyBadge = (r: Renderer) => {
     const views = r.root.findAll((n) => (n.type as any)?.name === 'View' || n.type === View);
     const matches = views.filter((n) => {
       const flattened = flattenStyle(n.props.style);
-      return flattened.position === 'absolute' && flattened.borderRadius === Radius.pill;
+      return flattened.borderRadius === Radius.pill && n.props.accessibilityRole === 'text';
     });
     if (matches.length > 1) {
-      throw new Error(`Expected at most 1 corner badge but found ${matches.length}`);
+      throw new Error(`Expected at most 1 urgency badge but found ${matches.length}`);
     }
     return matches[0];
   };
 
-  it('pins the badge to the card rather than threading it through the date row', () => {
-    const item: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(45) };
-    const r = render(
-      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
-    );
+  const badgeLabels = (r: Renderer) => proseTexts(r).map((n) => n.props.children);
 
-    const badge = findCornerBadge(r);
+  it('renders the badge in the title row, not the date row', () => {
+    const item: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(45) };
+    const r = renderCard(item);
+
+    const badge = findUrgencyBadge(r);
     expect(badge).toBeDefined();
 
-    // Inside the card surface...
-    expect(findCard(r, item).findAll((n) => n === badge)).toHaveLength(1);
-    // ...but no longer one of the date row's own children.
+    // It lives inside the title row — the same row that holds the report
+    // title and, on an unflagged card, the Draft/Submitted chip.
+    // justifyContent 'space-between' is unique to that row within the card.
+    // Asserted as containment rather than a direct parent link because RN's
+    // View is a forwardRef around its own host layer, so the styled node and
+    // the badge are never adjacent in the fiber tree (see findContentChildren
+    // above for the same caveat).
+    const titleRows = r.root
+      .findAll((n) => (n.type as any)?.name === 'View' || n.type === View)
+      .filter((n) => flattenStyle(n.props.style).justifyContent === 'space-between');
+    expect(titleRows.length).toBeGreaterThan(0);
+    expect(titleRows.some((row) => row.findAll((n) => n === badge).length === 1)).toBe(true);
+
+    // And it is nowhere near the date row, which is what it used to crowd.
     const calendarIcon = r.root.findAllByType(Ionicons).find((n) => n.props.name === 'calendar-outline');
     expect(calendarIcon!.parent!.children).not.toContain(badge);
   });
 
-  it('counts the days past the deadline in the label', () => {
-    const item: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(45) };
-    const r = render(
-      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
-    );
-    expect(proseTexts(r).some((n) => n.props.children === 'Overdue by 15 days')).toBe(true);
+  it('counts the days past the deadline compactly', () => {
+    const r = renderCard({ ...baseItem, status: 'draft', date: daysAgo(45) });
+    expect(badgeLabels(r)).toContain('15d overdue');
   });
 
-  it('counts the days of runway left for a due-soon draft', () => {
-    const item: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(15) };
-    const r = render(
-      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
-    );
-    expect(proseTexts(r).some((n) => n.props.children === 'Due in 15 days')).toBe(true);
+  it('counts the days of runway left compactly', () => {
+    const r = renderCard({ ...baseItem, status: 'draft', date: daysAgo(15) });
+    expect(badgeLabels(r)).toContain('Due in 15d');
   });
 
-  it('reserves top padding on a flagged card so the chip never lands on the title row', () => {
+  // The point of the whole change: the badge used to sit in a reserved band
+  // of top padding, which made every flagged card taller than a calm one for
+  // no informational gain.
+  it('costs a flagged card no extra height over a calm one', () => {
     const flagged: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(45) };
-    const r = render(
-      <ReportListCard item={flagged} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
-    );
-    expect(flattenStyle(findCard(r, flagged).props.style).paddingTop).toBe(URGENCY_BADGE_RESERVED_TOP);
+    const calm: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(2) };
+
+    const flaggedStyle = flattenStyle(findCard(renderCard(flagged), flagged).props.style);
+    const calmStyle = flattenStyle(findCard(renderCard(calm), calm).props.style);
+
+    expect(flaggedStyle.paddingTop).toBeUndefined();
+    expect(flaggedStyle.padding).toBe(Spacing.md);
+    expect(flaggedStyle.padding).toBe(calmStyle.padding);
   });
 
-  it('leaves an unflagged card on its usual padding', () => {
-    const calm: AllReportItem = { ...baseItem, status: 'draft', date: daysAgo(2) };
-    const r = render(
-      <ReportListCard item={calm} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
-    );
-    expect(findCornerBadge(r)).toBeUndefined();
-    const style = flattenStyle(findCard(r, calm).props.style);
-    // No reserved band, and the card keeps its uniform padding.
-    expect(style.paddingTop).toBeUndefined();
-    expect(style.padding).toBe(Spacing.md);
+  // A flagged report can only be a draft, so showing both chips said the same
+  // thing twice and cost the title row width it did not have.
+  it('replaces the Draft chip rather than sitting beside it', () => {
+    const r = renderCard({ ...baseItem, status: 'draft', date: daysAgo(45) });
+    const labels = badgeLabels(r);
+    expect(labels).toContain('15d overdue');
+    expect(labels).not.toContain('Draft');
+  });
+
+  it('keeps the Draft chip on a draft that is not flagged', () => {
+    const r = renderCard({ ...baseItem, status: 'draft', date: daysAgo(2) });
+    expect(findUrgencyBadge(r)).toBeUndefined();
+    expect(badgeLabels(r)).toContain('Draft');
+  });
+
+  it('keeps the Submitted chip on a submitted report, however old', () => {
+    const r = renderCard({ ...baseItem, status: 'submitted', date: daysAgo(400) });
+    expect(findUrgencyBadge(r)).toBeUndefined();
+    expect(badgeLabels(r)).toContain('Submitted');
   });
 
   it('still tints the whole card by urgency level', () => {
@@ -1112,11 +1140,4 @@ describe('ReportListCard urgency corner badge', () => {
     expect(dueSoonCard.backgroundColor).toBe(Colors.warning.bg);
   });
 
-  it('shows no badge for a submitted report however old it is', () => {
-    const item: AllReportItem = { ...baseItem, status: 'submitted', date: daysAgo(400) };
-    const r = render(
-      <ReportListCard item={item} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
-    );
-    expect(findCornerBadge(r)).toBeUndefined();
-  });
 });
