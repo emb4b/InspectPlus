@@ -23,15 +23,18 @@ export interface DynamicColumn {
   key: string;
   label: string;
   width: number;
-  type?: 'text' | 'number' | 'select';
+  // 'select' is pick-only; 'combo' is the same picker over a live text
+  // input, for lists that cannot anticipate every real-world answer.
+  type?: 'text' | 'number' | 'select' | 'combo';
   // A function here makes the column's choices depend on the rest of its
   // own row - the caller receives the row and returns the options catered
   // to it. Pair it with `dependsOn` so the cascade also knows which
   // column invalidates this one.
   options?: string[] | ((row: DynamicRow) => string[]);
   // Key of the column this one's options are catered to. When that column
-  // changes, this cell is cleared (see updateCell) because the value it
-  // held is no longer among the choices on offer.
+  // changes to something whose catered list excludes the value held here,
+  // this cell is cleared - see updateCell for why that is narrower than
+  // "cleared whenever the parent changes".
   dependsOn?: string;
   placeholder?: string;
 }
@@ -94,14 +97,20 @@ export const DynamicRowTable: React.FC<DynamicRowTableProps> = ({
   const updateCell = (rowIndex: number, key: string, value: string) => {
     const next = rows.slice();
     const row = { ...next[rowIndex], [key]: value };
-    // A dependent column's choices are catered to its parent's value, so
-    // changing the parent strands whatever the dependent cell held - it is
-    // no longer on offer. Clear it rather than leave a contradictory pair
-    // behind. Guarded on an actual change so re-picking the same parent
-    // value (an easy accidental tap) doesn't wipe the row's own answer.
+    // Changing a parent can strand what its dependent cell holds, so clear
+    // it - but only when the new parent value actually contradicts it. Two
+    // cases must survive, and both are real: re-picking the same parent
+    // (an easy accidental tap), and a parent typed off-list, which offers
+    // no catered list at all. The second is why this can't simply clear on
+    // every change - a parent combo fires per keystroke, so that rule
+    // would wipe the dependent answer the moment you edited the parent.
     if (next[rowIndex]?.[key] !== value) {
       columns.forEach(col => {
-        if (col.dependsOn === key) row[col.key] = '';
+        if (col.dependsOn !== key) return;
+        const held = row[col.key];
+        if (!held) return;
+        const offered = resolveOptions(col, row);
+        if (offered.length > 0 && !offered.includes(held)) row[col.key] = '';
       });
     }
     next[rowIndex] = row;
@@ -153,7 +162,8 @@ export const DynamicRowTable: React.FC<DynamicRowTableProps> = ({
                 // unanswered: there is nothing to choose from yet, so the
                 // cell stays inert and shows its placeholder instead of
                 // opening an empty sheet.
-                const options = col.type === 'select' ? resolveOptions(col, row) : [];
+                const options =
+                  col.type === 'select' || col.type === 'combo' ? resolveOptions(col, row) : [];
                 const canPick = options.length > 0;
                 const isLastFocusable =
                   focusableCells.length > 0 &&
@@ -175,6 +185,35 @@ export const DynamicRowTable: React.FC<DynamicRowTableProps> = ({
                         />
                         <Ionicons name="chevron-down" size={12} color={Colors.textMuted} />
                       </TouchableOpacity>
+                    ) : col.type === 'combo' ? (
+                      <View style={styles.comboCell}>
+                        <TextInput
+                          ref={el => { cellRefs.current[key] = el; }}
+                          style={styles.comboInput}
+                          allowFontScaling={FONT_SCALING.tabular}
+                          value={row[col.key] ?? ''}
+                          onChangeText={text => updateCell(rowIndex, col.key, text)}
+                          placeholder={col.placeholder}
+                          placeholderTextColor={Colors.textLight}
+                          returnKeyType={isLastFocusable ? 'done' : 'next'}
+                          blurOnSubmit={isLastFocusable}
+                          onSubmitEditing={() => focusNextCell(rowIndex, col.key)}
+                        />
+                        {/* Only the chevron goes inert when nothing is on
+                            offer - the input beside it stays live, because
+                            an off-list source is exactly the case a combo
+                            column exists to record. */}
+                        <TouchableOpacity
+                          style={styles.comboChevron}
+                          disabled={!canPick}
+                          onPress={() => canPick && setPickerFor({ rowIndex, column: col })}>
+                          <Ionicons
+                            name="chevron-down"
+                            size={12}
+                            color={canPick ? Colors.textMuted : Colors.borderLight}
+                          />
+                        </TouchableOpacity>
+                      </View>
                     ) : (
                       <TextInput
                         ref={el => { cellRefs.current[key] = el; }}
@@ -312,6 +351,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.sm,
     backgroundColor: Colors.white,
+  },
+  // Wears the same chrome as selectCell so a row of pickers reads as one
+  // control type, but carries no vertical padding of its own - the input
+  // inside supplies it, and doubling the two would make combo cells taller
+  // than the select cells beside them.
+  comboCell: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: Radius.sm,
+    paddingRight: Spacing.sm,
+    backgroundColor: Colors.white,
+  },
+  // Type.tabular, not Type.body - same fixed-width-column reasoning as
+  // headerCell/cellInput. Borderless: comboCell above draws the box.
+  comboInput: {
+    flex: 1,
+    fontSize: Type.tabular.fontSize,
+    lineHeight: Type.tabular.lineHeight,
+    color: Colors.textPrimary,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
+  },
+  comboChevron: {
+    justifyContent: 'center',
   },
   // A dependent cell whose parent is still blank. Muted like a disabled
   // control so the row reads as "answer the column to my left first"

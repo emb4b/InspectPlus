@@ -203,15 +203,18 @@ export const AbstractedWaterQualitySection: React.FC<{
       {section.editing ? (
         <DynamicRowTable
           columns={[
-            { key: 'source', label: 'Source', width: 130, type: 'select', options: ABSTRACTED_WATER_SOURCES, placeholder: 'Select source' },
+            // Combo, not select: the two lists cover the sources this office
+            // actually samples, but an inspector who meets one they don't
+            // name still has to be able to write it down.
+            { key: 'source', label: 'Source', width: 130, type: 'combo', options: ABSTRACTED_WATER_SOURCES, placeholder: 'Select...' },
             {
               key: 'specify',
               label: 'Specify',
               width: 130,
-              type: 'select',
+              type: 'combo',
               dependsOn: 'source',
               options: abstractedWaterSourceSpecifics,
-              placeholder: 'Select source first',
+              placeholder: 'Select...',
             },
             { key: 'bod_cod', label: 'BOD/COD', width: 90, placeholder: 'mg/L' },
             { key: 'tss', label: 'TSS', width: 80, placeholder: 'mg/L' },
