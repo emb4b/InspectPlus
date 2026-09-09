@@ -22,6 +22,10 @@ import {
   WASTEWATER_USE_TYPES,
   ABSTRACTED_WATER_SOURCES,
   abstractedWaterSourceSpecifics,
+  NON_WWTP_TREATMENT_OPTIONS,
+  NON_WWTP_TREATMENT_OTHERS,
+  NON_WWTP_TREATMENT_PROMPT,
+  NON_WWTP_TREATMENT_OTHER_LABEL,
   WWTP_TYPE_OPTIONS,
   WWTP_CONDITION_OPTIONS,
 } from './waterChecklistData';
@@ -150,6 +154,16 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
     set('dpConditions', value.dpConditions.filter((_, idx) => idx !== i));
   };
 
+  // Appends rather than reordering, so the ticks read in the order the
+  // inspector made them.
+  const toggleNonWwtpSystem = (option: string) => {
+    const has = value.nonWwtpSystems.includes(option);
+    set(
+      'nonWwtpSystems',
+      has ? value.nonWwtpSystems.filter(s => s !== option) : [...value.nonWwtpSystems, option],
+    );
+  };
+
   const toggleDocumentReviewed = (doc: string) => {
     const has = value.documentsReviewed.includes(doc);
     set(
@@ -229,7 +243,33 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
           <FormSection icon="construct-outline" title="A. Type of Wastewater Treatment System">
             <RadioGroup label="Has WWTP?" options={YES_NO} value={value.hasWwtp} onChange={v => set('hasWwtp', v as 'yes' | 'no')} />
             {value.hasWwtp === 'no' && (
-              <Text style={styles.emptyText}>Subsections B-E will be marked as not applicable.</Text>
+              <>
+                <Text style={styles.emptyText}>Subsections B-E will be marked as not applicable.</Text>
+                {/* No WWTP doesn't mean no treatment - this is where the
+                    septic tank or oil/water separator actually gets
+                    recorded. Hidden rather than cleared when Has WWTP flips
+                    back to yes; nonWwtpTreatmentForSave is what keeps the
+                    stored report consistent. */}
+                <Text style={styles.subTitle}>{NON_WWTP_TREATMENT_PROMPT}</Text>
+                {NON_WWTP_TREATMENT_OPTIONS.map(option => (
+                  <CheckboxRow
+                    key={option}
+                    label={option}
+                    checked={value.nonWwtpSystems.includes(option)}
+                    onToggle={() => toggleNonWwtpSystem(option)}
+                  />
+                ))}
+                {value.nonWwtpSystems.includes(NON_WWTP_TREATMENT_OTHERS) && (
+                  <TextField
+                    ref={setRef('nonWwtpOther')}
+                    label={NON_WWTP_TREATMENT_OTHER_LABEL}
+                    value={value.nonWwtpOther}
+                    onChangeText={t => set('nonWwtpOther', t)}
+                    placeholder="e.g. Grease trap"
+                    returnKeyType="done"
+                  />
+                )}
+              </>
             )}
           </FormSection>
         );

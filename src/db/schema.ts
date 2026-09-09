@@ -25,7 +25,7 @@ import { appSchema, tableSchema } from '@nozbe/watermelondb';
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const schema = appSchema({
-  version: 11,
+  version: 12,
   tables: [
 
     // ── ESTABLISHMENTS ───────────────────────────────────────────────────────
@@ -201,6 +201,10 @@ export const schema = appSchema({
         { name: 'wastewaterSources',          type: 'string', isOptional: true },
         { name: 'abstractedWaterQuality',     type: 'string', isOptional: true },
         { name: 'hasWwtp',                    type: 'boolean', isOptional: true },
+        // { systems: string[], other: string } - the treatment an
+        // establishment runs when it has no WWTP (section 5A). Only written
+        // while hasWwtp is false; see nonWwtpTreatmentForSave.
+        { name: 'nonWwtpTreatment',           type: 'string', isOptional: true },
         { name: 'wwtpType',                   type: 'string', isOptional: true },
         { name: 'wwtpDetails',                type: 'string', isOptional: true },
         { name: 'wwtpComponents',             type: 'string', isOptional: true },

@@ -35,6 +35,10 @@ import {
   WASTEWATER_USE_TYPES,
   ABSTRACTED_WATER_SOURCES,
   abstractedWaterSourceSpecifics,
+  NON_WWTP_TREATMENT_OPTIONS,
+  NON_WWTP_TREATMENT_OTHERS,
+  NON_WWTP_TREATMENT_PROMPT,
+  NON_WWTP_TREATMENT_OTHER_LABEL,
   WWTP_TYPE_OPTIONS,
   WWTP_CONDITION_OPTIONS,
 } from './waterChecklistData';
@@ -50,6 +54,8 @@ import {
   emptySamplingPoint,
   emptySamplingParameter,
   emptyDpCondition,
+  nonWwtpTreatmentFor,
+  describeNonWwtpTreatment,
 } from './waterTypes';
 import type { ComplianceWater } from '../../../db/models';
 import type { WaterMainTabDef } from './waterReportTabs';
@@ -254,19 +260,47 @@ export const WwtpUnavailableSection: React.FC<{ title: string }> = ({ title }) =
   </FormSection>
 );
 
+// The WWTP question and the treatment systems that answer *replaces* are
+// one section because they are one decision: 5A asks what treats this
+// establishment's wastewater, and "a WWTP" and "a septic tank" are two
+// answers to it. Editing them together also lets the draft hold both while
+// an inspector changes their mind, with only the save narrowing it - see
+// nonWwtpTreatmentFor.
+interface TreatmentSystemDraft {
+  hasWwtp: boolean | null;
+  systems: string[];
+  other: string;
+}
+
 export const TreatmentSystemTypeSection: React.FC<{
   complianceId: string;
-  value: boolean | null;
+  hasWwtp: boolean | null;
+  nonWwtpTreatment: Record<string, unknown>;
   canEdit: boolean;
   onSaved: () => void;
-}> = ({ complianceId, value, canEdit, onSaved }) => {
-  const section = useEditableSection<boolean | null>({
-    value,
-    onSave: async hasWwtp => {
-      await patchComplianceWater(complianceId, { hasWwtp });
+}> = ({ complianceId, hasWwtp, nonWwtpTreatment, canEdit, onSaved }) => {
+  const section = useEditableSection<TreatmentSystemDraft>({
+    value: {
+      hasWwtp,
+      systems: Array.isArray(nonWwtpTreatment.systems) ? (nonWwtpTreatment.systems as string[]) : [],
+      other: typeof nonWwtpTreatment.other === 'string' ? nonWwtpTreatment.other : '',
+    },
+    onSave: async draft => {
+      await patchComplianceWater(complianceId, {
+        hasWwtp: draft.hasWwtp,
+        nonWwtpTreatment: nonWwtpTreatmentFor(draft.hasWwtp === false, draft.systems, draft.other),
+      });
       onSaved();
     },
   });
+
+  const toggleSystem = (option: string) =>
+    section.setDraft(prev => ({
+      ...prev,
+      systems: prev.systems.includes(option)
+        ? prev.systems.filter(s => s !== option)
+        : [...prev.systems, option],
+    }));
 
   return (
     <FormSection
@@ -279,14 +313,47 @@ export const TreatmentSystemTypeSection: React.FC<{
         <RadioGroup
           label="Has WWTP?"
           options={YES_NO}
-          value={section.draft == null ? null : section.draft ? 'yes' : 'no'}
-          onChange={v => section.setDraft(v === 'yes')}
+          value={section.draft.hasWwtp == null ? null : section.draft.hasWwtp ? 'yes' : 'no'}
+          onChange={v => section.setDraft(prev => ({ ...prev, hasWwtp: v === 'yes' }))}
         />
       ) : (
-        <TextField label="Has WWTP?" value={section.draft == null ? '—' : section.draft ? 'Yes' : 'No'} readOnly />
+        <TextField
+          label="Has WWTP?"
+          value={section.draft.hasWwtp == null ? '—' : section.draft.hasWwtp ? 'Yes' : 'No'}
+          readOnly
+        />
       )}
-      {section.draft === false && (
-        <Text style={sharedStyles.emptyText}>Subsections B-E are marked as not applicable.</Text>
+      {section.draft.hasWwtp === false && (
+        <>
+          <Text style={sharedStyles.emptyText}>Subsections B-E are marked as not applicable.</Text>
+          {section.editing ? (
+            <>
+              <Text style={sharedStyles.subTitle}>{NON_WWTP_TREATMENT_PROMPT}</Text>
+              {NON_WWTP_TREATMENT_OPTIONS.map(option => (
+                <CheckboxRow
+                  key={option}
+                  label={option}
+                  checked={section.draft.systems.includes(option)}
+                  onToggle={() => toggleSystem(option)}
+                />
+              ))}
+              {section.draft.systems.includes(NON_WWTP_TREATMENT_OTHERS) && (
+                <TextField
+                  label={NON_WWTP_TREATMENT_OTHER_LABEL}
+                  value={section.draft.other}
+                  onChangeText={t => section.setDraft(prev => ({ ...prev, other: t }))}
+                  placeholder="e.g. Grease trap"
+                />
+              )}
+            </>
+          ) : (
+            <TextField
+              label="Treatment System"
+              value={describeNonWwtpTreatment(section.draft.systems, section.draft.other)}
+              readOnly
+            />
+          )}
+        </>
       )}
       {section.error && <Text style={styles.errorText}>{section.error}</Text>}
     </FormSection>
@@ -1373,7 +1440,15 @@ export const WaterExtraSectionsView: React.FC<WaterExtraSectionsViewProps> = ({
       case 'abstractedWaterQuality':
         return <AbstractedWaterQualitySection complianceId={complianceId} value={compliance.abstractedWaterQuality as DynamicRow[]} canEdit={canEdit} onSaved={onSaved} />;
       case 'treatmentSystemType':
-        return <TreatmentSystemTypeSection complianceId={complianceId} value={compliance.hasWwtp} canEdit={canEdit} onSaved={onSaved} />;
+        return (
+          <TreatmentSystemTypeSection
+            complianceId={complianceId}
+            hasWwtp={compliance.hasWwtp}
+            nonWwtpTreatment={compliance.nonWwtpTreatment}
+            canEdit={canEdit}
+            onSaved={onSaved}
+          />
+        );
       case 'wwtpType':
         return compliance.hasWwtp === false ? (
           <WwtpUnavailableSection title="B. Type of WWTP" />

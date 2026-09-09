@@ -470,6 +470,9 @@ report-creation time. Deliberately excludes `product`, `year_established`,
 - `wastewater_sources`
 - `abstracted_water_quality`
 - `has_wwtp`
+- `non_wwtp_treatment` — `{ systems: string[], other: string }`; what treats the
+  establishment's wastewater when `has_wwtp` is false. `{}` on any report that
+  records a WWTP.
 - `wwtp_type`
 - `wwtp_details`
 - `wwtp_components`

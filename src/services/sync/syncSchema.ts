@@ -215,6 +215,7 @@ export const syncSchema: Record<SyncEntityName, SyncEntitySchema> = {
       wastewater_sources:          'wastewaterSources',
       abstracted_water_quality:    'abstractedWaterQuality',
       has_wwtp:                    'hasWwtp',
+      non_wwtp_treatment:          'nonWwtpTreatment',
       wwtp_type:                   'wwtpType',
       wwtp_details:                'wwtpDetails',
       wwtp_components:             'wwtpComponents',

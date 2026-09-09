@@ -21,7 +21,7 @@ import { useReportFormState } from '../hooks/useReportFormState';
 import { createEstablishmentRecord } from '../establishmentPersistence';
 import { buildGeneralInfoFromEstablishment, GeneralInfoFormState, PurposeFormState } from '../types';
 import { WaterExtraFormSectionsView } from './WaterExtraFormSections';
-import { emptyWaterComplianceForm, WaterComplianceFormState } from './waterTypes';
+import { emptyWaterComplianceForm, nonWwtpTreatmentForSave, WaterComplianceFormState } from './waterTypes';
 import { buildWaterReportTabs, establishmentHasDischargePermit } from './waterReportTabs';
 import type { EstablishmentDTO } from '../../establishments/types';
 import { useHeaderScroll } from '../../home/context/HeaderScrollContext';
@@ -69,6 +69,7 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
         wastewaterSources: waterCompliance.wastewaterSources.filter(r => r.use_type?.trim()),
         abstractedWaterQuality: waterCompliance.abstractedWaterQuality.filter(r => r.source?.trim()),
         hasWwtp: waterCompliance.hasWwtp === 'yes',
+        nonWwtpTreatment: nonWwtpTreatmentForSave(waterCompliance),
         wwtpType: waterCompliance.wwtpType || null,
         wwtpDetails: waterCompliance.wwtpDetails,
         wwtpComponents: waterCompliance.wwtpComponents,
