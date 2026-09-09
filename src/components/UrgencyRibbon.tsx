@@ -25,10 +25,16 @@ const LEVEL_FILL = {
 // x + y = 36, so it never crosses the glyph it would otherwise obscure.
 const SIZE = 56;
 const BAND_INNER = 36;
-const BAND_OUTER = 52;
-// Midpoint of the band's centre line (x + y = 44), which the label rotates
-// about.
+const BAND_OUTER = 54;
+const LABEL_SIZE = 10;
+// Midpoint of the band's centre line, which the label rotates about.
 const MID = (BAND_INNER + BAND_OUTER) / 4;
+// SvgText's `y` is the BASELINE, not the visual centre, so anchoring at MID
+// puts every glyph on the corner side of the centre line and spills them out
+// of the band — confirmed on device before this offset existed. Nudging the
+// anchor along (1,1), which is perpendicular to the band, re-centres them:
+// half a cap height (~0.35em) projected onto each axis.
+const LABEL_ANCHOR = MID + LABEL_SIZE * 0.35 * Math.SQRT1_2;
 
 // Matches the card's own top-left corner so the band's square end is cut to
 // the rounded edge. Clipping here rather than with overflow:'hidden' on the
@@ -76,13 +82,13 @@ export const UrgencyRibbon: React.FC<UrgencyRibbonProps> = ({ urgency }) => {
           clipPath="url(#urgencyRibbonCorner)"
         />
         <SvgText
-          x={MID}
-          y={MID}
+          x={LABEL_ANCHOR}
+          y={LABEL_ANCHOR}
           fill={Colors.textWhite}
-          fontSize={9}
+          fontSize={LABEL_SIZE}
           fontWeight="700"
           textAnchor="middle"
-          transform={`rotate(-45, ${MID}, ${MID})`}
+          transform={`rotate(-45, ${LABEL_ANCHOR}, ${LABEL_ANCHOR})`}
           clipPath="url(#urgencyRibbonCorner)">
           {bandLabel(urgency)}
         </SvgText>
