@@ -2,6 +2,8 @@ import React, { useRef } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
+import { Spacing } from '../../../design/spacing';
+import { Type } from '../../../design/typography';
 import { database, collections } from '../../../db/database';
 import {
   FormSection,
@@ -327,7 +329,7 @@ export const TreatmentSystemTypeSection: React.FC<{
         <>
           {section.editing ? (
             <>
-              <Text style={sharedStyles.subTitle}>{NON_WWTP_TREATMENT_PROMPT}</Text>
+              <Text style={styles.fieldLabel}>{NON_WWTP_TREATMENT_PROMPT}</Text>
               {NON_WWTP_TREATMENT_OPTIONS.map(option => (
                 <CheckboxRow
                   key={option}
@@ -1524,6 +1526,22 @@ export const WaterExtraSectionsView: React.FC<WaterExtraSectionsViewProps> = ({
 };
 
 const styles = StyleSheet.create({
+  // Deliberately identical to RadioGroup's own `label` style (see
+  // components/form/RadioGroup.tsx): the treatment prompt and the
+  // "Has WWTP?" radio above it are two halves of one question, so the
+  // prompt must read as a field label, not as the uppercase section header
+  // `subTitle` would make it. nonWwtpTreatment.test.tsx asserts the two
+  // resolve to the same style in the same render, so they cannot drift.
+  fieldLabel: {
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
+    fontWeight: '700',
+    color: Colors.navy,
+    letterSpacing: 0.3,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.sm,
+  },
+
   row: {
     flexDirection: 'row',
     gap: 14,

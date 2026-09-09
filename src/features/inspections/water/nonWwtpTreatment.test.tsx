@@ -1,4 +1,5 @@
 import React from 'react';
+import { Text } from 'react-native';
 import renderer, { act } from 'react-test-renderer';
 import { WaterExtraFormSectionsView } from './WaterExtraFormSections';
 import { TreatmentSystemTypeSection } from './WaterComplianceEditSections';
@@ -77,6 +78,14 @@ function renderForm(value: WaterComplianceFormState, onChange: (v: WaterComplian
 
 const checkbox = (tree: renderer.ReactTestRenderer, label: string) =>
   tree.root.find(n => n.type === CheckboxRow && n.props.label === label);
+
+const flattenStyle = (style: unknown): Record<string, unknown> =>
+  Object.assign({}, ...([style].flat(Infinity).filter(Boolean) as Record<string, unknown>[]));
+
+// RadioGroup renders its label as [label, false] when `required` is unset,
+// so match on membership rather than identity.
+const findLabelText = (tree: renderer.ReactTestRenderer, content: string) =>
+  tree.root.find(n => n.type === Text && [n.props.children].flat().includes(content));
 
 const renderSectionForOrder = (
   hasWwtp: boolean | null,
@@ -329,5 +338,36 @@ describe('5A keeps the not-applicable remark at the foot of the subsection', () 
     );
     expect(seq).toContain(VIEW_NOTE);
     expect(seq.indexOf(VIEW_NOTE)).toBeGreaterThan(seq.indexOf('Treatment System'));
+  });
+});
+
+
+// ── How the prompt is set ────────────────────────────────────────────────────
+
+describe('5A styles the treatment prompt like the question above it', () => {
+  // "Has WWTP?" and the treatment prompt are two halves of one question, so
+  // the second must not read as a section header while the first reads as a
+  // field label. Asserted against the RadioGroup label rendered in the same
+  // tree rather than against literal values, so the two cannot drift apart:
+  // restyle one and this fails until the other follows.
+  const MATCHED = ['fontSize', 'lineHeight', 'fontWeight', 'color', 'letterSpacing'];
+
+  it('matches the Has WWTP? label on the create form', () => {
+    const tree = renderForm({ ...emptyWaterComplianceForm(), hasWwtp: 'no' });
+    const prompt = flattenStyle(findLabelText(tree, PROMPT).props.style);
+    const question = flattenStyle(findLabelText(tree, 'Has WWTP?').props.style);
+    MATCHED.forEach(key => expect(prompt[key]).toBe(question[key]));
+    expect(prompt.textTransform).toBeUndefined();
+  });
+
+  it('matches the Has WWTP? label on the report screen', () => {
+    const tree = renderSectionForOrder(false, {});
+    act(() => {
+      tree.root.find(n => n.props?.onStartEdit != null).props.onStartEdit();
+    });
+    const prompt = flattenStyle(findLabelText(tree, PROMPT).props.style);
+    const question = flattenStyle(findLabelText(tree, 'Has WWTP?').props.style);
+    MATCHED.forEach(key => expect(prompt[key]).toBe(question[key]));
+    expect(prompt.textTransform).toBeUndefined();
   });
 });
