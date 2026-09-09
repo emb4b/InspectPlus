@@ -10,15 +10,11 @@ import { Colors } from '../../../constants/colors';
 // native JSI binding that isn't present under plain Jest — same rationale as
 // ReportListCard.test.tsx and useEstablishment.test.ts. The useEstablishment
 // module mock below replaces that whole chain for this file already, but
-// these three mocks are kept alongside it (rather than relied on implicitly)
+// these two mocks are kept alongside it (rather than relied on implicitly)
 // to match the established pattern documented in ReportListCard.test.tsx,
 // in case any future edit here starts importing the real hook module for
 // something else it exports.
 jest.mock('../../../db/database', () => ({ database: {}, collections: {} }));
-jest.mock('@react-native-async-storage/async-storage', () =>
-  // eslint-disable-next-line @typescript-eslint/no-require-imports -- jest.mock factories can't reference out-of-scope imports
-  require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
-);
 jest.mock('../../../services/supabase/client', () => ({ supabase: {} }));
 
 jest.mock('expo-router', () => ({ router: { back: jest.fn(), push: jest.fn() } }));

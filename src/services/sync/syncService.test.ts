@@ -1,16 +1,5 @@
-import mockAsyncStorage from '@react-native-async-storage/async-storage/jest/async-storage-mock';
 import { createSyncService, SyncServiceDependencies } from './syncService';
 import { PushChangesPayload, PushChangesResponse } from './syncTypes';
-
-// syncService.ts pulls in syncState.ts, which persists sync metadata via
-// AsyncStorage — irrelevant to what this file tests (the push-conflict
-// wiring), but jest-expo's preset doesn't mock this third-party package on
-// its own, so it needs the mock the package itself ships for Jest. jest.mock
-// calls are hoisted above imports by babel-jest regardless of where they're
-// written, so this runs before syncService.ts is ever required — the
-// `mock`-prefixed name is required for that hoisting to be allowed to
-// reference it at all (Jest's out-of-scope-variable restriction).
-jest.mock('@react-native-async-storage/async-storage', () => mockAsyncStorage);
 
 // push_changes can reject specific "updated" rows via its last-write-wins
 // guard while still returning {status:'ok'} overall — the response's

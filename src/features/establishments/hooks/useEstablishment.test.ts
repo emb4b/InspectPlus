@@ -1,4 +1,3 @@
-import mockAsyncStorage from '@react-native-async-storage/async-storage/jest/async-storage-mock';
 import { INSPECTION_TYPE_LABELS } from './useEstablishment';
 import { REPORT_TYPE_DISPLAY, ReportDataKey } from '../../../constants/reportTypeDisplay';
 
@@ -10,13 +9,6 @@ import { REPORT_TYPE_DISPLAY, ReportDataKey } from '../../../constants/reportTyp
 // imports by babel-plugin-jest-hoist regardless of where they're written, so
 // this still applies before the import above actually resolves.
 jest.mock('../../../db/database', () => ({ database: {}, collections: {} }));
-
-// useEstablishment.ts also transitively imports inspectorNames.ts, which
-// persists a name cache via AsyncStorage — irrelevant to INSPECTION_TYPE_LABELS,
-// but jest-expo's preset doesn't mock this third-party package on its own
-// (see syncService.test.ts for the same pattern), so it needs the mock the
-// package itself ships for Jest.
-jest.mock('@react-native-async-storage/async-storage', () => mockAsyncStorage);
 
 // Both inspectorNames.ts and AuthProvider.tsx (via services/supabase/auth.ts)
 // transitively import services/supabase/client.ts, which calls
