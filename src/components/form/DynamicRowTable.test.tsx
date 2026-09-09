@@ -342,7 +342,7 @@ describe('DynamicRowTable combo columns (typeable dropdowns)', () => {
   };
 
   const comboColumns: DynamicColumn[] = [
-    { key: 'source', label: 'Source', width: 130, type: 'combo', options: ['Surface Water', 'Ground Water'], placeholder: 'Select...' },
+    { key: 'source', label: 'Source', width: 130, type: 'combo', options: ['Surface Water', 'Ground Water'], placeholder: 'Select' },
     {
       key: 'specify',
       label: 'Specify',
@@ -350,7 +350,7 @@ describe('DynamicRowTable combo columns (typeable dropdowns)', () => {
       type: 'combo',
       dependsOn: 'source',
       options: (row) => SPECIFICS[row.source] ?? [],
-      placeholder: 'Select...',
+      placeholder: 'Select',
     },
   ];
 
