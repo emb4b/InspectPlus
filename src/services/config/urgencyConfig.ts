@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { ENV } from '../../core/config/env';
 
 export interface UrgencyThresholds {
@@ -62,5 +63,51 @@ export async function hydrateUrgencyConfig(): Promise<void> {
     if (stored) snapshot = stored;
   } catch {
     // A storage read failure leaves the ENV defaults in place — never fatal.
+  }
+}
+
+const DUE_SOON_KEY = 'due_soon_days';
+const OVERDUE_KEY = 'overdue_days';
+
+interface ConfigRow {
+  key: string;
+  value: string;
+}
+
+function numberFromRows(rows: ConfigRow[], key: string, fallback: number): number {
+  const row = rows.find(r => r.key === key);
+  if (!row) return fallback;
+
+  const parsed = Number(row.value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+// Reads the operator-controlled thresholds out of app_config. Fails open in
+// every direction — a network error, a missing table, an RLS denial or a
+// nonsensical pair all leave the last known values in effect. It must never
+// reject: runManagedSync awaits it, and a config read has no business
+// failing a sync.
+export async function refreshUrgencyConfig(supabase: SupabaseClient): Promise<void> {
+  try {
+    const { data, error } = await supabase
+      .from('app_config')
+      .select('key, value')
+      .in('key', [DUE_SOON_KEY, OVERDUE_KEY]);
+
+    if (error || !data) return;
+
+    const rows = data as ConfigRow[];
+    const current = getUrgencyConfig();
+    const candidate: UrgencyThresholds = {
+      dueSoonDays: numberFromRows(rows, DUE_SOON_KEY, current.dueSoonDays),
+      overdueDays: numberFromRows(rows, OVERDUE_KEY, current.overdueDays),
+    };
+
+    if (!isValidThresholds(candidate)) return;
+
+    snapshot = candidate;
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(candidate));
+  } catch {
+    // Fail open — same stance as assertAppVersionSupported.
   }
 }

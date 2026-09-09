@@ -1,5 +1,6 @@
 import mockAsyncStorage from '@react-native-async-storage/async-storage/jest/async-storage-mock';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { ENV } from '../../core/config/env';
 
 // jest-expo's preset does not mock this third-party package, so it needs the
@@ -84,5 +85,131 @@ describe('isValidThresholds', () => {
     ['an infinite value', { dueSoonDays: 14, overdueDays: Number.POSITIVE_INFINITY }, false],
   ])('returns %s -> %s', (_label, pair, expected) => {
     expect(isValidThresholds(pair)).toBe(expected);
+  });
+});
+
+// app_config is read straight through PostgREST, the same out-of-band
+// pattern appVersionGate.ts uses. `.in()` is the terminal call in that
+// chain, so it is what resolves.
+type ConfigRow = { key: string; value: string };
+
+function fakeSupabase(result: {
+  data: ConfigRow[] | null;
+  error: { message: string } | null;
+}): SupabaseClient {
+  return {
+    from: () => ({
+      select: () => ({
+        in: () => Promise.resolve(result),
+      }),
+    }),
+  } as unknown as SupabaseClient;
+}
+
+function rejectingSupabase(): SupabaseClient {
+  return {
+    from: () => ({
+      select: () => ({
+        in: () => Promise.reject(new Error('network down')),
+      }),
+    }),
+  } as unknown as SupabaseClient;
+}
+
+describe('refreshUrgencyConfig', () => {
+  beforeEach(async () => {
+    await AsyncStorage.clear();
+  });
+
+  it('adopts a valid remote pair and caches it for the next cold start', async () => {
+    const { getUrgencyConfig, refreshUrgencyConfig } = loadModule();
+
+    await refreshUrgencyConfig(
+      fakeSupabase({
+        data: [
+          { key: 'due_soon_days', value: '7' },
+          { key: 'overdue_days', value: '21' },
+        ],
+        error: null,
+      }),
+    );
+
+    expect(getUrgencyConfig()).toEqual({ dueSoonDays: 7, overdueDays: 21 });
+    expect(JSON.parse((await AsyncStorage.getItem(STORAGE_KEY)) as string)).toEqual({
+      dueSoonDays: 7,
+      overdueDays: 21,
+    });
+  });
+
+  it('fills a key the response omits from the currently resolved value', async () => {
+    const { getUrgencyConfig, refreshUrgencyConfig } = loadModule();
+
+    await refreshUrgencyConfig(
+      fakeSupabase({ data: [{ key: 'due_soon_days', value: '9' }], error: null }),
+    );
+
+    expect(getUrgencyConfig()).toEqual({ dueSoonDays: 9, overdueDays: ENV.overdueDays });
+  });
+
+  it('keeps the current values when the read errors', async () => {
+    const { getUrgencyConfig, refreshUrgencyConfig } = loadModule();
+
+    await refreshUrgencyConfig(fakeSupabase({ data: null, error: { message: 'permission denied' } }));
+
+    expect(getUrgencyConfig()).toEqual({
+      dueSoonDays: ENV.dueSoonDays,
+      overdueDays: ENV.overdueDays,
+    });
+    expect(await AsyncStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
+  it('discards an invalid pair whole rather than adopting half of it', async () => {
+    const { getUrgencyConfig, refreshUrgencyConfig } = loadModule();
+
+    await refreshUrgencyConfig(
+      fakeSupabase({
+        data: [
+          { key: 'due_soon_days', value: '40' },
+          { key: 'overdue_days', value: '30' },
+        ],
+        error: null,
+      }),
+    );
+
+    expect(getUrgencyConfig()).toEqual({
+      dueSoonDays: ENV.dueSoonDays,
+      overdueDays: ENV.overdueDays,
+    });
+    expect(await AsyncStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+
+  it('ignores a non-numeric value rather than resolving NaN thresholds', async () => {
+    const { getUrgencyConfig, refreshUrgencyConfig } = loadModule();
+
+    await refreshUrgencyConfig(
+      fakeSupabase({
+        data: [
+          { key: 'due_soon_days', value: 'soon' },
+          { key: 'overdue_days', value: '21' },
+        ],
+        error: null,
+      }),
+    );
+
+    expect(getUrgencyConfig()).toEqual({ dueSoonDays: ENV.dueSoonDays, overdueDays: 21 });
+  });
+
+  // A sync run awaits this call, so a rejection here would break sync
+  // entirely. This is where the spec's "a rejected refresh does not fail the
+  // sync run" guarantee lives — the orchestrator relies on it rather than
+  // wrapping the call in its own catch.
+  it('never rejects, even when the query itself throws', async () => {
+    const { getUrgencyConfig, refreshUrgencyConfig } = loadModule();
+
+    await expect(refreshUrgencyConfig(rejectingSupabase())).resolves.toBeUndefined();
+    expect(getUrgencyConfig()).toEqual({
+      dueSoonDays: ENV.dueSoonDays,
+      overdueDays: ENV.overdueDays,
+    });
   });
 });
