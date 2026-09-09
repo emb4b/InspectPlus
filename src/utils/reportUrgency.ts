@@ -10,6 +10,15 @@ export interface ReportUrgency {
   days: number;
 }
 
+// An establishment's roll-up of its own reports: the colour it should wear
+// and how many reports are asking for attention.
+export interface DueReportsSummary {
+  // The worst state present, which is what the indicator's colour shows.
+  level: Exclude<ReportUrgencyLevel, 'none'>;
+  // Every flagged report, not just the ones at `level`.
+  count: number;
+}
+
 const NONE: ReportUrgency = { level: 'none', days: 0 };
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
@@ -37,4 +46,48 @@ export function getReportUrgency(dateIso: string, status: string | null): Report
     return { level: 'due-soon', days: Math.ceil(overdueDays - daysSince) };
   }
   return NONE;
+}
+
+// Rolls a set of reports up into the single indicator an establishment wears.
+//
+// The count deliberately spans both states rather than just the worst one.
+// Counting only the worst tier makes the number move the wrong way as things
+// deteriorate: an establishment with 1 overdue and 5 due-soon would read "1"
+// while a strictly healthier one with 5 due-soon read "5". Splitting the two
+// channels — colour for severity, number for volume — keeps both readable at
+// a glance and keeps the count monotonic as reports slip.
+export function summarizeDueReports(
+  reports: { date: string; status: string | null }[],
+): DueReportsSummary | null {
+  let count = 0;
+  let anyOverdue = false;
+
+  reports.forEach(report => {
+    const { level } = getReportUrgency(report.date, report.status);
+    if (level === 'none') return;
+    count += 1;
+    if (level === 'overdue') anyOverdue = true;
+  });
+
+  if (count === 0) return null;
+  return { level: anyOverdue ? 'overdue' : 'due-soon', count };
+}
+
+const plural = (days: number) => (days === 1 ? 'day' : 'days');
+
+// Abbreviated for places that are tight — the corner ribbon's diagonal, a
+// chip sharing a row with other badges. Both callers must agree on this
+// wording, or the same report reads differently in a list and on its own
+// screen.
+export function urgencyShortLabel(urgency: ReportUrgency): string {
+  if (urgency.level === 'due-soon') return `${urgency.days}d left`;
+  if (urgency.days === 0) return 'Overdue';
+  return `${urgency.days}d late`;
+}
+
+// What a screen reader gets instead: "5d late" is not something to read out.
+export function urgencySpokenLabel(urgency: ReportUrgency): string {
+  if (urgency.level === 'due-soon') return `Due in ${urgency.days} ${plural(urgency.days)}`;
+  if (urgency.days === 0) return 'Overdue';
+  return `Overdue by ${urgency.days} ${plural(urgency.days)}`;
 }

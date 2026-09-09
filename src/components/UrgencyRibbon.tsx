@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import Svg, { ClipPath, Defs, Path, Polygon, Text as SvgText } from 'react-native-svg';
 import { Colors } from '../design/colors';
 import { Radius } from '../design/radius';
+import { urgencyShortLabel, urgencySpokenLabel } from '../utils/reportUrgency';
 import type { ReportUrgency } from '../utils/reportUrgency';
 
 interface UrgencyRibbonProps {
@@ -41,22 +42,6 @@ const LABEL_ANCHOR = MID + LABEL_SIZE * 0.35 * Math.SQRT1_2;
 // card keeps Android's elevation shadow intact — see Elevation.raised.
 const CORNER_CLIP = `M${Radius.lg},0 A${Radius.lg},${Radius.lg} 0 0 0 0,${Radius.lg} L0,${SIZE} L${SIZE},${SIZE} L${SIZE},0 Z`;
 
-const plural = (days: number) => (days === 1 ? 'day' : 'days');
-
-// Roughly eight characters fit on the diagonal before the band would reach
-// the type tile, so the visible label is abbreviated hard.
-function bandLabel(urgency: ReportUrgency): string {
-  if (urgency.level === 'due-soon') return `${urgency.days}d left`;
-  if (urgency.days === 0) return 'Overdue';
-  return `${urgency.days}d late`;
-}
-
-function spokenLabel(urgency: ReportUrgency): string {
-  if (urgency.level === 'due-soon') return `Due in ${urgency.days} ${plural(urgency.days)}`;
-  if (urgency.days === 0) return 'Overdue';
-  return `Overdue by ${urgency.days} ${plural(urgency.days)}`;
-}
-
 // A corner banner wrapping a card's top-left corner, flagging how a draft
 // report sits against its filing deadline.
 export const UrgencyRibbon: React.FC<UrgencyRibbonProps> = ({ urgency }) => {
@@ -69,7 +54,7 @@ export const UrgencyRibbon: React.FC<UrgencyRibbonProps> = ({ urgency }) => {
       style={styles.wrap}
       pointerEvents="none"
       accessibilityRole="text"
-      accessibilityLabel={spokenLabel(urgency)}>
+      accessibilityLabel={urgencySpokenLabel(urgency)}>
       <Svg width={SIZE} height={SIZE} viewBox={`0 0 ${SIZE} ${SIZE}`}>
         <Defs>
           <ClipPath id="urgencyRibbonCorner">
@@ -90,7 +75,7 @@ export const UrgencyRibbon: React.FC<UrgencyRibbonProps> = ({ urgency }) => {
           textAnchor="middle"
           transform={`rotate(-45, ${LABEL_ANCHOR}, ${LABEL_ANCHOR})`}
           clipPath="url(#urgencyRibbonCorner)">
-          {bandLabel(urgency)}
+          {urgencyShortLabel(urgency)}
         </SvgText>
       </Svg>
     </View>

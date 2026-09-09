@@ -1,6 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, LayoutChangeEvent } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { DueCountBadge } from '../../../components/DueCountBadge';
 import { Colors } from '../../../design/colors';
 import { Elevation } from '../../../design/elevation';
 import { Radius } from '../../../design/radius';
@@ -57,8 +58,11 @@ export const EstablishmentHeaderCard: React.FC<EstablishmentHeaderCardProps> = (
           appears at its final size instead of visibly popping from the 40
           default to the measured size once layout settles. */}
       <View style={[styles.topRow, titleBlockHeight === null && styles.topRowMeasuring]}>
+        {/* Same badge, same icon as the Manage Establishments tile, so the
+            list and the detail screen teach one thing rather than two. */}
         <View style={[styles.iconWrap, { width: iconSize, height: iconSize }]}>
           <Ionicons name="business" size={iconGlyphSize} color={Colors.green} />
+          <DueCountBadge summary={establishment.dueReports} style={styles.dueBadge} />
         </View>
         <View style={styles.titleInfo}>
           <View onLayout={handleTitleBlockLayout}>
@@ -157,6 +161,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+  },
+  // Matches the Manage Establishments tile's placement exactly.
+  dueBadge: {
+    position: 'absolute',
+    top: -7,
+    right: -10,
   },
   titleInfo: {
     flex: 1,

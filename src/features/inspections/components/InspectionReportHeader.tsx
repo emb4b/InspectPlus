@@ -17,6 +17,11 @@ import { useInspectorName } from '../../../core/hooks/useInspectorName';
 import { canManageAllRecords } from '../../establishments/hooks/useEstablishment';
 import { getReportTypeMeta } from '../reportTypeMeta';
 import { confirmResolveConflict } from '../../../services/sync/syncConflictResolution';
+import {
+  getReportUrgency,
+  urgencyShortLabel,
+  urgencySpokenLabel,
+} from '../../../utils/reportUrgency';
 import { TwoRowTabs, TwoRowMainTabDef } from './TwoRowTabs';
 import type { SyncStatus } from '../../establishments/types';
 
@@ -88,6 +93,13 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
   const typeMeta = getReportTypeMeta(reportType);
   const IconAsset = typeMeta.iconAsset;
   const isSubmitted = reportStatus === 'submitted';
+  // Same computation the report's own card runs in the list — a report that
+  // shows a ribbon there must show the matching chip here.
+  const urgency = getReportUrgency(inspectionDate, reportStatus);
+  const urgencyTone =
+    urgency.level === 'overdue'
+      ? { badgeBg: Colors.hazwaste.badgeBg, text: Colors.hazwaste.badgeText }
+      : { badgeBg: Colors.warning.badgeBg, text: Colors.warning.text };
 
   // collapsed is HeaderScrollContext's own animated 0..1 value (a single,
   // bounded transition per threshold crossing — see HeaderScrollContext) —
@@ -297,6 +309,13 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
                     color={isSubmitted ? Colors.green : Colors.warning.text}
                   />
                 </View>
+                {urgency.level !== 'none' && (
+                  <View
+                    style={[styles.badgeIcon, { backgroundColor: urgencyTone.badgeBg }]}
+                    accessibilityLabel={urgencySpokenLabel(urgency)}>
+                    <Ionicons name="alert-circle" size={14} color={urgencyTone.text} />
+                  </View>
+                )}
                 {syncStatus === 'pending' && (
                   <View
                     style={[styles.badgeIcon, { backgroundColor: Colors.pendingMuted }]}
@@ -350,6 +369,20 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
                     {isSubmitted ? 'Submitted' : 'Draft'}
                   </Text>
                 </View>
+                {/* A single report has no count to give, so it carries the
+                    state instead — same wording as the corner ribbon its card
+                    wears in the list, so the report reads the same in both
+                    places. */}
+                {urgency.level !== 'none' && (
+                  <View
+                    style={[styles.statusBadge, { backgroundColor: urgencyTone.badgeBg }]}
+                    accessibilityLabel={urgencySpokenLabel(urgency)}>
+                    <Ionicons name="alert-circle" size={11} color={urgencyTone.text} />
+                    <Text style={[styles.statusBadgeText, { color: urgencyTone.text }]}>
+                      {urgencyShortLabel(urgency)}
+                    </Text>
+                  </View>
+                )}
               </>
             )}
           </View>
