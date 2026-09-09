@@ -74,12 +74,15 @@ interface ConfigRow {
   value: string;
 }
 
+// Falls back to `fallback` only when the response omits the key entirely. A
+// key that is present but unparseable must reach isValidThresholds as NaN
+// (Number.isInteger(NaN) is false) so the whole pair is discarded, rather
+// than silently reverting just that key while adopting the other.
 function numberFromRows(rows: ConfigRow[], key: string, fallback: number): number {
   const row = rows.find(r => r.key === key);
   if (!row) return fallback;
 
-  const parsed = Number(row.value);
-  return Number.isFinite(parsed) ? parsed : fallback;
+  return Number(row.value);
 }
 
 // Reads the operator-controlled thresholds out of app_config. Fails open in

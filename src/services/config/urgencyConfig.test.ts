@@ -183,7 +183,7 @@ describe('refreshUrgencyConfig', () => {
     expect(await AsyncStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 
-  it('ignores a non-numeric value rather than resolving NaN thresholds', async () => {
+  it('discards the whole pair when a present value does not parse, rather than adopting half of it', async () => {
     const { getUrgencyConfig, refreshUrgencyConfig } = loadModule();
 
     await refreshUrgencyConfig(
@@ -196,7 +196,8 @@ describe('refreshUrgencyConfig', () => {
       }),
     );
 
-    expect(getUrgencyConfig()).toEqual({ dueSoonDays: ENV.dueSoonDays, overdueDays: 21 });
+    expect(getUrgencyConfig()).toEqual({ dueSoonDays: ENV.dueSoonDays, overdueDays: ENV.overdueDays });
+    expect(await AsyncStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 
   // A sync run awaits this call, so a rejection here would break sync
