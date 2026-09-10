@@ -205,10 +205,10 @@ interface WwtpDetailCard {
 The same narrowing rule the codebase already applies to `nonWwtpOther`
 applies here: the free text is dropped on save unless `NOT_LISTED` is
 actually selected, so a stranded string cannot contradict the option beside
-it. This is a per-row rule, so it belongs with the row rather than in a
-form-level function — a `wwtpDetailForSave(detail)` helper in
-`waterTypes.ts`, shared by both entry paths exactly as
-`nonWwtpTreatmentFor` is.
+it. The rule is a `receivingBodyOfWaterForSave(selection, other)` helper in
+`waterTypes.ts`, paired with `decodeReceivingBodyOfWater(stored, province)`
+which splits a stored string back apart on open — shared by both entry
+paths exactly as `nonWwtpTreatmentFor` is.
 
 ### Label
 
