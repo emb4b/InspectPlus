@@ -223,7 +223,14 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
             <ComplianceStatusView compliance={compliance} />
           ))}
         {isWater && compliance.kind === 'water' && (activeMainTab.key === 'watersupply' || activeMainTab.key === 'wastewaterpollution' || activeMainTab.key === 'samplingfindings') && (
-          <WaterExtraSectionsView compliance={compliance} canEdit={canEdit} onSaved={refetch} mainTab={activeWaterMainTab} hasDp={hasDp} />
+          <WaterExtraSectionsView
+            compliance={compliance}
+            canEdit={canEdit}
+            onSaved={refetch}
+            mainTab={activeWaterMainTab}
+            hasDp={hasDp}
+            province={report.establishmentSnapshot.province}
+          />
         )}
         {activeMainTab.key === 'attachments' && (
           <AttachmentsSection parentType="inspection" parentId={report.reportId} canEdit={canEdit} />

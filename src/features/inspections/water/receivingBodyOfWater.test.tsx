@@ -2,6 +2,7 @@ import React from 'react';
 import renderer, { act } from 'react-test-renderer';
 import { SelectField, TextField } from '../../../components/form';
 import { WaterExtraFormSectionsView } from './WaterExtraFormSections';
+import { WwtpDetailsSection } from './WaterComplianceEditSections';
 import { buildWaterReportTabs } from './waterReportTabs';
 import {
   decodeReceivingBodyOfWater,
@@ -168,5 +169,70 @@ describe('Receiving Body of Water (create form, section 5C)', () => {
         wwtpDetails: [expect.objectContaining({ receivingBodyOfWater: 'Boac River (C)' })],
       }),
     );
+  });
+});
+
+const renderEditSection = (details: Record<string, unknown>[], province: string) => {
+  let tree!: renderer.ReactTestRenderer;
+  act(() => {
+    tree = renderer.create(
+      <WwtpDetailsSection
+        complianceId="c1"
+        value={details as never}
+        canEdit
+        onSaved={() => {}}
+        province={province}
+      />,
+    );
+  });
+  return tree;
+};
+
+const startEditing = (tree: renderer.ReactTestRenderer) => {
+  const edit = tree.root.findAll(n => typeof n.props.onStartEdit === 'function')[0];
+  act(() => { edit.props.onStartEdit(); });
+};
+
+describe('Receiving Body of Water (edit screen, section 5C)', () => {
+  it('shows the recorded waterbody on the read-only card', () => {
+    const tree = renderEditSection(
+      [{ ...emptyWwtpDetail('1'), receivingBodyOfWater: 'Boac River (C)' }],
+      'Marinduque',
+    );
+    expect(JSON.stringify(tree.toJSON())).toContain('Boac River (C)');
+  });
+
+  // A report written before the dropdown existed holds a hand-typed name.
+  // Opening it must show that name, not a "Not listed (specify)" label.
+  it('shows legacy free text rather than the not-listed label', () => {
+    const tree = renderEditSection(
+      [{ ...emptyWwtpDetail('1'), receivingBodyOfWater: 'creek behind the plant' }],
+      'Marinduque',
+    );
+    const json = JSON.stringify(tree.toJSON());
+    expect(json).toContain('creek behind the plant');
+    expect(json).not.toContain('Not listed (specify)');
+  });
+
+  it('opens legacy free text into the specify box for editing', () => {
+    const tree = renderEditSection(
+      [{ ...emptyWwtpDetail('1'), receivingBodyOfWater: 'creek behind the plant' }],
+      'Marinduque',
+    );
+    startEditing(tree);
+    const specify = tree.root.findAll(n => n.type === TextField && n.props.label === 'Specify');
+    expect(specify).toHaveLength(1);
+    expect(specify[0].props.value).toBe('creek behind the plant');
+  });
+
+  it('offers the establishment’s own province when editing', () => {
+    const tree = renderEditSection([{ ...emptyWwtpDetail('1') }], 'Romblon');
+    startEditing(tree);
+    const options = tree.root
+      .find(n => n.type === SelectField
+        && n.props.label === 'Receiving Body of Water (Water Classification)')
+      .props.groups.flatMap((g: { options: string[] }) => g.options);
+    expect(options).toContain('Cajimos Bay (SC)');
+    expect(options).not.toContain('Boac River (C)');
   });
 });

@@ -58,9 +58,13 @@ import {
   emptyDpCondition,
   nonWwtpTreatmentFor,
   describeNonWwtpTreatment,
+  decodeReceivingBodyOfWater,
+  receivingBodyOfWaterForSave,
+  describeReceivingBodyOfWater,
 } from './waterTypes';
 import type { ComplianceWater } from '../../../db/models';
 import type { WaterMainTabDef } from './waterReportTabs';
+import { getWaterbodyGroups, WATERBODY_NOT_LISTED } from '../../../constants/waterbodies';
 
 const YES_NO = [
   { label: 'Yes', value: 'yes' },
@@ -399,18 +403,47 @@ export const WwtpDetailsSection: React.FC<{
   value: WwtpDetailCard[];
   canEdit: boolean;
   onSaved: () => void;
-}> = ({ complianceId, value, canEdit, onSaved }) => {
+  province: string;
+}> = ({ complianceId, value, canEdit, onSaved, province }) => {
   const fieldRefs = useRef<Record<string, TextInput | null>>({});
   const focus = (key: string) => focusInput(fieldRefs.current[key]);
   const setRef = (key: string) => (el: TextInput | null) => { fieldRefs.current[key] = el; };
 
   const section = useEditableSection<WwtpDetailCard[]>({
-    value,
+    // A stored row holds one string; the form needs it split into the
+    // dropdown's selection and the specify box beside it.
+    value: value.map(d => {
+      const { selection, other } = decodeReceivingBodyOfWater(d.receivingBodyOfWater, province);
+      return { ...d, receivingBodyOfWater: selection, receivingBodyOfWaterOther: other };
+    }),
     onSave: async wwtpDetails => {
-      await patchComplianceWater(complianceId, { wwtpDetails });
+      await patchComplianceWater(complianceId, {
+        wwtpDetails: wwtpDetails.map(d => ({
+          ...d,
+          receivingBodyOfWater: receivingBodyOfWaterForSave(
+            d.receivingBodyOfWater,
+            d.receivingBodyOfWaterOther,
+          ),
+          receivingBodyOfWaterOther: '',
+        })),
+      });
       onSaved();
     },
   });
+
+  // The escape hatch is its own trailing group, never folded into an EMB
+  // classification heading, and filing it under one would read as though
+  // "Not listed (specify)" were itself a classified waterbody.
+  // getWaterbodyGroups returns the bundled dataset's own arrays, so we
+  // spread into a new outer array rather than pushing into any of its
+  // groups' option arrays.
+  const waterbodyGroups = React.useMemo(
+    () => [
+      ...getWaterbodyGroups(province),
+      { label: 'Not on the list', options: [WATERBODY_NOT_LISTED] },
+    ],
+    [province],
+  );
 
   const updateDetail = (i: number, patch: Partial<WwtpDetailCard>) => {
     const rows = section.draft.slice();
@@ -504,20 +537,16 @@ export const WwtpDetailsSection: React.FC<{
                 onChangeText={t => updateDetail(i, { outletLocation: t })}
                 returnKeyType="next"
                 blurOnSubmit={false}
-                onSubmitEditing={() => focus(k('receivingBodyOfWater'))}
+                onSubmitEditing={() => focus(k('flowMeterDevice'))}
 
               />
             </View>
             <View style={styles.row}>
-              <TextField
-                ref={setRef(k('receivingBodyOfWater'))}
-                label="Receiving Body of Water"
+              <SelectField
+                label="Receiving Body of Water (Water Classification)"
                 value={d.receivingBodyOfWater}
-                onChangeText={t => updateDetail(i, { receivingBodyOfWater: t })}
-                returnKeyType="next"
-                blurOnSubmit={false}
-                onSubmitEditing={() => focus(k('flowMeterDevice'))}
-
+                groups={waterbodyGroups}
+                onSelect={v => updateDetail(i, { receivingBodyOfWater: v })}
               />
               <TextField
                 ref={setRef(k('flowMeterDevice'))}
@@ -530,6 +559,20 @@ export const WwtpDetailsSection: React.FC<{
 
               />
             </View>
+            {d.receivingBodyOfWater === WATERBODY_NOT_LISTED && (
+              <View style={styles.row}>
+                <TextField
+                  ref={setRef(k('receivingBodyOfWaterOther'))}
+                  label="Specify"
+                  value={d.receivingBodyOfWaterOther}
+                  onChangeText={t => updateDetail(i, { receivingBodyOfWaterOther: t })}
+                  placeholder="e.g. Sapa Creek"
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => focus(k('flowMeterDevice'))}
+                />
+              </View>
+            )}
             <View style={styles.row}>
               <TextField
                 ref={setRef(k('flowRate'))}
@@ -551,7 +594,7 @@ export const WwtpDetailsSection: React.FC<{
               { label: 'Design Capacity', value: d.designCapacity },
               { label: 'Annual Maintenance Cost', value: d.annualMaintenanceCost },
               { label: 'Outlet Location', value: d.outletLocation },
-              { label: 'Receiving Body of Water', value: d.receivingBodyOfWater },
+              { label: 'Receiving Body of Water (Water Classification)', value: describeReceivingBodyOfWater(d) },
               { label: 'Flow Meter Device', value: d.flowMeterDevice },
               { label: 'Flow Rate', value: d.flowRate },
             ]}
@@ -1423,6 +1466,7 @@ interface WaterExtraSectionsViewProps {
   onSaved: () => void;
   mainTab: WaterMainTabDef;
   hasDp: boolean;
+  province: string;
 }
 
 export const WaterExtraSectionsView: React.FC<WaterExtraSectionsViewProps> = ({
@@ -1431,6 +1475,7 @@ export const WaterExtraSectionsView: React.FC<WaterExtraSectionsViewProps> = ({
   onSaved,
   mainTab,
   hasDp,
+  province,
 }) => {
   const complianceId = compliance.complianceId;
 
@@ -1462,7 +1507,7 @@ export const WaterExtraSectionsView: React.FC<WaterExtraSectionsViewProps> = ({
         return compliance.hasWwtp === false ? (
           <WwtpUnavailableSection title="C. WWTP Details" />
         ) : (
-          <WwtpDetailsSection complianceId={complianceId} value={compliance.wwtpDetails} canEdit={canEdit} onSaved={onSaved} />
+          <WwtpDetailsSection complianceId={complianceId} value={compliance.wwtpDetails} canEdit={canEdit} onSaved={onSaved} province={province} />
         );
       case 'wwtpComponents':
         return compliance.hasWwtp === false ? (

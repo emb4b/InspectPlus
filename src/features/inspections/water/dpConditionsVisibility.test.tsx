@@ -90,6 +90,7 @@ describe('DP conditions Edit-button visibility (view screen)', () => {
           onSaved={() => {}}
           mainTab={samplingFindingsTab}
           hasDp
+          province="Marinduque"
         />,
       );
     });
@@ -110,6 +111,7 @@ describe('DP conditions Edit-button visibility (view screen)', () => {
           onSaved={() => {}}
           mainTab={samplingFindingsTab}
           hasDp={false}
+          province="Marinduque"
         />,
       );
     });
