@@ -1,5 +1,6 @@
 import type { DynamicRow, ChecklistValue, YnValue } from '../../../components/form';
 import { DAO_2005_10_CHECKLIST, NON_WWTP_TREATMENT_OTHERS } from './waterChecklistData';
+import { getWaterbodyGroups, WATERBODY_NOT_LISTED } from '../../../constants/waterbodies';
 
 export interface WwtpDetailCard {
   outletNo: string;
@@ -9,6 +10,7 @@ export interface WwtpDetailCard {
   annualMaintenanceCost: string;
   outletLocation: string;
   receivingBodyOfWater: string;
+  receivingBodyOfWaterOther: string;
   flowMeterDevice: string;
   flowRate: string;
 }
@@ -104,6 +106,7 @@ export const emptyWwtpDetail = (outletNo: string): WwtpDetailCard => ({
   annualMaintenanceCost: '',
   outletLocation: '',
   receivingBodyOfWater: '',
+  receivingBodyOfWaterOther: '',
   flowMeterDevice: '',
   flowRate: '',
 });
@@ -193,4 +196,35 @@ export function describeNonWwtpTreatment(systems: string[], other: string): stri
   return systems
     .map(s => (s === NON_WWTP_TREATMENT_OTHERS && other ? `${s}: ${other}` : s))
     .join(', ');
+}
+
+// ── Receiving body of water ──────────────────────────────────────────────────
+// The field stores one string either way: the picked option, or - when the
+// receiving water isn't on EMB's list - whatever the inspector typed. The
+// form splits that back into a selection and a text box on open and rejoins
+// it on save, so the record never holds a "Not listed (specify)" label
+// standing in for a real name.
+
+export function decodeReceivingBodyOfWater(
+  stored: string,
+  province: string,
+): { selection: string; other: string } {
+  if (!stored) return { selection: '', other: '' };
+  const known = getWaterbodyGroups(province).some(g => g.options.includes(stored));
+  return known
+    ? { selection: stored, other: '' }
+    : { selection: WATERBODY_NOT_LISTED, other: stored };
+}
+
+export function receivingBodyOfWaterForSave(selection: string, other: string): string {
+  if (selection !== WATERBODY_NOT_LISTED) return selection;
+  return other.trim();
+}
+
+export function describeReceivingBodyOfWater(detail: WwtpDetailCard): string {
+  const value = receivingBodyOfWaterForSave(
+    detail.receivingBodyOfWater,
+    detail.receivingBodyOfWaterOther,
+  );
+  return value || '—';
 }
