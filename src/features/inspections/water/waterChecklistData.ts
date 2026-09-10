@@ -89,3 +89,38 @@ export const WWTP_CONDITION_OPTIONS = [
 ];
 
 export const SAMPLE_TYPE_OPTIONS = ['Grab', 'Composite'];
+
+// Section 5D's three treatment columns. A WWTP runs several units in each
+// stage at once - a screen and a grit chamber ahead of an equalization tank
+// is an ordinary train - so these are checkboxes rather than one choice,
+// matching the printed inspection form.
+export const TREATMENT_OTHERS = 'Others (specify)';
+
+export const PRIMARY_TREATMENT_OPTIONS = [
+  'Screening',
+  'Grit Removal',
+  'Oil/Water Separator',
+  'Equalization Tank',
+  TREATMENT_OTHERS,
+];
+
+// The printed form reads "Tricking Filter"; the app uses the correct term.
+// Deliberate, and agreed with EMB - see the design doc.
+export const BIOLOGICAL_TREATMENT_OPTIONS = [
+  'Activated Sludge',
+  'Anaerobic Digestion',
+  'Anaerobic Baffled Reactor (ABR)',
+  'Reed Bed System',
+  'Trickling Filter',
+  'Oxidation/Stabilization Batch',
+  'Sequencing Batch Reactor',
+  TREATMENT_OTHERS,
+];
+
+export const CHEMICAL_TREATMENT_OPTIONS = [
+  'pH Adjustment',
+  'Disinfection',
+  'Redox',
+  'Flocculation/Coagulation',
+  TREATMENT_OTHERS,
+];
