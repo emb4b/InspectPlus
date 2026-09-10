@@ -102,6 +102,7 @@ describe('WWTP subsection field visibility (create form)', () => {
           onChange={() => {}}
           mainTab={wastewaterPollutionTab}
           hasDp={false}
+          province="Marinduque"
         />,
       );
     });
@@ -118,6 +119,7 @@ describe('WWTP subsection field visibility (create form)', () => {
           onChange={() => {}}
           mainTab={wastewaterPollutionTab}
           hasDp={false}
+          province="Marinduque"
         />,
       );
     });

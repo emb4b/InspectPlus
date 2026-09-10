@@ -21,7 +21,12 @@ import { useReportFormState } from '../hooks/useReportFormState';
 import { createEstablishmentRecord } from '../establishmentPersistence';
 import { buildGeneralInfoFromEstablishment, GeneralInfoFormState, PurposeFormState } from '../types';
 import { WaterExtraFormSectionsView } from './WaterExtraFormSections';
-import { emptyWaterComplianceForm, nonWwtpTreatmentForSave, WaterComplianceFormState } from './waterTypes';
+import {
+  emptyWaterComplianceForm,
+  nonWwtpTreatmentForSave,
+  receivingBodyOfWaterForSave,
+  WaterComplianceFormState,
+} from './waterTypes';
 import { buildWaterReportTabs, establishmentHasDischargePermit } from './waterReportTabs';
 import type { EstablishmentDTO } from '../../establishments/types';
 import { useHeaderScroll } from '../../home/context/HeaderScrollContext';
@@ -71,7 +76,14 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
         hasWwtp: waterCompliance.hasWwtp === 'yes',
         nonWwtpTreatment: nonWwtpTreatmentForSave(waterCompliance),
         wwtpType: waterCompliance.wwtpType || null,
-        wwtpDetails: waterCompliance.wwtpDetails,
+        wwtpDetails: waterCompliance.wwtpDetails.map(d => ({
+          ...d,
+          receivingBodyOfWater: receivingBodyOfWaterForSave(
+            d.receivingBodyOfWater,
+            d.receivingBodyOfWaterOther,
+          ),
+          receivingBodyOfWaterOther: '',
+        })),
         wwtpComponents: waterCompliance.wwtpComponents,
         wwtpCondition: waterCompliance.wwtpCondition || null,
         wwtpUnderConstruction: waterCompliance.wwtpUnderConstruction === 'yes',
@@ -206,7 +218,13 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
           />
         )}
         {(activeMainTab.key === 'watersupply' || activeMainTab.key === 'wastewaterpollution' || activeMainTab.key === 'samplingfindings') && (
-          <WaterExtraFormSectionsView value={waterCompliance} onChange={setWaterCompliance} mainTab={activeMainTab} hasDp={hasDp} />
+          <WaterExtraFormSectionsView
+            value={waterCompliance}
+            onChange={setWaterCompliance}
+            mainTab={activeMainTab}
+            hasDp={hasDp}
+            province={generalInfo.province}
+          />
         )}
         {activeMainTab.key === 'attachments' && (
           <AttachmentsSection

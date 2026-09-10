@@ -129,6 +129,7 @@ describe('DP conditions field visibility (create form)', () => {
           onChange={() => {}}
           mainTab={samplingFindingsTab}
           hasDp
+          province="Marinduque"
         />,
       );
     });
@@ -144,6 +145,7 @@ describe('DP conditions field visibility (create form)', () => {
           onChange={() => {}}
           mainTab={samplingFindingsTab}
           hasDp={false}
+          province="Marinduque"
         />,
       );
     });

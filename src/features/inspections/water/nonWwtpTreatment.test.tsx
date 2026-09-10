@@ -70,7 +70,7 @@ function renderForm(value: WaterComplianceFormState, onChange: (v: WaterComplian
   let tree!: renderer.ReactTestRenderer;
   act(() => {
     tree = renderer.create(
-      <WaterExtraFormSectionsView value={value} onChange={onChange} mainTab={wastewaterPollutionTab} hasDp={false} />,
+      <WaterExtraFormSectionsView value={value} onChange={onChange} mainTab={wastewaterPollutionTab} hasDp={false} province="Marinduque" />,
     );
   });
   return tree;

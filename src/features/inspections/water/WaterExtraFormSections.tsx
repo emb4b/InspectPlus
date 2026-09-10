@@ -41,6 +41,7 @@ import {
   SamplingParameterRow,
 } from './waterTypes';
 import type { WaterMainTabDef } from './waterReportTabs';
+import { getWaterbodyGroups, WATERBODY_NOT_LISTED } from '../../../constants/waterbodies';
 
 const YES_NO = [
   { label: 'Yes', value: 'yes' },
@@ -52,6 +53,7 @@ interface WaterExtraFormSectionsViewProps {
   onChange: (value: WaterComplianceFormState) => void;
   mainTab: WaterMainTabDef;
   hasDp: boolean;
+  province: string;
 }
 
 // Renders every subsection of the active main tab in template order, top to
@@ -65,10 +67,25 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
   onChange,
   mainTab,
   hasDp,
+  province,
 }) => {
   const fieldRefs = useRef<Record<string, TextInput | null>>({});
   const focus = (key: string) => focusInput(fieldRefs.current[key]);
   const setRef = (key: string) => (el: TextInput | null) => { fieldRefs.current[key] = el; };
+
+  // The dropdown offers this establishment's own province plus a way to say
+  // "none of these" - see getWaterbodyGroups for the out-of-region fallback.
+  // The not-listed option rides along in "Other Waterbodies" (every
+  // province's list ends with that group) rather than as a group of its
+  // own, so the picker still reads as the same three-group shape the 2020
+  // list has everywhere.
+  const waterbodyGroups = React.useMemo(() => {
+    const groups = getWaterbodyGroups(province).map(g => ({ ...g, options: [...g.options] }));
+    const other = groups.find(g => g.label === 'Other Waterbodies');
+    if (other) other.options.push(WATERBODY_NOT_LISTED);
+    else groups.push({ label: 'Other Waterbodies', options: [WATERBODY_NOT_LISTED] });
+    return groups;
+  }, [province]);
 
   const set = <K extends keyof WaterComplianceFormState>(key: K, v: WaterComplianceFormState[K]) =>
     onChange({ ...value, [key]: v });
@@ -373,18 +390,15 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                       onChangeText={t => updateWwtpDetail(i, { outletLocation: t })}
                       returnKeyType="next"
                       blurOnSubmit={false}
-                      onSubmitEditing={() => focus(k('receivingBodyOfWater'))}
+                      onSubmitEditing={() => focus(k('flowMeterDevice'))}
                     />
                   </View>
                   <View style={styles.row}>
-                    <TextField
-                      ref={setRef(k('receivingBodyOfWater'))}
-                      label="Receiving Body of Water"
+                    <SelectField
+                      label="Receiving Body of Water (Water Classification)"
                       value={d.receivingBodyOfWater}
-                      onChangeText={t => updateWwtpDetail(i, { receivingBodyOfWater: t })}
-                      returnKeyType="next"
-                      blurOnSubmit={false}
-                      onSubmitEditing={() => focus(k('flowMeterDevice'))}
+                      groups={waterbodyGroups}
+                      onSelect={v => updateWwtpDetail(i, { receivingBodyOfWater: v })}
                     />
                     <TextField
                       ref={setRef(k('flowMeterDevice'))}
@@ -396,6 +410,20 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                       onSubmitEditing={() => focus(k('flowRate'))}
                     />
                   </View>
+                  {d.receivingBodyOfWater === WATERBODY_NOT_LISTED && (
+                    <View style={styles.row}>
+                      <TextField
+                        ref={setRef(k('receivingBodyOfWaterOther'))}
+                        label="Specify"
+                        value={d.receivingBodyOfWaterOther}
+                        onChangeText={t => updateWwtpDetail(i, { receivingBodyOfWaterOther: t })}
+                        placeholder="e.g. Sapa Creek"
+                        returnKeyType="next"
+                        blurOnSubmit={false}
+                        onSubmitEditing={() => focus(k('flowMeterDevice'))}
+                      />
+                    </View>
+                  )}
                   <View style={styles.row}>
                     <TextField
                       ref={setRef(k('flowRate'))}
