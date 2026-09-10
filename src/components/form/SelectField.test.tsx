@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, TouchableOpacity } from 'react-native';
+import { Text, TextInput, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import TestRenderer from 'react-test-renderer';
 import { SelectField } from './SelectField';
@@ -177,5 +177,93 @@ describe('SelectField behavior (unchanged by this task)', () => {
       retailRowBtn.props.onPress();
     });
     expect(onSelect).toHaveBeenCalledWith('Retail');
+  });
+});
+
+describe('SelectField groups', () => {
+  // Marinduque's real waterbody list (src/data/mimaropaWaterbodies.ts) -
+  // three groups, 8 options total. Needs to clear the same >6 threshold a
+  // real caller's data would, or the search box in the "drops a header"
+  // case below never mounts.
+  const groups = [
+    { label: 'Principal Rivers', options: ['Boac River (C)', 'Tagum River (C)', 'Tawiran River (A, B, C)'] },
+    { label: 'Minor Rivers', options: ['Balanacan River (C)', 'Mogpog River (C)'] },
+    { label: 'Other Waterbodies', options: ['Calancan Bay (SB)', 'Maniwaya Coastal Waters (SB)', 'Ulan Bay (SB, SC)'] },
+  ];
+
+  const openPicker = (tree: Renderer) => {
+    TestRenderer.act(() => {
+      tree.root.findAll((n) => n.type === TouchableOpacity)[0].props.onPress();
+    });
+  };
+
+  // `tree.toJSON()` isn't usable here: with the picker's Modal open, this
+  // environment's react-test-renderer throws "Converting circular structure
+  // to JSON" (reproduced on the pre-existing `options` path too, so it's an
+  // environment quirk, not something this change introduced) - text
+  // presence is checked via the rendered Text nodes instead.
+  const hasText = (tree: Renderer, text: string) =>
+    tree.root.findAll((n) => n.type === Text && [n.props.children].flat().includes(text)).length > 0;
+
+  it('renders a header above each group', () => {
+    const tree = render(
+      <SelectField label="Receiving Body of Water" value="" groups={groups} onSelect={noop} />,
+    );
+    openPicker(tree);
+    expect(hasText(tree, 'Principal Rivers')).toBe(true);
+    expect(hasText(tree, 'Other Waterbodies')).toBe(true);
+    expect(hasText(tree, 'Boac River (C)')).toBe(true);
+  });
+
+  // A header is a label, not a choice. Tapping it must not select it, or an
+  // inspector ends up with "Principal Rivers" recorded as their outlet's
+  // receiving water.
+  it('does not select a header when it is tapped', () => {
+    const onSelect = jest.fn();
+    const tree = render(
+      <SelectField label="Receiving Body of Water" value="" groups={groups} onSelect={onSelect} />,
+    );
+    openPicker(tree);
+    const header = tree.root.findAll(
+      (n) => n.type === Text && [n.props.children].flat().includes('Principal Rivers'),
+    )[0];
+    expect(header.parent?.props.onPress).toBeUndefined();
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+
+  it('still selects a real option', () => {
+    const onSelect = jest.fn();
+    const tree = render(
+      <SelectField label="Receiving Body of Water" value="" groups={groups} onSelect={onSelect} />,
+    );
+    openPicker(tree);
+    // Anchored on the option row's own resolved style rather than a `.parent`
+    // walk off the Text, for the same reason as the pre-existing "selects an
+    // option" test above: TouchableOpacity's own test instance sits below an
+    // intermediate host View, so `Text.parent` resolves to that View instead.
+    const optionRowBtn = tree.root.find(
+      (n) => n.type === TouchableOpacity && flattenStyle(n.props.style).justifyContent === 'space-between'
+        && flattenStyle(n.props.style).paddingHorizontal === Spacing.xs
+        && n.findAllByType(Text).some((t) => t.props.children === 'Boac River (C)'),
+    );
+    TestRenderer.act(() => {
+      optionRowBtn.props.onPress();
+    });
+    expect(onSelect).toHaveBeenCalledWith('Boac River (C)');
+  });
+
+  // Otherwise a search matching nothing in a group leaves its header
+  // stranded above a gap.
+  it('drops a header whose options all filter out', () => {
+    const tree = render(
+      <SelectField label="Receiving Body of Water" value="" groups={groups} onSelect={noop} />,
+    );
+    openPicker(tree);
+    const search = tree.root.findAll((n) => n.type === TextInput)[0];
+    TestRenderer.act(() => {
+      search.props.onChangeText('Ulan');
+    });
+    expect(hasText(tree, 'Other Waterbodies')).toBe(true);
+    expect(hasText(tree, 'Principal Rivers')).toBe(false);
   });
 });
