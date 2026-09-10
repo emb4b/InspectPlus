@@ -75,17 +75,20 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
 
   // The dropdown offers this establishment's own province plus a way to say
   // "none of these" - see getWaterbodyGroups for the out-of-region fallback.
-  // The not-listed option rides along in "Other Waterbodies" (every
-  // province's list ends with that group) rather than as a group of its
-  // own, so the picker still reads as the same three-group shape the 2020
-  // list has everywhere.
-  const waterbodyGroups = React.useMemo(() => {
-    const groups = getWaterbodyGroups(province).map(g => ({ ...g, options: [...g.options] }));
-    const other = groups.find(g => g.label === 'Other Waterbodies');
-    if (other) other.options.push(WATERBODY_NOT_LISTED);
-    else groups.push({ label: 'Other Waterbodies', options: [WATERBODY_NOT_LISTED] });
-    return groups;
-  }, [province]);
+  // The not-listed option is its own trailing, ungrouped-feeling group
+  // rather than folded into "Other Waterbodies": that group is a real EMB
+  // classification heading, and filing the escape hatch under it would read
+  // as though "Not listed (specify)" were itself a classified waterbody.
+  // getWaterbodyGroups returns the bundled dataset's own arrays, so we
+  // spread into a new outer array rather than pushing into any of its
+  // groups' option arrays.
+  const waterbodyGroups = React.useMemo(
+    () => [
+      ...getWaterbodyGroups(province),
+      { label: 'Not on the list', options: [WATERBODY_NOT_LISTED] },
+    ],
+    [province],
+  );
 
   const set = <K extends keyof WaterComplianceFormState>(key: K, v: WaterComplianceFormState[K]) =>
     onChange({ ...value, [key]: v });

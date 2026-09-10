@@ -134,10 +134,10 @@ describe('Receiving Body of Water (create form, section 5C)', () => {
     expect(options).not.toContain('Honda Bay (SB)');
   });
 
-  it('groups them principal, then minor, then other', () => {
+  it('groups them principal, then minor, then other, then not-listed', () => {
     const labels = receivingField(renderForm(withOneOutlet(), 'Marinduque')).props.groups
       .map((g: { label: string }) => g.label);
-    expect(labels).toEqual(['Principal Rivers', 'Minor Rivers', 'Other Waterbodies']);
+    expect(labels).toEqual(['Principal Rivers', 'Minor Rivers', 'Other Waterbodies', 'Not on the list']);
   });
 
   it('always offers the not-listed escape hatch', () => {
