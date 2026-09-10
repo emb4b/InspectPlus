@@ -13,7 +13,6 @@ import type { PermitSnapshotItem } from '../../../services/sync/syncTypes';
 // are hoisted above imports by babel-plugin-jest-hoist regardless of
 // where written, so these apply before DenrPermitsSection is required.
 jest.mock('../../../db/database', () => ({ database: {}, collections: {} }));
-jest.mock('@react-native-async-storage/async-storage');
 jest.mock('../../../services/supabase/client');
 jest.mock('react-native-keyboard-controller', () => jest.requireActual('react-native-keyboard-controller/jest'));
 

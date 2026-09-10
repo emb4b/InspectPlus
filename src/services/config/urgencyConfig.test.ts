@@ -1,12 +1,6 @@
-import mockAsyncStorage from '@react-native-async-storage/async-storage/jest/async-storage-mock';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ENV } from '../../core/config/env';
-
-// jest-expo's preset does not mock this third-party package, so it needs the
-// mock the package itself ships. The `mock`-prefixed name is required for
-// Jest to allow the hoisted factory to reference it.
-jest.mock('@react-native-async-storage/async-storage', () => mockAsyncStorage);
 
 const STORAGE_KEY = 'inspectplus.config.urgency';
 
