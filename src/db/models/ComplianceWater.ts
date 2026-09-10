@@ -25,8 +25,11 @@ export class ComplianceWater extends Model {
   // { systems: string[], other: string } - only populated when hasWwtp is
   // false; a report with a WWTP stores {} here. See nonWwtpTreatmentForSave.
   @json('nonWwtpTreatment', asObject)        nonWwtpTreatment!: Record<string, any>;
-  // wwtpType: 'Physical' | 'Biological' | 'Chemical' | 'Others'
+  // wwtpType: 'Physical' | 'Biological' | 'Chemical' | 'Combined' | 'Others'
   @field('wwtpType')                         wwtpType!: string | null;
+  // What "Others" means, when that's the answer. Empty otherwise - see
+  // wwtpTypeOtherForSave in src/features/inspections/water/waterTypes.ts.
+  @field('wwtpTypeOther')                    wwtpTypeOther!: string | null;
   // Each item: { outletNo, wwtpDetail, dateOfInstallation, designCapacity,
   //   annualMaintenanceCost, outletLocation, receivingBodyOfWater,
   //   flowMeterDevice, flowRate }. Keys are camelCase: the form object is

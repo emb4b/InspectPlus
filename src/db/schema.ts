@@ -25,7 +25,7 @@ import { appSchema, tableSchema } from '@nozbe/watermelondb';
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const schema = appSchema({
-  version: 12,
+  version: 13,
   tables: [
 
     // ── ESTABLISHMENTS ───────────────────────────────────────────────────────
@@ -206,6 +206,7 @@ export const schema = appSchema({
         // while hasWwtp is false; see nonWwtpTreatmentForSave.
         { name: 'nonWwtpTreatment',           type: 'string', isOptional: true },
         { name: 'wwtpType',                   type: 'string', isOptional: true },
+        { name: 'wwtpTypeOther',              type: 'string', isOptional: true },
         { name: 'wwtpDetails',                type: 'string', isOptional: true },
         { name: 'wwtpComponents',             type: 'string', isOptional: true },
         { name: 'wwtpCondition',              type: 'string', isOptional: true },

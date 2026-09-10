@@ -217,6 +217,7 @@ export const syncSchema: Record<SyncEntityName, SyncEntitySchema> = {
       has_wwtp:                    'hasWwtp',
       non_wwtp_treatment:          'nonWwtpTreatment',
       wwtp_type:                   'wwtpType',
+      wwtp_type_other:             'wwtpTypeOther',
       wwtp_details:                'wwtpDetails',
       wwtp_components:             'wwtpComponents',
       wwtp_condition:              'wwtpCondition',
