@@ -66,7 +66,7 @@ import {
   receivingBodyOfWaterForSave,
   describeReceivingBodyOfWater,
   decodeWwtpComponent,
-  treatmentForSave,
+  wwtpComponentForSave,
   describeTreatment,
 } from './waterTypes';
 import type { ComplianceWater } from '../../../db/models';
@@ -634,20 +634,7 @@ export const WwtpComponentsSection: React.FC<{
     value: value.map(c => decodeWwtpComponent(c)),
     onSave: async wwtpComponents => {
       await patchComplianceWater(complianceId, {
-        wwtpComponents: wwtpComponents.map(c => {
-          const primary = treatmentForSave(c.primaryTreatment, c.primaryTreatmentOther);
-          const biological = treatmentForSave(c.biologicalTreatment, c.biologicalTreatmentOther);
-          const chemical = treatmentForSave(c.chemicalTreatment, c.chemicalTreatmentOther);
-          return {
-            ...c,
-            primaryTreatment: primary.selected,
-            primaryTreatmentOther: primary.other,
-            biologicalTreatment: biological.selected,
-            biologicalTreatmentOther: biological.other,
-            chemicalTreatment: chemical.selected,
-            chemicalTreatmentOther: chemical.other,
-          };
-        }),
+        wwtpComponents: wwtpComponents.map(c => wwtpComponentForSave(c)),
       });
       onSaved();
     },

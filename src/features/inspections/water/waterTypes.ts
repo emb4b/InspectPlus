@@ -311,6 +311,26 @@ export function treatmentForSave(
   return { selected, other: selected.includes(TREATMENT_OTHERS) ? other.trim() : '' };
 }
 
+// Both entry paths - the create form and the edit screen - write a whole
+// component card, not one stage at a time, so this is the boundary they
+// actually share. Reconciling all three stages in one place means a fourth
+// stage, or a rename, can't update one call site and silently leave the
+// other persisting text stranded by an unticked Others.
+export function wwtpComponentForSave(c: WwtpComponentCard): WwtpComponentCard {
+  const primary = treatmentForSave(c.primaryTreatment, c.primaryTreatmentOther);
+  const biological = treatmentForSave(c.biologicalTreatment, c.biologicalTreatmentOther);
+  const chemical = treatmentForSave(c.chemicalTreatment, c.chemicalTreatmentOther);
+  return {
+    ...c,
+    primaryTreatment: primary.selected,
+    primaryTreatmentOther: primary.other,
+    biologicalTreatment: biological.selected,
+    biologicalTreatmentOther: biological.other,
+    chemicalTreatment: chemical.selected,
+    chemicalTreatmentOther: chemical.other,
+  };
+}
+
 export function describeTreatment(selected: string[], other: string): string {
   if (selected.length === 0) return '—';
   return selected.map(s => (s === TREATMENT_OTHERS && other ? `${s}: ${other}` : s)).join(', ');

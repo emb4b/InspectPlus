@@ -12,6 +12,7 @@ import {
   decodeTreatment,
   decodeWwtpComponent,
   treatmentForSave,
+  wwtpComponentForSave,
   describeTreatment,
   emptyWwtpComponent,
   emptyWaterComplianceForm,
@@ -225,6 +226,66 @@ describe('what reaches the record', () => {
       selected: ['Screening'],
       other: '',
     });
+  });
+});
+
+describe('reconciling a whole component card for save', () => {
+  // Both entry paths write a component card through this one function, so a
+  // fourth stage or a rename only has to be handled here - not once per
+  // call site with nothing pinning the second one.
+  it('reconciles all three stages independently', () => {
+    const card = {
+      ...emptyWwtpComponent('1'),
+      primaryTreatment: [TREATMENT_OTHERS],
+      primaryTreatmentOther: ' Sedimentation ',
+      biologicalTreatment: ['Activated Sludge'],
+      biologicalTreatmentOther: 'stray text',
+      chemicalTreatment: [TREATMENT_OTHERS],
+      chemicalTreatmentOther: ' Ferric chloride ',
+    };
+    expect(wwtpComponentForSave(card)).toEqual({
+      ...card,
+      primaryTreatmentOther: 'Sedimentation',
+      biologicalTreatmentOther: '',
+      chemicalTreatmentOther: 'Ferric chloride',
+    });
+  });
+
+  it('keeps a stage’s text when that stage’s Others is ticked', () => {
+    const card = {
+      ...emptyWwtpComponent('1'),
+      primaryTreatment: [TREATMENT_OTHERS],
+      primaryTreatmentOther: 'Sedimentation',
+    };
+    expect(wwtpComponentForSave(card).primaryTreatmentOther).toBe('Sedimentation');
+  });
+
+  it('drops a stage’s text when that stage’s Others is not ticked', () => {
+    const card = {
+      ...emptyWwtpComponent('1'),
+      primaryTreatment: ['Screening'],
+      primaryTreatmentOther: 'Sedimentation',
+    };
+    expect(wwtpComponentForSave(card).primaryTreatmentOther).toBe('');
+  });
+
+  // A fourth stage or a rename that updates one path and leaves the other
+  // is exactly the defect this helper closes off - pin that one stage's
+  // text cannot end up reconciled under another stage's key.
+  it('does not let one stage’s text leak into another', () => {
+    const card = {
+      ...emptyWwtpComponent('1'),
+      primaryTreatment: ['Screening'],
+      primaryTreatmentOther: 'stray',
+      biologicalTreatment: [TREATMENT_OTHERS],
+      biologicalTreatmentOther: 'Anaerobic notes',
+      chemicalTreatment: [],
+      chemicalTreatmentOther: '',
+    };
+    const saved = wwtpComponentForSave(card);
+    expect(saved.primaryTreatmentOther).toBe('');
+    expect(saved.biologicalTreatmentOther).toBe('Anaerobic notes');
+    expect(saved.chemicalTreatmentOther).toBe('');
   });
 });
 
