@@ -27,12 +27,16 @@ export class ComplianceWater extends Model {
   @json('nonWwtpTreatment', asObject)        nonWwtpTreatment!: Record<string, any>;
   // wwtpType: 'Physical' | 'Biological' | 'Chemical' | 'Others'
   @field('wwtpType')                         wwtpType!: string | null;
-  // Each item: { outlet_no, wwtp_detail, date_of_installation,
-  //   design_capacity, annual_maintenance_cost, outlet_location,
-  //   receiving_body_of_water, flow_meter_device, flow_rate }
+  // Each item: { outletNo, wwtpDetail, dateOfInstallation, designCapacity,
+  //   annualMaintenanceCost, outletLocation, receivingBodyOfWater,
+  //   flowMeterDevice, flowRate }. Keys are camelCase: the form object is
+  //   written straight through by Object.assign, with no key transform.
   @json('wwtpDetails', asArray)              wwtpDetails!: any[];
-  // Each item: { outlet_no, primary_treatment[], biological_treatment[],
-  //   chemical_treatment[], other_treatment }
+  // Each item: { outletNo, wwtp, primaryTreatment[], primaryTreatmentOther,
+  //   biologicalTreatment[], biologicalTreatmentOther, chemicalTreatment[],
+  //   chemicalTreatmentOther, otherTreatment }. Rows written before section
+  //   5D became checkboxes hold comma-separated strings where the arrays
+  //   are; decodeWwtpComponent in waterTypes.ts reads both.
   @json('wwtpComponents', asArray)           wwtpComponents!: any[];
   // wwtpCondition: 'Properly Maintained' | 'Inadequately Maintained' |
   //                'Poor Maintenance' | 'Others'

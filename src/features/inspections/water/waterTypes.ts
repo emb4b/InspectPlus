@@ -1,5 +1,12 @@
 import type { DynamicRow, ChecklistValue, YnValue } from '../../../components/form';
-import { DAO_2005_10_CHECKLIST, NON_WWTP_TREATMENT_OTHERS } from './waterChecklistData';
+import {
+  DAO_2005_10_CHECKLIST,
+  NON_WWTP_TREATMENT_OTHERS,
+  TREATMENT_OTHERS,
+  PRIMARY_TREATMENT_OPTIONS,
+  BIOLOGICAL_TREATMENT_OPTIONS,
+  CHEMICAL_TREATMENT_OPTIONS,
+} from './waterChecklistData';
 import { getWaterbodyGroups, WATERBODY_NOT_LISTED } from '../../../constants/waterbodies';
 
 export interface WwtpDetailCard {
@@ -17,9 +24,13 @@ export interface WwtpDetailCard {
 
 export interface WwtpComponentCard {
   outletNo: string;
-  primaryTreatment: string;
-  biologicalTreatment: string;
-  chemicalTreatment: string;
+  wwtp: string;
+  primaryTreatment: string[];
+  primaryTreatmentOther: string;
+  biologicalTreatment: string[];
+  biologicalTreatmentOther: string;
+  chemicalTreatment: string[];
+  chemicalTreatmentOther: string;
   otherTreatment: string;
 }
 
@@ -113,9 +124,13 @@ export const emptyWwtpDetail = (outletNo: string): WwtpDetailCard => ({
 
 export const emptyWwtpComponent = (outletNo: string): WwtpComponentCard => ({
   outletNo,
-  primaryTreatment: '',
-  biologicalTreatment: '',
-  chemicalTreatment: '',
+  wwtp: '',
+  primaryTreatment: [],
+  primaryTreatmentOther: '',
+  biologicalTreatment: [],
+  biologicalTreatmentOther: '',
+  chemicalTreatment: [],
+  chemicalTreatmentOther: '',
   otherTreatment: '',
 });
 
@@ -227,4 +242,76 @@ export function describeReceivingBodyOfWater(detail: WwtpDetailCard): string {
     detail.receivingBodyOfWaterOther,
   );
   return value || '—';
+}
+
+// ── WWTP treatment components ────────────────────────────────────────────────
+// Rows written before section 5D became checkboxes hold a comma-separated
+// string here, because the field was one free-text box hinted
+// "Comma-separated". Decoding is lenient and happens on read: no data
+// migration, and a report nobody re-opens is never rewritten.
+
+export function decodeTreatment(
+  stored: unknown,
+  options: string[],
+): { selected: string[]; other: string } {
+  const parts = Array.isArray(stored)
+    ? stored.map(String)
+    : typeof stored === 'string'
+      ? stored.split(',').map(s => s.trim())
+      : [];
+  const selected: string[] = [];
+  const unmatched: string[] = [];
+  parts.filter(Boolean).forEach(part => {
+    const match = options.find(o => o.toLowerCase() === part.toLowerCase());
+    if (match) {
+      if (!selected.includes(match)) selected.push(match);
+    } else {
+      unmatched.push(part);
+    }
+  });
+  // What the list doesn't recognise is still what the inspector wrote, so it
+  // moves under Others rather than being discarded.
+  if (unmatched.length > 0 && !selected.includes(TREATMENT_OTHERS)) {
+    selected.push(TREATMENT_OTHERS);
+  }
+  return { selected, other: unmatched.join(', ') };
+}
+
+// A stage's specify text can arrive two ways, and only one of them at a
+// time. A legacy row has no specify key at all - its unrecognised fragments
+// are what decodeTreatment recovered. A row this build wrote keeps the text
+// in its own key, and the array beside it holds nothing but the Others tick,
+// so there is nothing to recover and the stored key is the only copy.
+const treatmentOtherFor = (recovered: string, stored: unknown): string =>
+  recovered || String(stored ?? '');
+
+export function decodeWwtpComponent(stored: Record<string, unknown>): WwtpComponentCard {
+  const primary = decodeTreatment(stored.primaryTreatment, PRIMARY_TREATMENT_OPTIONS);
+  const biological = decodeTreatment(stored.biologicalTreatment, BIOLOGICAL_TREATMENT_OPTIONS);
+  const chemical = decodeTreatment(stored.chemicalTreatment, CHEMICAL_TREATMENT_OPTIONS);
+  return {
+    outletNo: String(stored.outletNo ?? ''),
+    wwtp: String(stored.wwtp ?? ''),
+    primaryTreatment: primary.selected,
+    primaryTreatmentOther: treatmentOtherFor(primary.other, stored.primaryTreatmentOther),
+    biologicalTreatment: biological.selected,
+    biologicalTreatmentOther: treatmentOtherFor(biological.other, stored.biologicalTreatmentOther),
+    chemicalTreatment: chemical.selected,
+    chemicalTreatmentOther: treatmentOtherFor(chemical.other, stored.chemicalTreatmentOther),
+    otherTreatment: String(stored.otherTreatment ?? ''),
+  };
+}
+
+// Same boundary nonWwtpTreatmentFor draws: text stranded by an untick would
+// contradict the boxes beside it, so it never reaches the record.
+export function treatmentForSave(
+  selected: string[],
+  other: string,
+): { selected: string[]; other: string } {
+  return { selected, other: selected.includes(TREATMENT_OTHERS) ? other.trim() : '' };
+}
+
+export function describeTreatment(selected: string[], other: string): string {
+  if (selected.length === 0) return '—';
+  return selected.map(s => (s === TREATMENT_OTHERS && other ? `${s}: ${other}` : s)).join(', ');
 }

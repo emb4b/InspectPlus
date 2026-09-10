@@ -8,7 +8,23 @@ import {
   CHEMICAL_TREATMENT_OPTIONS,
   TREATMENT_OTHERS,
 } from './waterChecklistData';
+import {
+  decodeTreatment,
+  decodeWwtpComponent,
+  treatmentForSave,
+  describeTreatment,
+  emptyWwtpComponent,
+  emptyWaterComplianceForm,
+  WaterComplianceFormState,
+} from './waterTypes';
+import { WaterExtraFormSectionsView } from './WaterExtraFormSections';
+import { WwtpComponentsSection } from './WaterComplianceEditSections';
+import { buildWaterReportTabs } from './waterReportTabs';
 
+jest.mock('../../../db/database', () => ({
+  database: { write: async (fn: () => Promise<void>) => fn() },
+  collections: { complianceWater: { find: async () => ({ update: () => {} }) } },
+}));
 // components/form pulls in useScrollToInput, which touches the native
 // KeyboardEvents binding at import time - not available under plain Jest
 // (no device/simulator). See dpConditionsVisibility.test.tsx for the same
@@ -114,5 +130,287 @@ describe('TreatmentCheckboxGroup', () => {
     const fields = tree.root.findAll(n => n.type === TextField);
     expect(fields).toHaveLength(1);
     expect(fields[0].props.value).toBe('Sedimentation');
+  });
+});
+
+describe('decoding treatment stored by an older build', () => {
+  // Rows written before this change hold a comma-separated string, because
+  // the field was one free-text box hinted "Comma-separated".
+  it('splits a comma-separated string into ticks', () => {
+    expect(decodeTreatment('Screening, Grit Removal', PRIMARY_TREATMENT_OPTIONS)).toEqual({
+      selected: ['Screening', 'Grit Removal'],
+      other: '',
+    });
+  });
+
+  it('matches option names case-insensitively', () => {
+    expect(decodeTreatment('screening', PRIMARY_TREATMENT_OPTIONS)).toEqual({
+      selected: ['Screening'],
+      other: '',
+    });
+  });
+
+  // Anything the list doesn't know is preserved rather than dropped - it's
+  // what the inspector actually wrote.
+  it('keeps unrecognised text under Others', () => {
+    expect(decodeTreatment('Screening, Sedimentation', PRIMARY_TREATMENT_OPTIONS)).toEqual({
+      selected: ['Screening', TREATMENT_OTHERS],
+      other: 'Sedimentation',
+    });
+  });
+
+  it('takes an array as it stands', () => {
+    expect(decodeTreatment(['Screening'], PRIMARY_TREATMENT_OPTIONS)).toEqual({
+      selected: ['Screening'],
+      other: '',
+    });
+  });
+
+  it('reads a missing value as nothing selected', () => {
+    expect(decodeTreatment(undefined, PRIMARY_TREATMENT_OPTIONS)).toEqual({ selected: [], other: '' });
+  });
+});
+
+describe('decoding a whole stored component row', () => {
+  it('carries a legacy row across to the new shape', () => {
+    expect(
+      decodeWwtpComponent({
+        outletNo: '1',
+        primaryTreatment: 'Screening',
+        biologicalTreatment: 'Activated Sludge',
+        chemicalTreatment: 'Disinfection',
+        otherTreatment: 'none',
+      }),
+    ).toEqual({
+      outletNo: '1',
+      wwtp: '',
+      primaryTreatment: ['Screening'],
+      primaryTreatmentOther: '',
+      biologicalTreatment: ['Activated Sludge'],
+      biologicalTreatmentOther: '',
+      chemicalTreatment: ['Disinfection'],
+      chemicalTreatmentOther: '',
+      otherTreatment: 'none',
+    });
+  });
+
+  // A row this build wrote keeps its specify text in its own key, and the
+  // array beside it holds only the Others tick - so there are no unmatched
+  // fragments for the decode to rebuild the text from, and it has to take
+  // the stored one or the inspector's words vanish on re-open.
+  it('keeps the specify text a row of the current shape stored beside the tick', () => {
+    expect(
+      decodeWwtpComponent({
+        outletNo: '1',
+        primaryTreatment: ['Screening', TREATMENT_OTHERS],
+        primaryTreatmentOther: 'Sedimentation',
+      }),
+    ).toMatchObject({
+      primaryTreatment: ['Screening', TREATMENT_OTHERS],
+      primaryTreatmentOther: 'Sedimentation',
+    });
+  });
+});
+
+describe('what reaches the record', () => {
+  it('keeps free text alongside an Others tick', () => {
+    expect(treatmentForSave([TREATMENT_OTHERS], ' Sedimentation ')).toEqual({
+      selected: [TREATMENT_OTHERS],
+      other: 'Sedimentation',
+    });
+  });
+
+  it('drops free text left behind by an unticked Others', () => {
+    expect(treatmentForSave(['Screening'], 'Sedimentation')).toEqual({
+      selected: ['Screening'],
+      other: '',
+    });
+  });
+});
+
+describe('summarising for a read-only card', () => {
+  it('joins the ticked options', () => {
+    expect(describeTreatment(['Screening', 'Grit Removal'], '')).toBe('Screening, Grit Removal');
+  });
+
+  it('folds the free text into the Others tick it belongs to', () => {
+    expect(describeTreatment(['Screening', TREATMENT_OTHERS], 'Sedimentation')).toBe(
+      'Screening, Others (specify): Sedimentation',
+    );
+  });
+
+  it('shows an em dash when nothing was recorded', () => {
+    expect(describeTreatment([], '')).toBe('—');
+  });
+});
+
+const wastewaterTab = buildWaterReportTabs().find(t => t.key === 'wastewaterpollution')!;
+
+function renderForm(
+  value: WaterComplianceFormState,
+  onChange: (v: WaterComplianceFormState) => void = () => {},
+) {
+  let tree!: renderer.ReactTestRenderer;
+  act(() => {
+    tree = renderer.create(
+      <WaterExtraFormSectionsView
+        value={value}
+        onChange={onChange}
+        mainTab={wastewaterTab}
+        hasDp={false}
+        province="Marinduque"
+      />,
+    );
+  });
+  return tree;
+}
+
+const withOneComponent = (patch: Partial<ReturnType<typeof emptyWwtpComponent>> = {}) => ({
+  ...emptyWaterComplianceForm(),
+  hasWwtp: 'yes' as const,
+  wwtpComponents: [{ ...emptyWwtpComponent('1'), ...patch }],
+});
+
+const group = (tree: renderer.ReactTestRenderer, label: string) =>
+  tree.root.find(n => n.type === TreatmentCheckboxGroup && n.props.label === label);
+
+describe('Components of the WWTP (create form, section 5D)', () => {
+  // The printed form's section D has a WWTP column beside Outlet No. Without
+  // it a report describing two plants gives no way to tell which one a
+  // component set belongs to.
+  it('offers a WWTP column beside the outlet number', () => {
+    const tree = renderForm(withOneComponent());
+    expect(tree.root.findAll(n => n.type === TextField && n.props.label === 'WWTP')).toHaveLength(1);
+  });
+
+  it('records what is typed into the WWTP column', () => {
+    const onChange = jest.fn();
+    const tree = renderForm(withOneComponent(), onChange);
+    const field = tree.root.find(n => n.type === TextField && n.props.label === 'WWTP');
+    act(() => { field.props.onChangeText('Septic Tank'); });
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        wwtpComponents: [expect.objectContaining({ wwtp: 'Septic Tank' })],
+      }),
+    );
+  });
+
+  it('offers all three treatment stages as checkbox groups', () => {
+    const tree = renderForm(withOneComponent());
+    expect(group(tree, 'Primary')).toBeTruthy();
+    expect(group(tree, 'Biological')).toBeTruthy();
+    expect(group(tree, 'Chemical')).toBeTruthy();
+  });
+
+  it('records a ticked treatment unit', () => {
+    const onChange = jest.fn();
+    const tree = renderForm(withOneComponent(), onChange);
+    act(() => { group(tree, 'Primary').props.onChangeSelected(['Screening']); });
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        wwtpComponents: [expect.objectContaining({ primaryTreatment: ['Screening'] })],
+      }),
+    );
+  });
+
+  // Each stage keeps its own specify text, so "Sedimentation" under Primary
+  // can't leak into Chemical.
+  it('keeps each stage’s specify text separate', () => {
+    const onChange = jest.fn();
+    const tree = renderForm(withOneComponent(), onChange);
+    act(() => { group(tree, 'Chemical').props.onChangeOther('Ferric chloride'); });
+    expect(onChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        wwtpComponents: [
+          expect.objectContaining({ chemicalTreatmentOther: 'Ferric chloride', primaryTreatmentOther: '' }),
+        ],
+      }),
+    );
+  });
+});
+
+const renderComponentsSection = (rows: Record<string, unknown>[]) => {
+  let tree!: renderer.ReactTestRenderer;
+  act(() => {
+    tree = renderer.create(
+      <WwtpComponentsSection complianceId="c1" value={rows as never} canEdit onSaved={() => {}} />,
+    );
+  });
+  return tree;
+};
+
+const startEditing = (tree: renderer.ReactTestRenderer) => {
+  const edit = tree.root.findAll(n => typeof n.props.onStartEdit === 'function')[0];
+  act(() => { edit.props.onStartEdit(); });
+};
+
+describe('Components of the WWTP (edit screen, section 5D)', () => {
+  it('summarises the ticked units on the read-only card', () => {
+    const tree = renderComponentsSection([
+      { outletNo: '1', wwtp: 'STP-1', primaryTreatment: ['Screening', 'Grit Removal'] },
+    ]);
+    expect(JSON.stringify(tree.toJSON())).toContain('Screening, Grit Removal');
+  });
+
+  it('shows the WWTP name on the read-only card', () => {
+    const tree = renderComponentsSection([{ outletNo: '1', wwtp: 'STP-1' }]);
+    expect(JSON.stringify(tree.toJSON())).toContain('STP-1');
+  });
+
+  // The card summarises what the decode made of a legacy row, so the reader
+  // sees the inspector's own words under the tick they now sit beneath -
+  // not the raw stored string.
+  it('folds a legacy row’s unrecognised text into Others on the card', () => {
+    const tree = renderComponentsSection([
+      { outletNo: '1', primaryTreatment: 'Screening, Sedimentation' },
+    ]);
+    expect(JSON.stringify(tree.toJSON())).toContain('Screening, Others (specify): Sedimentation');
+  });
+
+  // A report written by an older build stored one comma-separated string.
+  it('ticks the boxes a legacy comma-separated row named', () => {
+    const tree = renderComponentsSection([
+      { outletNo: '1', primaryTreatment: 'Screening, Grit Removal' },
+    ]);
+    startEditing(tree);
+    const primary = tree.root.find(
+      n => n.type === TreatmentCheckboxGroup && n.props.label === 'Primary',
+    );
+    expect(primary.props.selected).toEqual(['Screening', 'Grit Removal']);
+  });
+
+  it('preserves a legacy value the option list doesn’t know', () => {
+    const tree = renderComponentsSection([
+      { outletNo: '1', primaryTreatment: 'Screening, Sedimentation' },
+    ]);
+    startEditing(tree);
+    const primary = tree.root.find(
+      n => n.type === TreatmentCheckboxGroup && n.props.label === 'Primary',
+    );
+    expect(primary.props.selected).toContain(TREATMENT_OTHERS);
+    expect(primary.props.other).toBe('Sedimentation');
+  });
+
+  // Re-opening a report this build saved must find the specify text where
+  // that save put it - in its own key, not in the array beside it.
+  it('re-opens a saved specify text into its box', () => {
+    const tree = renderComponentsSection([
+      {
+        outletNo: '1',
+        primaryTreatment: ['Screening', TREATMENT_OTHERS],
+        primaryTreatmentOther: 'Sedimentation',
+      },
+    ]);
+    startEditing(tree);
+    const primary = tree.root.find(
+      n => n.type === TreatmentCheckboxGroup && n.props.label === 'Primary',
+    );
+    expect(primary.props.other).toBe('Sedimentation');
+  });
+
+  it('offers a WWTP field when editing', () => {
+    const tree = renderComponentsSection([{ outletNo: '1' }]);
+    startEditing(tree);
+    expect(tree.root.findAll(n => n.type === TextField && n.props.label === 'WWTP')).toHaveLength(1);
   });
 });

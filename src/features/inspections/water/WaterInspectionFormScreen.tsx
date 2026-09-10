@@ -25,6 +25,7 @@ import {
   emptyWaterComplianceForm,
   nonWwtpTreatmentForSave,
   receivingBodyOfWaterForSave,
+  treatmentForSave,
   WaterComplianceFormState,
 } from './waterTypes';
 import { buildWaterReportTabs, establishmentHasDischargePermit } from './waterReportTabs';
@@ -84,7 +85,20 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
           ),
           receivingBodyOfWaterOther: '',
         })),
-        wwtpComponents: waterCompliance.wwtpComponents,
+        wwtpComponents: waterCompliance.wwtpComponents.map(c => {
+          const primary = treatmentForSave(c.primaryTreatment, c.primaryTreatmentOther);
+          const biological = treatmentForSave(c.biologicalTreatment, c.biologicalTreatmentOther);
+          const chemical = treatmentForSave(c.chemicalTreatment, c.chemicalTreatmentOther);
+          return {
+            ...c,
+            primaryTreatment: primary.selected,
+            primaryTreatmentOther: primary.other,
+            biologicalTreatment: biological.selected,
+            biologicalTreatmentOther: biological.other,
+            chemicalTreatment: chemical.selected,
+            chemicalTreatmentOther: chemical.other,
+          };
+        }),
         wwtpCondition: waterCompliance.wwtpCondition || null,
         wwtpUnderConstruction: waterCompliance.wwtpUnderConstruction === 'yes',
         samplingPoints: waterCompliance.samplingPoints,

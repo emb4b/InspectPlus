@@ -41,9 +41,13 @@ import {
   NON_WWTP_TREATMENT_OTHERS,
   NON_WWTP_TREATMENT_PROMPT,
   NON_WWTP_TREATMENT_OTHER_LABEL,
+  PRIMARY_TREATMENT_OPTIONS,
+  BIOLOGICAL_TREATMENT_OPTIONS,
+  CHEMICAL_TREATMENT_OPTIONS,
   WWTP_TYPE_OPTIONS,
   WWTP_CONDITION_OPTIONS,
 } from './waterChecklistData';
+import { TreatmentCheckboxGroup } from './TreatmentCheckboxGroup';
 import {
   WwtpDetailCard,
   WwtpComponentCard,
@@ -61,6 +65,9 @@ import {
   decodeReceivingBodyOfWater,
   receivingBodyOfWaterForSave,
   describeReceivingBodyOfWater,
+  decodeWwtpComponent,
+  treatmentForSave,
+  describeTreatment,
 } from './waterTypes';
 import type { ComplianceWater } from '../../../db/models';
 import type { WaterMainTabDef } from './waterReportTabs';
@@ -607,9 +614,13 @@ export const WwtpDetailsSection: React.FC<{
   );
 };
 
+// `value` arrives as stored JSON rather than WwtpComponentCard[]: rows
+// written before section 5D became checkboxes hold a comma-separated string
+// where each treatment array now is, so the shape is only settled once
+// decodeWwtpComponent has read it.
 export const WwtpComponentsSection: React.FC<{
   complianceId: string;
-  value: WwtpComponentCard[];
+  value: Record<string, unknown>[];
   canEdit: boolean;
   onSaved: () => void;
 }> = ({ complianceId, value, canEdit, onSaved }) => {
@@ -618,9 +629,26 @@ export const WwtpComponentsSection: React.FC<{
   const setRef = (key: string) => (el: TextInput | null) => { fieldRefs.current[key] = el; };
 
   const section = useEditableSection<WwtpComponentCard[]>({
-    value,
+    // Rows written by an older build hold comma-separated strings where the
+    // arrays now are; decodeWwtpComponent reads both shapes.
+    value: value.map(c => decodeWwtpComponent(c)),
     onSave: async wwtpComponents => {
-      await patchComplianceWater(complianceId, { wwtpComponents });
+      await patchComplianceWater(complianceId, {
+        wwtpComponents: wwtpComponents.map(c => {
+          const primary = treatmentForSave(c.primaryTreatment, c.primaryTreatmentOther);
+          const biological = treatmentForSave(c.biologicalTreatment, c.biologicalTreatmentOther);
+          const chemical = treatmentForSave(c.chemicalTreatment, c.chemicalTreatmentOther);
+          return {
+            ...c,
+            primaryTreatment: primary.selected,
+            primaryTreatmentOther: primary.other,
+            biologicalTreatment: biological.selected,
+            biologicalTreatmentOther: biological.other,
+            chemicalTreatment: chemical.selected,
+            chemicalTreatmentOther: chemical.other,
+          };
+        }),
+      });
       onSaved();
     },
   });
@@ -662,49 +690,49 @@ export const WwtpComponentsSection: React.FC<{
                 onChangeText={t => updateComponent(i, { outletNo: t })}
                 returnKeyType="next"
                 blurOnSubmit={false}
-                onSubmitEditing={() => focus(k('primaryTreatment'))}
+                onSubmitEditing={() => focus(k('wwtp'))}
 
               />
+              {/* Chain ends here: what follows is checkbox groups, not text,
+                  so there is nothing left for "next" to reach. */}
               <TextField
-                ref={setRef(k('primaryTreatment'))}
-                label="Primary Treatment"
-                value={c.primaryTreatment}
-                onChangeText={t => updateComponent(i, { primaryTreatment: t })}
-                hint="Comma-separated"
-                returnKeyType="next"
-                blurOnSubmit={false}
-                onSubmitEditing={() => focus(k('biologicalTreatment'))}
+                ref={setRef(k('wwtp'))}
+                label="WWTP"
+                value={c.wwtp}
+                onChangeText={t => updateComponent(i, { wwtp: t })}
+                placeholder="e.g. Septic Tank"
+                returnKeyType="done"
 
               />
             </View>
-            <View style={styles.row}>
-              <TextField
-                ref={setRef(k('biologicalTreatment'))}
-                label="Biological Treatment"
-                value={c.biologicalTreatment}
-                onChangeText={t => updateComponent(i, { biologicalTreatment: t })}
-                hint="Comma-separated"
-                returnKeyType="next"
-                blurOnSubmit={false}
-                onSubmitEditing={() => focus(k('chemicalTreatment'))}
-
-              />
-              <TextField
-                ref={setRef(k('chemicalTreatment'))}
-                label="Chemical Treatment"
-                value={c.chemicalTreatment}
-                onChangeText={t => updateComponent(i, { chemicalTreatment: t })}
-                hint="Comma-separated"
-                returnKeyType="next"
-                blurOnSubmit={false}
-                onSubmitEditing={() => focus(k('otherTreatment'))}
-
-              />
-            </View>
+            <TreatmentCheckboxGroup
+              label="Primary"
+              options={PRIMARY_TREATMENT_OPTIONS}
+              selected={c.primaryTreatment}
+              other={c.primaryTreatmentOther}
+              onChangeSelected={v => updateComponent(i, { primaryTreatment: v })}
+              onChangeOther={v => updateComponent(i, { primaryTreatmentOther: v })}
+            />
+            <TreatmentCheckboxGroup
+              label="Biological"
+              options={BIOLOGICAL_TREATMENT_OPTIONS}
+              selected={c.biologicalTreatment}
+              other={c.biologicalTreatmentOther}
+              onChangeSelected={v => updateComponent(i, { biologicalTreatment: v })}
+              onChangeOther={v => updateComponent(i, { biologicalTreatmentOther: v })}
+            />
+            <TreatmentCheckboxGroup
+              label="Chemical"
+              options={CHEMICAL_TREATMENT_OPTIONS}
+              selected={c.chemicalTreatment}
+              other={c.chemicalTreatmentOther}
+              onChangeSelected={v => updateComponent(i, { chemicalTreatment: v })}
+              onChangeOther={v => updateComponent(i, { chemicalTreatmentOther: v })}
+            />
             <View style={styles.row}>
               <TextField
                 ref={setRef(k('otherTreatment'))}
-                label="Other Treatment"
+                label="Others"
                 value={c.otherTreatment}
                 onChangeText={t => updateComponent(i, { otherTreatment: t })}
                 returnKeyType="done"
@@ -717,10 +745,11 @@ export const WwtpComponentsSection: React.FC<{
             key={i}
             title={`Outlet ${c.outletNo}`}
             fields={[
-              { label: 'Primary Treatment', value: c.primaryTreatment },
-              { label: 'Biological Treatment', value: c.biologicalTreatment },
-              { label: 'Chemical Treatment', value: c.chemicalTreatment },
-              { label: 'Other Treatment', value: c.otherTreatment },
+              { label: 'WWTP', value: c.wwtp },
+              { label: 'Primary', value: describeTreatment(c.primaryTreatment, c.primaryTreatmentOther) },
+              { label: 'Biological', value: describeTreatment(c.biologicalTreatment, c.biologicalTreatmentOther) },
+              { label: 'Chemical', value: describeTreatment(c.chemicalTreatment, c.chemicalTreatmentOther) },
+              { label: 'Others', value: c.otherTreatment },
             ]}
           />
         );

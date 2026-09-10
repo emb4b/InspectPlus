@@ -9,7 +9,6 @@ import type { EstablishmentSnapshot, PermitSnapshotItem } from '../../../service
 import type { YnValue } from '../../../components/form';
 import type {
   WwtpDetailCard,
-  WwtpComponentCard,
   SamplingPointCard,
   DpConditionRow,
   PreviousInspectionState,
@@ -79,7 +78,12 @@ export interface WaterComplianceView {
   // WaterComplianceFormState's camelCase field names verbatim, unlike the
   // rest of this schema's snake_case JSONB convention — see waterTypes.ts.
   wwtpDetails: WwtpDetailCard[];
-  wwtpComponents: WwtpComponentCard[];
+  // Untyped like waterSources and its neighbours, not WwtpComponentCard[]:
+  // rows written before section 5D became checkboxes hold a comma-separated
+  // string where each treatment array now is, so claiming the card shape
+  // here would be a lie a reader would act on. WwtpComponentsSection decodes
+  // on read — see decodeWwtpComponent in waterTypes.ts.
+  wwtpComponents: Record<string, unknown>[];
   wwtpCondition: string | null;
   wwtpUnderConstruction: boolean | null;
   samplingPoints: SamplingPointCard[];

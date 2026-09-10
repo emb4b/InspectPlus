@@ -28,9 +28,13 @@ import {
   NON_WWTP_TREATMENT_OTHERS,
   NON_WWTP_TREATMENT_PROMPT,
   NON_WWTP_TREATMENT_OTHER_LABEL,
+  PRIMARY_TREATMENT_OPTIONS,
+  BIOLOGICAL_TREATMENT_OPTIONS,
+  CHEMICAL_TREATMENT_OPTIONS,
   WWTP_TYPE_OPTIONS,
   WWTP_CONDITION_OPTIONS,
 } from './waterChecklistData';
+import { TreatmentCheckboxGroup } from './TreatmentCheckboxGroup';
 import {
   WaterComplianceFormState,
   emptySamplingPoint,
@@ -472,45 +476,47 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                       onChangeText={t => updateWwtpComponent(i, { outletNo: t })}
                       returnKeyType="next"
                       blurOnSubmit={false}
-                      onSubmitEditing={() => focus(k('primaryTreatment'))}
+                      onSubmitEditing={() => focus(k('wwtp'))}
                     />
+                    {/* Chain ends here: what follows is checkbox groups, not
+                        text, so there is nothing left for "next" to reach. */}
                     <TextField
-                      ref={setRef(k('primaryTreatment'))}
-                      label="Primary Treatment"
-                      value={c.primaryTreatment}
-                      onChangeText={t => updateWwtpComponent(i, { primaryTreatment: t })}
-                      hint="Comma-separated"
-                      returnKeyType="next"
-                      blurOnSubmit={false}
-                      onSubmitEditing={() => focus(k('biologicalTreatment'))}
+                      ref={setRef(k('wwtp'))}
+                      label="WWTP"
+                      value={c.wwtp}
+                      onChangeText={t => updateWwtpComponent(i, { wwtp: t })}
+                      placeholder="e.g. Septic Tank"
+                      returnKeyType="done"
                     />
                   </View>
-                  <View style={styles.row}>
-                    <TextField
-                      ref={setRef(k('biologicalTreatment'))}
-                      label="Biological Treatment"
-                      value={c.biologicalTreatment}
-                      onChangeText={t => updateWwtpComponent(i, { biologicalTreatment: t })}
-                      hint="Comma-separated"
-                      returnKeyType="next"
-                      blurOnSubmit={false}
-                      onSubmitEditing={() => focus(k('chemicalTreatment'))}
-                    />
-                    <TextField
-                      ref={setRef(k('chemicalTreatment'))}
-                      label="Chemical Treatment"
-                      value={c.chemicalTreatment}
-                      onChangeText={t => updateWwtpComponent(i, { chemicalTreatment: t })}
-                      hint="Comma-separated"
-                      returnKeyType="next"
-                      blurOnSubmit={false}
-                      onSubmitEditing={() => focus(k('otherTreatment'))}
-                    />
-                  </View>
+                  <TreatmentCheckboxGroup
+                    label="Primary"
+                    options={PRIMARY_TREATMENT_OPTIONS}
+                    selected={c.primaryTreatment}
+                    other={c.primaryTreatmentOther}
+                    onChangeSelected={v => updateWwtpComponent(i, { primaryTreatment: v })}
+                    onChangeOther={v => updateWwtpComponent(i, { primaryTreatmentOther: v })}
+                  />
+                  <TreatmentCheckboxGroup
+                    label="Biological"
+                    options={BIOLOGICAL_TREATMENT_OPTIONS}
+                    selected={c.biologicalTreatment}
+                    other={c.biologicalTreatmentOther}
+                    onChangeSelected={v => updateWwtpComponent(i, { biologicalTreatment: v })}
+                    onChangeOther={v => updateWwtpComponent(i, { biologicalTreatmentOther: v })}
+                  />
+                  <TreatmentCheckboxGroup
+                    label="Chemical"
+                    options={CHEMICAL_TREATMENT_OPTIONS}
+                    selected={c.chemicalTreatment}
+                    other={c.chemicalTreatmentOther}
+                    onChangeSelected={v => updateWwtpComponent(i, { chemicalTreatment: v })}
+                    onChangeOther={v => updateWwtpComponent(i, { chemicalTreatmentOther: v })}
+                  />
                   <View style={styles.row}>
                     <TextField
                       ref={setRef(k('otherTreatment'))}
-                      label="Other Treatment"
+                      label="Others"
                       value={c.otherTreatment}
                       onChangeText={t => updateWwtpComponent(i, { otherTreatment: t })}
                       returnKeyType="done"
