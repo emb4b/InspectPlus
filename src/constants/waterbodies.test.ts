@@ -34,6 +34,27 @@ describe('bundled waterbody dataset', () => {
     every.forEach(option => expect(option).toMatch(/^.+ \([A-Z]{1,2}(, [A-Za-z]+(?: [A-Za-z]+)*)*\)$/));
   });
 
+  // The generator's other three gates count records, classifications and
+  // provinces but never inspect an individual name, so a section heading
+  // bleeding into a name band during coordinate-based extraction (e.g.
+  // 'Balanacan River WATERBODY (C)') could ship undetected. This is an
+  // independent check on the name portion specifically.
+  it('never carries a section-heading artifact in a name', () => {
+    const HEADING_TOKENS = [
+      'WATERBODY',
+      'WATERBODIES',
+      'CLASSIFICATION',
+      'For Classification',
+      'PRINCIPAL RIVERS',
+      'MINOR RIVERS',
+    ];
+    const every = Object.values(WATERBODIES).flatMap(gs => gs.flatMap(g => g.options));
+    every.forEach(option => {
+      const name = option.replace(/\s\([^()]*\)$/, '');
+      HEADING_TOKENS.forEach(token => expect(name).not.toContain(token));
+    });
+  });
+
   it('orders groups principal, then minor, then other', () => {
     // Romblon has no principal rivers at all, so the assertion is about
     // relative order rather than a fixed list.

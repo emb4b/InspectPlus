@@ -34,6 +34,12 @@ EXPECT_CLASSIFICATIONS = 125
 EXPECT_PER_PROVINCE = {'Occidental Mindoro': 13, 'Oriental Mindoro': 24,
                        'Marinduque': 8, 'Romblon': 7, 'Palawan': 50}
 
+# Section-heading tokens that have been observed (or could plausibly) bleed
+# into a name band during coordinate-based extraction. A name containing one
+# of these is almost certainly corrupted, not a legitimate waterbody name.
+NAME_ARTIFACT_TOKENS = ('WATERBODY', 'WATERBODIES', 'CLASSIFICATION', 'For Classification',
+                         'PRINCIPAL RIVERS', 'MINOR RIVERS')
+
 
 def lines_of(page):
     """Cluster a page's words into visual lines, left to right."""
@@ -106,6 +112,10 @@ def extract(pdf_path):
 def clean(records):
     for r in records:
         r['name'] = re.sub(r'\s+', ' ', r['name']).strip()
+        # Extraction artifact: the next table's section heading sometimes
+        # bleeds into the preceding row's name band. Strip it the same way
+        # it's already stripped from the classification field below.
+        r['name'] = re.sub(r'\s+(For|WATERBODY)$', '', r['name'])
         cls = re.sub(r'\s*,\s*', ', ', re.sub(r'\s+', ' ', r['classification']).strip())
         cls = re.sub(r'\s+(For|WATERBODY)$', '', cls)
         # A column-duplication artifact in the source: three rows repeat their
@@ -136,6 +146,13 @@ def verify(records):
     blank = [r for r in records if not r['name'] or not r['classification']]
     if blank:
         problems.append('{} record(s) missing a name or classification'.format(len(blank)))
+    # None of the counts above inspect an individual name, so a section
+    # heading bleeding into a name band (e.g. 'Balanacan River WATERBODY')
+    # would otherwise slip through undetected. Catch it explicitly.
+    tainted = [r for r in records if any(tok in r['name'] for tok in NAME_ARTIFACT_TOKENS)]
+    if tainted:
+        problems.append('{} record(s) have a section-heading artifact in the name: {}'.format(
+            len(tainted), sorted(r['name'] for r in tainted)))
     return problems
 
 

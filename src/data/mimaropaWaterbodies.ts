@@ -78,7 +78,7 @@ export const WATERBODIES: Record<string, WaterbodyGroup[]> = {
       'Tawiran River (A, B, C)',
     ] },
     { label: 'Minor Rivers', options: [
-      'Balanacan River WATERBODY (C)',
+      'Balanacan River (C)',
       'Mogpog River (C)',
     ] },
     { label: 'Other Waterbodies', options: [
