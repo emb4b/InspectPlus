@@ -596,7 +596,7 @@ export const WwtpDetailsSection: React.FC<{
                   placeholder="e.g. Sapa Creek"
                   returnKeyType="next"
                   blurOnSubmit={false}
-                  onSubmitEditing={() => focus(k('flowMeterDevice'))}
+                  onSubmitEditing={() => focus(k('flowRate'))}
                 />
               </View>
             )}
