@@ -314,7 +314,22 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
         }
         return (
           <FormSection icon="business-outline" title="B. Type of WWTP">
-            <SelectField label="WWTP Type" value={value.wwtpType} options={WWTP_TYPE_OPTIONS} onSelect={v => set('wwtpType', v)} />
+            <SelectField
+              label="WWTP Type"
+              value={value.wwtpType}
+              options={WWTP_TYPE_OPTIONS}
+              onSelect={v => set('wwtpType', v)}
+            />
+            {value.wwtpType === 'Others' && (
+              <TextField
+                ref={setRef('wwtpTypeOther')}
+                label="Specify the type of WWTP"
+                value={value.wwtpTypeOther}
+                onChangeText={t => set('wwtpTypeOther', t)}
+                placeholder="e.g. Membrane bioreactor"
+                returnKeyType="done"
+              />
+            )}
           </FormSection>
         );
 

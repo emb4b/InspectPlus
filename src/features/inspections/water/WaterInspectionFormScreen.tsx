@@ -26,6 +26,7 @@ import {
   nonWwtpTreatmentForSave,
   receivingBodyOfWaterForSave,
   wwtpComponentForSave,
+  wwtpTypeOtherForSave,
   WaterComplianceFormState,
 } from './waterTypes';
 import { buildWaterReportTabs, establishmentHasDischargePermit } from './waterReportTabs';
@@ -77,6 +78,7 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
         hasWwtp: waterCompliance.hasWwtp === 'yes',
         nonWwtpTreatment: nonWwtpTreatmentForSave(waterCompliance),
         wwtpType: waterCompliance.wwtpType || null,
+        wwtpTypeOther: wwtpTypeOtherForSave(waterCompliance.wwtpType, waterCompliance.wwtpTypeOther) || null,
         wwtpDetails: waterCompliance.wwtpDetails.map(d => ({
           ...d,
           receivingBodyOfWater: receivingBodyOfWaterForSave(

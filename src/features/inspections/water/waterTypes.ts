@@ -78,6 +78,7 @@ export interface WaterComplianceFormState {
   nonWwtpSystems: string[];
   nonWwtpOther: string;
   wwtpType: string;
+  wwtpTypeOther: string;
   wwtpDetails: WwtpDetailCard[];
   wwtpComponents: WwtpComponentCard[];
   wwtpCondition: string;
@@ -150,6 +151,7 @@ export function emptyWaterComplianceForm(): WaterComplianceFormState {
     nonWwtpSystems: [],
     nonWwtpOther: '',
     wwtpType: '',
+    wwtpTypeOther: '',
     wwtpDetails: [],
     wwtpComponents: [],
     wwtpCondition: '',
@@ -334,4 +336,19 @@ export function wwtpComponentForSave(c: WwtpComponentCard): WwtpComponentCard {
 export function describeTreatment(selected: string[], other: string): string {
   if (selected.length === 0) return '—';
   return selected.map(s => (s === TREATMENT_OTHERS && other ? `${s}: ${other}` : s)).join(', ');
+}
+
+// ── Type of WWTP ─────────────────────────────────────────────────────────────
+// "Others" says the plant is none of the listed kinds; this says which kind
+// it is. Same boundary as nonWwtpTreatmentFor: text stranded by re-picking a
+// listed type would contradict the choice beside it, so it never reaches the
+// record.
+
+export function wwtpTypeOtherForSave(wwtpType: string, other: string): string {
+  return wwtpType === 'Others' ? other.trim() : '';
+}
+
+export function describeWwtpType(wwtpType: string, other: string): string {
+  if (!wwtpType) return '—';
+  return wwtpType === 'Others' && other ? `${wwtpType}: ${other}` : wwtpType;
 }

@@ -68,6 +68,8 @@ import {
   decodeWwtpComponent,
   wwtpComponentForSave,
   describeTreatment,
+  wwtpTypeOtherForSave,
+  describeWwtpType,
 } from './waterTypes';
 import type { ComplianceWater } from '../../../db/models';
 import type { WaterMainTabDef } from './waterReportTabs';
@@ -377,13 +379,17 @@ export const TreatmentSystemTypeSection: React.FC<{
 export const WwtpTypeSection: React.FC<{
   complianceId: string;
   value: string | null;
+  otherValue: string | null;
   canEdit: boolean;
   onSaved: () => void;
-}> = ({ complianceId, value, canEdit, onSaved }) => {
-  const section = useEditableSection<string | null>({
-    value,
-    onSave: async wwtpType => {
-      await patchComplianceWater(complianceId, { wwtpType: wwtpType || null });
+}> = ({ complianceId, value, otherValue, canEdit, onSaved }) => {
+  const section = useEditableSection<{ wwtpType: string; wwtpTypeOther: string }>({
+    value: { wwtpType: value || '', wwtpTypeOther: otherValue || '' },
+    onSave: async draft => {
+      await patchComplianceWater(complianceId, {
+        wwtpType: draft.wwtpType || null,
+        wwtpTypeOther: wwtpTypeOtherForSave(draft.wwtpType, draft.wwtpTypeOther) || null,
+      });
       onSaved();
     },
   });
@@ -396,9 +402,29 @@ export const WwtpTypeSection: React.FC<{
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
       {section.editing ? (
-        <SelectField label="WWTP Type" value={section.draft || ''} options={WWTP_TYPE_OPTIONS} onSelect={v => section.setDraft(v)} />
+        <>
+          <SelectField
+            label="WWTP Type"
+            value={section.draft.wwtpType}
+            options={WWTP_TYPE_OPTIONS}
+            onSelect={v => section.setDraft({ ...section.draft, wwtpType: v })}
+          />
+          {section.draft.wwtpType === 'Others' && (
+            <TextField
+              label="Specify the type of WWTP"
+              value={section.draft.wwtpTypeOther}
+              onChangeText={t => section.setDraft({ ...section.draft, wwtpTypeOther: t })}
+              placeholder="e.g. Membrane bioreactor"
+              returnKeyType="done"
+            />
+          )}
+        </>
       ) : (
-        <TextField label="WWTP Type" value={section.draft || '—'} readOnly />
+        <TextField
+          label="WWTP Type"
+          value={describeWwtpType(section.draft.wwtpType, section.draft.wwtpTypeOther)}
+          readOnly
+        />
       )}
       {section.error && <Text style={styles.errorText}>{section.error}</Text>}
     </FormSection>
@@ -1517,7 +1543,13 @@ export const WaterExtraSectionsView: React.FC<WaterExtraSectionsViewProps> = ({
         return compliance.hasWwtp === false ? (
           <WwtpUnavailableSection title="B. Type of WWTP" />
         ) : (
-          <WwtpTypeSection complianceId={complianceId} value={compliance.wwtpType} canEdit={canEdit} onSaved={onSaved} />
+          <WwtpTypeSection
+            complianceId={complianceId}
+            value={compliance.wwtpType}
+            otherValue={compliance.wwtpTypeOther}
+            canEdit={canEdit}
+            onSaved={onSaved}
+          />
         );
       case 'wwtpDetails':
         return compliance.hasWwtp === false ? (

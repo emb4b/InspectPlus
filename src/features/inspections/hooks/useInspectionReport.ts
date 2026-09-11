@@ -73,6 +73,7 @@ export interface WaterComplianceView {
   hasWwtp: boolean | null;
   nonWwtpTreatment: Record<string, unknown>;
   wwtpType: string | null;
+  wwtpTypeOther: string | null;
   // wwtpDetails/wwtpComponents/samplingPoints/dpConditions are written by
   // the create flow (WaterInspectionFormScreen -> useReportFormState) using
   // WaterComplianceFormState's camelCase field names verbatim, unlike the
@@ -256,6 +257,7 @@ export function useInspectionReport(reportId: string | undefined): UseInspection
               hasWwtp: c.hasWwtp,
               nonWwtpTreatment: c.nonWwtpTreatment ?? {},
               wwtpType: c.wwtpType,
+              wwtpTypeOther: c.wwtpTypeOther,
               wwtpDetails: c.wwtpDetails ?? [],
               wwtpComponents: c.wwtpComponents ?? [],
               wwtpCondition: c.wwtpCondition,

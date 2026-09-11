@@ -46,6 +46,7 @@ function baseCompliance(): WaterComplianceView {
     nonWwtpTreatment: {},
     hasWwtp: null,
     wwtpType: null,
+    wwtpTypeOther: null,
     wwtpDetails: [],
     wwtpComponents: [],
     wwtpCondition: null,
