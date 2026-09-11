@@ -24,7 +24,7 @@ import { WaterExtraFormSectionsView } from './WaterExtraFormSections';
 import {
   emptyWaterComplianceForm,
   nonWwtpTreatmentForSave,
-  receivingBodyOfWaterForSave,
+  wwtpDetailForSave,
   wwtpComponentForSave,
   wwtpTypeOtherForSave,
   WaterComplianceFormState,
@@ -79,14 +79,7 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
         nonWwtpTreatment: nonWwtpTreatmentForSave(waterCompliance),
         wwtpType: waterCompliance.wwtpType || null,
         wwtpTypeOther: wwtpTypeOtherForSave(waterCompliance.wwtpType, waterCompliance.wwtpTypeOther) || null,
-        wwtpDetails: waterCompliance.wwtpDetails.map(d => ({
-          ...d,
-          receivingBodyOfWater: receivingBodyOfWaterForSave(
-            d.receivingBodyOfWater,
-            d.receivingBodyOfWaterOther,
-          ),
-          receivingBodyOfWaterOther: '',
-        })),
+        wwtpDetails: waterCompliance.wwtpDetails.map(d => wwtpDetailForSave(d)),
         wwtpComponents: waterCompliance.wwtpComponents.map(c => wwtpComponentForSave(c)),
         wwtpCondition: waterCompliance.wwtpCondition || null,
         wwtpUnderConstruction: waterCompliance.wwtpUnderConstruction === 'yes',

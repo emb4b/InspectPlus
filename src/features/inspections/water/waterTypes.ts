@@ -239,6 +239,23 @@ export function receivingBodyOfWaterForSave(selection: string, other: string): s
   return other.trim();
 }
 
+// Both entry paths - the create form and the edit screen - write a whole
+// outlet card, not one field at a time, so this is the boundary they
+// actually share, exactly as wwtpComponentForSave is for section 5D. The
+// specify key is blanked because the record holds one string: what the
+// inspector typed is now *in* receivingBodyOfWater, and a copy left beside
+// it would be text the next open has to reconcile.
+export function wwtpDetailForSave(d: WwtpDetailCard): WwtpDetailCard {
+  return {
+    ...d,
+    receivingBodyOfWater: receivingBodyOfWaterForSave(
+      d.receivingBodyOfWater,
+      d.receivingBodyOfWaterOther,
+    ),
+    receivingBodyOfWaterOther: '',
+  };
+}
+
 export function describeReceivingBodyOfWater(detail: WwtpDetailCard): string {
   const value = receivingBodyOfWaterForSave(
     detail.receivingBodyOfWater,

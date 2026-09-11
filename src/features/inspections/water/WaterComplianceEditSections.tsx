@@ -64,7 +64,7 @@ import {
   nonWwtpTreatmentFor,
   describeNonWwtpTreatment,
   decodeReceivingBodyOfWater,
-  receivingBodyOfWaterForSave,
+  wwtpDetailForSave,
   describeReceivingBodyOfWater,
   decodeWwtpComponent,
   wwtpComponentForSave,
@@ -452,14 +452,7 @@ export const WwtpDetailsSection: React.FC<{
     }),
     onSave: async wwtpDetails => {
       await patchComplianceWater(complianceId, {
-        wwtpDetails: wwtpDetails.map(d => ({
-          ...d,
-          receivingBodyOfWater: receivingBodyOfWaterForSave(
-            d.receivingBodyOfWater,
-            d.receivingBodyOfWaterOther,
-          ),
-          receivingBodyOfWaterOther: '',
-        })),
+        wwtpDetails: wwtpDetails.map(d => wwtpDetailForSave(d)),
       });
       onSaved();
     },
