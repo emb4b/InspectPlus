@@ -90,6 +90,8 @@ them fails**:
 - the per-class histogram — `AA 1, A 24, B 19, C 51, D 3, SA 4, SB 14,
   SC 9, SD 0` — which catches a class read as another, or dropped or
   doubled in one row, where two such errors would cancel in the total;
+- options emitted equal classifications counted (125), since a
+  multi-class waterbody is offered once per class — see Value format;
 - section-heading text bleeding into a name band;
 - vocabulary: no province outside the five, no blank name or class.
 
@@ -135,18 +137,29 @@ export function getWaterbodyGroups(province: string): WaterbodyGroup[];
 
 ### Value format
 
-`Name (Classification)` — `Boac River (C)`, `Ulan Bay (SB, SC)`,
-`Tawiran River (A, B, C)`.
+`Name (Class)` — `Boac River (C)`, `Ulan Bay (SB)`, `Tawiran River (A)`.
+One class per option.
 
-The parentheses carry the separation, so no comma sits between name and
-classification. This matters for the 20 multi-class entries: `Ulan Bay (SB,
-SC)` reads as one name with two classifications, where `Ulan Bay, SB, SC`
-would not.
+A waterbody the PDF lists with several classifications — 20 of the 102 —
+is offered once per class: `Tawiran River (A, B, C)` becomes three options,
+`Tawiran River (A)`, `Tawiran River (B)`, `Tawiran River (C)`, adjacent in
+the list. An outlet discharges into one stretch of a river, and where the
+stretches are classified differently it is that stretch's standard that
+binds; a single `(A, B, C)` option would record the river but not which
+standard applies. The dropdown therefore holds **125 options for 102
+waterbodies** — 125 being the PDF's own "Total Classifications Assigned",
+which the generator enforces as a gate: options emitted must equal
+classifications counted.
 
-Three entries carry a qualifier that would otherwise nest parentheses. They
-are flattened: `C (assigned)` becomes `Madugo River (C, assigned)`, and
-`SC (brackish mangrove)` becomes `Rio Tuba River (SC, brackish mangrove)`.
-Lossless, and avoids `Rio Tuba River (SC (brackish mangrove))`.
+Three entries carry a qualifier on a single class. A qualifier is not a
+second class — `C (assigned)` says the C is provisional, `SC (brackish
+mangrove)` says what kind of SC water it is — so each stays one option,
+with the qualifier flattened in beside its class rather than nesting
+parentheses: `Madugo River (C, assigned)`, `Pinamalayan River (C,
+assigned)`, `Rio Tuba River (SC, brackish mangrove)`. The generator tells a
+qualifier from a class by the source's own parentheses; the test tells them
+apart by case, since classes are upper-case letters and qualifiers start
+lower-case.
 
 The stored value is this whole string. The app does not parse it back into
 name and classification; nothing in the report needs those separately, and
@@ -156,7 +169,7 @@ later revised.
 ### Ordering
 
 Principal Rivers, then Minor Rivers, then Other Waterbodies; alphabetical
-within each group. Group sizes vary sharply — Palawan is 21/19/10 while
+within each group. Group sizes vary sharply — Palawan runs 32/25/10 options while
 Romblon has no principal rivers at all and opens on minor rivers — so the
 ordering is signposted with headers rather than left implicit (see §4).
 

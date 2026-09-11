@@ -9,9 +9,11 @@
 // generator refuses to write unless its counts match the totals printed in
 // the source PDF's own summary table, so a hand edit here is unverified.
 //
-// Each option is "Name (Classification)" - the classification is what
-// determines the effluent standards an outlet is held to, so it travels with
-// the name rather than being looked up separately.
+// Each option is "Name (Class)" - the classification is what determines
+// the effluent standards an outlet is held to, so it travels with the name
+// rather than being looked up separately. A waterbody carrying several
+// classes is offered once per class: an outlet discharges into one stretch
+// of a river, and that stretch's standard is the one that binds.
 export interface WaterbodyGroup {
   label: string;
   options: string[];
@@ -36,7 +38,8 @@ export const WATERBODIES: Record<string, WaterbodyGroup[]> = {
       'Tubaong River (C)',
     ] },
     { label: 'Other Waterbodies', options: [
-      'Mangarin Bay (SB, SC)',
+      'Mangarin Bay (SB)',
+      'Mangarin Bay (SC)',
     ] },
   ],
   'Oriental Mindoro': [
@@ -64,7 +67,8 @@ export const WATERBODIES: Record<string, WaterbodyGroup[]> = {
     ] },
     { label: 'Other Waterbodies', options: [
       'Bulalacao Bay (SA)',
-      'Calapan Bay (SA, SB)',
+      'Calapan Bay (SA)',
+      'Calapan Bay (SB)',
       'Muelle Bay (SA)',
       'Naujan Lake (B)',
       'Sabang Bay (SB)',
@@ -75,7 +79,9 @@ export const WATERBODIES: Record<string, WaterbodyGroup[]> = {
     { label: 'Principal Rivers', options: [
       'Boac River (C)',
       'Tagum River (C)',
-      'Tawiran River (A, B, C)',
+      'Tawiran River (A)',
+      'Tawiran River (B)',
+      'Tawiran River (C)',
     ] },
     { label: 'Minor Rivers', options: [
       'Balanacan River (C)',
@@ -84,12 +90,14 @@ export const WATERBODIES: Record<string, WaterbodyGroup[]> = {
     { label: 'Other Waterbodies', options: [
       'Calancan Bay (SB)',
       'Maniwaya Coastal Waters (SB)',
-      'Ulan Bay (SB, SC)',
+      'Ulan Bay (SB)',
+      'Ulan Bay (SC)',
     ] },
   ],
   'Romblon': [
     { label: 'Minor Rivers', options: [
-      'Bangon River (C, SC)',
+      'Bangon River (C)',
+      'Bangon River (SC)',
       'Binayaan River (A)',
       'Bongoy River (SC)',
       'Cabitangahan River (A)',
@@ -103,16 +111,27 @@ export const WATERBODIES: Record<string, WaterbodyGroup[]> = {
   'Palawan': [
     { label: 'Principal Rivers', options: [
       'Abongan River (C)',
-      'Aborlan River (B, C)',
-      'Apurauan River (B, C)',
-      'Aramaywan River (Narra Stream) (A, C)',
-      'Aramaywan River (Quezon Stream) (A, C)',
-      'Bacungan River (A, B, C)',
-      'Barbacan River (B, C)',
-      'Caramay River (B, C)',
+      'Aborlan River (B)',
+      'Aborlan River (C)',
+      'Apurauan River (B)',
+      'Apurauan River (C)',
+      'Aramaywan River (Narra Stream) (A)',
+      'Aramaywan River (Narra Stream) (C)',
+      'Aramaywan River (Quezon Stream) (A)',
+      'Aramaywan River (Quezon Stream) (C)',
+      'Bacungan River (A)',
+      'Bacungan River (B)',
+      'Bacungan River (C)',
+      'Barbacan River (B)',
+      'Barbacan River (C)',
+      'Caramay River (B)',
+      'Caramay River (C)',
       'Inagauan River (C)',
-      'Iwahig River / Ihawig River (A, B)',
-      'Lamikan River (A, B, C)',
+      'Iwahig River / Ihawig River (A)',
+      'Iwahig River / Ihawig River (B)',
+      'Lamikan River (A)',
+      'Lamikan River (B)',
+      'Lamikan River (C)',
       'Langogan River (B)',
       'Malasgao / Malatgao River (A)',
       'Ocayan River (C)',
@@ -127,19 +146,25 @@ export const WATERBODIES: Record<string, WaterbodyGroup[]> = {
     { label: 'Minor Rivers', options: [
       'Babuyan River (B)',
       'Balitien River (D)',
-      'Balsahan River (A, B)',
-      'Calategas River (A, C)',
+      'Balsahan River (A)',
+      'Balsahan River (B)',
+      'Calategas River (A)',
+      'Calategas River (C)',
       'Ipilan River (C)',
-      'Irawan River (A, B)',
+      'Irawan River (A)',
+      'Irawan River (B)',
       'Katubusan River (C)',
-      'Maasin River (B, C)',
+      'Maasin River (B)',
+      'Maasin River (C)',
       'Malatgao River (A)',
-      'Malinao River (A, B)',
+      'Malinao River (A)',
+      'Malinao River (B)',
       'Mambalot River (C)',
       'Montible River (A)',
       'Nagsaguipi River (A)',
       'Panacan River (C)',
-      'Pinagduguan River (B, D)',
+      'Pinagduguan River (B)',
+      'Pinagduguan River (D)',
       'Tagburos River (C)',
       'Tamlang River (B)',
       'Tayuman River (C)',

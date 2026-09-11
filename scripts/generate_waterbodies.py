@@ -149,10 +149,23 @@ def clean(records):
         if cls == 'A, B, B':
             cls = 'A, B'
         r['classification'] = cls
-        # Flatten a nested qualifier so the rendered value doesn't nest parens:
-        # 'SC (brackish mangrove)' -> 'SC, brackish mangrove'.
-        r['value'] = '{} ({})'.format(r['name'], re.sub(r'\s*\((.*)\)\s*$', r', \1', cls))
+        r['values'] = option_values(r['name'], cls)
     return records
+
+
+def option_values(name, cls):
+    """The dropdown options one row contributes: one per class.
+
+    A river classified A upstream and C downstream is offered as 'X (A)' and
+    'X (C)' - an outlet discharges into one stretch, and that stretch's
+    standard is the one that binds. A qualifier is not a second class:
+    'SC (brackish mangrove)' says what kind of SC water it is, and 'C
+    (assigned)' says the C is provisional, so each stays one option with the
+    qualifier flattened in beside its class rather than nesting parentheses.
+    """
+    if '(' in cls:
+        return ['{} ({})'.format(name, re.sub(r'\s*\((.*)\)\s*$', r', \1', cls))]
+    return ['{} ({})'.format(name, token) for token in re.split(r',\s*', cls)]
 
 
 def class_tokens(record):
@@ -177,6 +190,11 @@ def verify(records):
             problems.append('class {!r} is not in the summary vocabulary ({} row(s))'.format(cls, got))
         elif got != expected:
             problems.append('class {} appears {} time(s), expected {}'.format(cls, got, expected))
+    # One option per class, so the options emitted must equal the classes
+    # counted - pins option_values against the histogram gate above.
+    options = sum(len(r['values']) for r in records)
+    if options != EXPECT_CLASSIFICATIONS:
+        problems.append('{} options emitted for {} classifications assigned'.format(options, EXPECT_CLASSIFICATIONS))
     for province, expected in EXPECT_PER_PROVINCE.items():
         got = sum(1 for r in records if r['province'] == province)
         if got != expected:
@@ -214,9 +232,11 @@ def render(records):
         "// generator refuses to write unless its counts match the totals printed in",
         "// the source PDF's own summary table, so a hand edit here is unverified.",
         "//",
-        "// Each option is \"Name (Classification)\" - the classification is what",
-        "// determines the effluent standards an outlet is held to, so it travels with",
-        "// the name rather than being looked up separately.",
+        "// Each option is \"Name (Class)\" - the classification is what determines",
+        "// the effluent standards an outlet is held to, so it travels with the name",
+        "// rather than being looked up separately. A waterbody carrying several",
+        "// classes is offered once per class: an outlet discharges into one stretch",
+        "// of a river, and that stretch's standard is the one that binds.",
         "export interface WaterbodyGroup {",
         "  label: string;",
         "  options: string[];",
@@ -227,8 +247,9 @@ def render(records):
     for province in PROVINCES:
         lines.append('  {}: ['.format(ts_str(province)))
         for key, label in GROUPS:
-            options = sorted((r['value'] for r in records
-                              if r['province'] == province and r['table'] == key), key=str.lower)
+            options = sorted((v for r in records
+                              if r['province'] == province and r['table'] == key
+                              for v in r['values']), key=str.lower)
             if not options:
                 continue
             lines.append("    {{ label: '{}', options: [".format(label))
@@ -251,7 +272,8 @@ def main():
         sys.exit(1)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(render(records), encoding='utf-8')
-    print('Wrote {} - {} waterbodies across {} provinces.'.format(OUT, len(records), len(EXPECT_PER_PROVINCE)))
+    print('Wrote {} - {} options for {} waterbodies across {} provinces.'.format(
+        OUT, sum(len(r['values']) for r in records), len(records), len(EXPECT_PER_PROVINCE)))
 
 
 if __name__ == '__main__':
