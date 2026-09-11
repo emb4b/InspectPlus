@@ -190,12 +190,46 @@ describe('InspectionReportHeader due indicator', () => {
     });
   });
 
-  it('turns the meta chips white on a flagged card', () => {
-    const chips = findMetaChips(renderHeader({ inspectionDate: daysAgo(15) }));
+  // Only the fill changes on a flagged card. Border and icon keep the type
+  // colour, as the R.A. pill beside them does — a chip that went grey all
+  // over read as a generic chip, not as a water chip that happens to be
+  // sitting on an alarm.
+  it('turns the meta chips white on a flagged card but keeps their type border and icon', () => {
+    const r = renderHeader({ inspectionDate: daysAgo(15) });
+    const chips = findMetaChips(r);
     expect(chips).toHaveLength(3);
     chips.forEach((chip) => {
       expect(flattenStyle(chip.props.style).backgroundColor).toBe(Colors.white);
+      expect(flattenStyle(chip.props.style).borderColor).toBe(Colors.water.border);
+      expect(chip.findByType(Ionicons).props.color).toBe(Colors.water.text);
     });
+  });
+
+  // The tile is the largest coloured element on the card and the one the
+  // list card already paints in the type's colours, with the type's own
+  // glyph. A brand-green document glyph here made the same report look like
+  // two different kinds of thing on the list and on its own screen.
+  const findTile = (r: Renderer) =>
+    r.root.findAll((n) => n.type === Ionicons && n.props.name === 'water-outline')[0];
+
+  it("paints the type tile with the type's glyph and colours, like the list card", () => {
+    const glyph = findTile(renderHeader({ inspectionDate: daysAgo(2) }));
+    expect(glyph).toBeDefined();
+    expect(glyph.props.color).toBe(Colors.water.text);
+    // Walk up to the tile box: the nearest ancestor carrying a backgroundColor.
+    let box = glyph.parent;
+    while (box && flattenStyle(box.props.style).backgroundColor === undefined) box = box.parent;
+    expect(flattenStyle(box!.props.style).backgroundColor).toBe(Colors.water.bg);
+  });
+
+  it('keeps the type tile in type colours even on a flagged card', () => {
+    expect(findTile(renderHeader({ inspectionDate: daysAgo(15) })).props.color).toBe(Colors.water.text);
+  });
+
+  it('paints the location pin in the type colour', () => {
+    const r = renderHeader({ inspectionDate: daysAgo(2) });
+    const pin = r.root.findAll((n) => n.type === Ionicons && n.props.name === 'location')[0];
+    expect(pin.props.color).toBe(Colors.water.text);
   });
 
   // The Draft pill is pale amber; the due-soon tint is pale amber. On a

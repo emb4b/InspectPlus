@@ -103,13 +103,15 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
       ? { fill: Colors.hazwaste.text, bg: Colors.hazwaste.bg, border: Colors.hazwaste.border }
       : { fill: Colors.warning.text, bg: Colors.warning.bg, border: Colors.warning.border };
   const flagged = urgency.level !== 'none';
-  // The meta chips follow the card: the type's tint while the card is plain,
-  // white once it is tinted so they sit on the alarm colour rather than
-  // sinking into it.
-  const chipTone = flagged
-    ? { backgroundColor: Colors.white, borderColor: Colors.border }
-    : { backgroundColor: typeMeta.bgColor, borderColor: typeMeta.borderColor };
-  const chipIconColor = flagged ? Colors.textLight : typeMeta.textColor;
+  // The meta chips wear the type's border and icon in both states, as the
+  // R.A. pill does; only their fill follows the card — the type's tint while
+  // it is plain, white once it is tinted so they sit on the alarm colour
+  // rather than sinking into it.
+  const chipTone = {
+    backgroundColor: flagged ? Colors.white : typeMeta.bgColor,
+    borderColor: typeMeta.borderColor,
+  };
+  const chipIconColor = typeMeta.textColor;
 
   // collapsed is HeaderScrollContext's own animated 0..1 value (a single,
   // bounded transition per threshold crossing — see HeaderScrollContext) —
@@ -263,9 +265,17 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
             default to the measured size once layout settles — see
             EstablishmentHeaderCard for the same treatment. */}
         <View style={[styles.topRow, titleBlockHeight === null && styles.topRowMeasuring]}>
-          <Reanimated.View style={[styles.iconWrap, iconBoxStyle]}>
+          {/* The type's own glyph in the type's own colours — the same tile
+              the list card paints, so the report looks like one kind of
+              thing there and here. Type colours even on a flagged card: the
+              alarm lives on the card's ground, not on what the report is. */}
+          <Reanimated.View style={[styles.iconWrap, { backgroundColor: typeMeta.bgColor }, iconBoxStyle]}>
             <Reanimated.View style={iconGlyphStyle}>
-              <Ionicons name="document-text" size={iconGlyphSize} color={Colors.green} />
+              <Ionicons
+                name={typeMeta.iconName as keyof typeof Ionicons.glyphMap}
+                size={iconGlyphSize}
+                color={typeMeta.textColor}
+              />
             </Reanimated.View>
           </Reanimated.View>
           <View style={styles.titleInfo}>
@@ -277,7 +287,7 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
                   unlike the meta chips below, which repeat information the
                   form itself carries. */}
               <View style={styles.locationRow}>
-                <Ionicons name="location" size={11} color={Colors.green} style={styles.locationIcon} />
+                <Ionicons name="location" size={11} color={typeMeta.textColor} style={styles.locationIcon} />
                 <AppText
                   variant="marquee"
                   text={establishmentLocation}
@@ -541,7 +551,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: Colors.greenMuted,
+    // backgroundColor comes from the type, set inline.
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,

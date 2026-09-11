@@ -19,6 +19,9 @@ export interface ReportTypeMeta {
   textColor: string;
   bgColor: string;
   borderColor: string;
+  // The Ionicons glyph the list card's tile uses for this type, so a report
+  // can wear the same glyph on its own screen as it does in the list.
+  iconName: string;
   iconAsset?: React.FC<SvgProps>;
 }
 
@@ -32,6 +35,7 @@ export function getReportTypeMeta(reportType: string): ReportTypeMeta {
       textColor: found.textColor,
       bgColor: found.bgColor,
       borderColor: found.borderColor,
+      iconName: found.iconName,
       iconAsset: found.iconAsset,
     };
   }
@@ -41,5 +45,6 @@ export function getReportTypeMeta(reportType: string): ReportTypeMeta {
     textColor: Colors.textMuted,
     bgColor: Colors.bgLight,
     borderColor: Colors.border,
+    iconName: 'document-outline',
   };
 }
