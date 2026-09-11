@@ -1,6 +1,6 @@
 # Water inspection report — form revisions
 
-Status: designed, not implemented. Branch `feat/water-report-form-revisions`
+Status: implemented. Branch `feat/water-report-form-revisions`
 off `develop` (9f91841).
 
 Three revisions to the water report's "Information on Wastewater Pollution"
