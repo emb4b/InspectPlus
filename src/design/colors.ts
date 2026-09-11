@@ -31,16 +31,20 @@ export const Colors = {
   borderLight: '#f1f5f9',
 
   // Status / compliance badge colors
-  // Orange is the one hue left that separates cleanly from the other four
-  // report types at glyph size — water's blue, survey's green, eia's violet
-  // and hazwaste's red. It shipped as a neutral grey (the same value as
-  // textMuted), which made air the only type whose tile read as "untyped".
+  // Air is gray, by decision. It was briefly orange here — "the one hue left
+  // that separates cleanly from the other four types at glyph size" — but
+  // the FAB's speed dial kept its own hex copy and stayed gray, and gray is
+  // what was reviewed and approved against. The palette moved to meet the
+  // dial rather than the reverse; reportTypes.ts now reads these values so
+  // the two can't diverge again. The cost the orange change was made to
+  // avoid still stands: text is the same value as textMuted, so an air tile
+  // beside a neutral chip reads as untyped rather than typed-gray.
   // badgeBg/badgeText stay blue: Badge's `info` tone is their only consumer
   // and has nothing to do with air monitoring.
   air: {
-    bg: '#fff7ed',
-    border: '#fed7aa',
-    text: '#ea580c',
+    bg: '#f9fafb',
+    border: '#d1d5db',
+    text: '#6b7280',
     badgeBg: '#dbeafe',
     badgeText: '#1e40af',
   },

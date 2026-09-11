@@ -1,5 +1,6 @@
 import { REPORT_TYPES, ReportType, ReportTypeKey } from './reportTypes';
 import { REPORT_TYPE_DISPLAY, ReportDataKey } from './reportTypeDisplay';
+import { Colors } from '../design/colors';
 
 // Locate a create-flow entry by its key. Throws instead of silently
 // returning undefined if the key is missing or (impossibly, given the
@@ -68,5 +69,35 @@ describe('REPORT_TYPES dataKey/shortTitle', () => {
     expect([...distinctDataKeys].sort()).toEqual(
       (Object.keys(REPORT_TYPE_DISPLAY) as ReportDataKey[]).sort(),
     );
+  });
+});
+
+// The speed dial once carried its own hex copy of every type's colours and
+// drifted: air was changed to orange in the design palette while this file
+// still said gray, so the dial disagreed with every other air surface. Each
+// entry now reads the palette directly, and this pins that it stays so.
+describe('REPORT_TYPES colours come from the design palette', () => {
+  const PALETTE: Record<ReportTypeKey, { bg: string; border: string; text: string }> = {
+    air: Colors.air,
+    water: Colors.water,
+    hazwaste_generator: Colors.hazwaste,
+    hazwaste_tsd: Colors.warning,
+    eia: Colors.eia,
+    survey: Colors.survey,
+  };
+
+  it.each(Object.keys(PALETTE) as ReportTypeKey[])('%s reads Colors, not literals', key => {
+    const entry = findEntry(key);
+    expect(entry.bgColor).toBe(PALETTE[key].bg);
+    expect(entry.borderColor).toBe(PALETTE[key].border);
+    expect(entry.textColor).toBe(PALETTE[key].text);
+  });
+
+  // Gray, by decision: it is what the speed dial showed and was approved
+  // against, so the palette moved to meet the dial rather than the reverse.
+  it('air is the gray the speed dial always showed', () => {
+    expect(Colors.air.bg).toBe('#f9fafb');
+    expect(Colors.air.border).toBe('#d1d5db');
+    expect(Colors.air.text).toBe('#6b7280');
   });
 });

@@ -1,6 +1,7 @@
 import type React from 'react';
 import type { SvgProps } from 'react-native-svg';
 import type { ReportDataKey } from './reportTypeDisplay';
+import { Colors } from '../design/colors';
 
 export type ReportTypeKey =
   | 'air'
@@ -49,9 +50,9 @@ export const REPORT_TYPES: ReportType[] = [
     iconName: 'partly-sunny-outline',
     iconLibrary: 'Ionicons',
     iconAsset: require('../../assets/icons/air.svg').default,
-    bgColor: '#f9fafb',
-    borderColor: '#d1d5db',
-    textColor: '#6b7280',
+    bgColor: Colors.air.bg,
+    borderColor: Colors.air.border,
+    textColor: Colors.air.text,
     route: '/inspection/new?type=air',
   },
   {
@@ -63,9 +64,9 @@ export const REPORT_TYPES: ReportType[] = [
     iconName: 'water-outline',
     iconLibrary: 'Ionicons',
     iconAsset: require('../../assets/icons/water.svg').default,
-    bgColor: '#f0f9ff',
-    borderColor: '#bae6fd',
-    textColor: '#0284c7',
+    bgColor: Colors.water.bg,
+    borderColor: Colors.water.border,
+    textColor: Colors.water.text,
     route: '/inspection/new?type=water',
   },
   {
@@ -77,9 +78,9 @@ export const REPORT_TYPES: ReportType[] = [
     iconName: 'warning-outline',
     iconLibrary: 'Ionicons',
     iconAsset: require('../../assets/icons/hazwaste_generator.svg').default,
-    bgColor: '#fff7f7',
-    borderColor: '#fecaca',
-    textColor: '#dc2626',
+    bgColor: Colors.hazwaste.bg,
+    borderColor: Colors.hazwaste.border,
+    textColor: Colors.hazwaste.text,
     route: '/inspection/new?type=hazwaste_generator',
   },
   {
@@ -91,9 +92,9 @@ export const REPORT_TYPES: ReportType[] = [
     iconName: 'lock-closed-outline',
     iconLibrary: 'Ionicons',
     iconAsset: require('../../assets/icons/hazwaste_tsd.svg').default,
-    bgColor: '#fffbeb',
-    borderColor: '#fde68a',
-    textColor: '#d97706',
+    bgColor: Colors.warning.bg,
+    borderColor: Colors.warning.border,
+    textColor: Colors.warning.text,
     route: '/inspection/new?type=hazwaste_tsd',
   },
   {
@@ -105,9 +106,9 @@ export const REPORT_TYPES: ReportType[] = [
     iconName: 'document-text-outline',
     iconLibrary: 'Ionicons',
     iconAsset: require('../../assets/icons/eia.svg').default,
-    bgColor: '#faf5ff',
-    borderColor: '#ddd6fe',
-    textColor: '#7c3aed',
+    bgColor: Colors.eia.bg,
+    borderColor: Colors.eia.border,
+    textColor: Colors.eia.text,
     route: '/inspection/new?type=eia',
   },
   {
@@ -119,9 +120,9 @@ export const REPORT_TYPES: ReportType[] = [
     iconName: 'globe-outline',
     iconLibrary: 'Ionicons',
     iconAsset: require('../../assets/icons/survey.svg').default,
-    bgColor: '#f0fdf4',
-    borderColor: '#bbf7d0',
-    textColor: '#059669',
+    bgColor: Colors.survey.bg,
+    borderColor: Colors.survey.border,
+    textColor: Colors.survey.text,
     route: '/survey/new',
   },
 ];
