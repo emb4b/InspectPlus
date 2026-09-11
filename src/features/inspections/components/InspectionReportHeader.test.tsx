@@ -260,13 +260,38 @@ describe('InspectionReportHeader due indicator', () => {
     expect(labels(r)).toContain('15d late');
   });
 
-  // Placement: under the address in the title column, not stacked as a third
-  // pill in the badge column. The title column renders before the badge
-  // column, so in render order the urgency text precedes the law pill's.
-  it('sits in the title column, ahead of the badge column', () => {
+  // Placement: the top of the badge column, above the status pill. That is
+  // the slot the eye goes to for a card's status, so the alarm takes it. It
+  // fits there now because the law pill is gone — the tile, pin, chips, edge
+  // and tabs all say the type, and the law is a function of the type, so
+  // the pill was saying it a seventh time. Two lines on the left, two pills
+  // on the right: the card balances without a stamp under the address.
+  it('sits at the top of the badge column, above the status pill', () => {
     const r = renderHeader({ inspectionDate: daysAgo(15) });
+    const stamp = findUrgencyChip(r);
+    const pill = findStatusPill(r);
+    // Same column: both live inside the badge group. Render order alone
+    // can't tell "under the address" from "top of the badge column", since
+    // both precede Draft; containment can. (Not a parent comparison: the
+    // two locators land at different depths of RN's composite/host View
+    // pairs, and a failing toBe on test instances pretty-prints whole trees
+    // and exhausts the heap.)
+    const badgeGroup = r.root.findAll(
+      (n) =>
+        n.type === View &&
+        flattenStyle(n.props.style).flexDirection === 'column' &&
+        flattenStyle(n.props.style).alignItems === 'flex-end',
+    )[0];
+    const contains = (node: TestRenderer.ReactTestInstance) =>
+      badgeGroup.findAll((n) => n === node).length > 0;
+    expect(contains(stamp)).toBe(true);
+    expect(contains(pill)).toBe(true);
     const order = labels(r);
-    expect(order.indexOf('15d left')).toBeGreaterThan(-1);
-    expect(order.indexOf('15d left')).toBeLessThan(order.indexOf('R.A. 9275'));
+    expect(order.indexOf('15d left')).toBeLessThan(order.indexOf('Draft'));
+  });
+
+  it('no longer shows a law pill — the type is carried everywhere else', () => {
+    const r = renderHeader({ inspectionDate: daysAgo(2) });
+    expect(labels(r)).not.toContain('R.A. 9275');
   });
 });

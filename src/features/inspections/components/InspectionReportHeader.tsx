@@ -91,7 +91,6 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
   collapsed,
 }) => {
   const typeMeta = getReportTypeMeta(reportType);
-  const IconAsset = typeMeta.iconAsset;
   const isSubmitted = reportStatus === 'submitted';
   // Same computation the report's own card runs in the list — a report that
   // shows a ribbon there must be flagged just as plainly here. `fill` is the
@@ -296,26 +295,6 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
                 />
               </View>
             </View>
-            {/* How the draft sits against its filing deadline — a solid strip
-                under the address rather than a third pill in the badge
-                column. Three stacked pills ran taller than this two-line
-                title block and left a dead band beneath the address; the
-                strip fills that band. It is saturated, white on the ribbon's
-                hue, where the Draft pill beside it is pale: the two are
-                different facts and should not read as twins, and a draft
-                nearing its deadline should look alarming, not calm. Same
-                short wording as the corner ribbon its card wears in the list,
-                so the report reads the same in both places. Collapsed, it
-                joins the badge group as a solid icon chip like the sync line
-                below, so the collapsed header's height never depends on it. */}
-            {!badgesCollapsed && urgency.level !== 'none' && (
-              <View
-                style={[styles.urgencyStrip, { backgroundColor: urgencyTone.fill }]}
-                accessibilityLabel={urgencySpokenLabel(urgency)}>
-                <Ionicons name="alert-circle" size={12} color={Colors.textWhite} />
-                <Text style={styles.urgencyStripText}>{urgencyShortLabel(urgency)}</Text>
-              </View>
-            )}
             {/* Spelled out while there's room. Collapsed, this moves into the
                 badge group as a chip instead of staying a third line in a
                 column that has already shrunk to two — otherwise the
@@ -338,25 +317,26 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
             )}
           </View>
           <View style={[styles.badgeGroup, badgesCollapsed && styles.badgeGroupInline]}>
-            {/* The law citation (e.g. "R.A. 9275") stands in for the full report
-                type name here. Stacked top-to-bottom rather than side by side —
-                a row of both pills was wide enough to squeeze the name/address
-                column into truncating; stacked, badgeGroup only needs to be as
-                wide as the wider single pill.
+            {/* Stacked top-to-bottom, urgency first then filing status. Two
+                pills fit beside a two-line title block; the law pill that
+                used to lead the stack is gone, its job done by every other
+                type-coloured element on the card.
 
-                Collapsed, both drop their labels and sit inline as icons: the
-                pair then costs one line instead of two, which is what let the
-                header actually compact down once the icon box stopped
-                reserving its expanded footprint. The labels they lose are
-                re-attached as accessibility names, since an icon alone still
-                has to announce which law and which status it stands for. */}
+                Collapsed, both drop their labels and sit inline as icons, so
+                the pair costs one line instead of two. The labels they lose
+                are re-attached as accessibility names. */}
             {badgesCollapsed ? (
               <>
-                <View
-                  style={[styles.badgeIcon, { backgroundColor: typeMeta.bgColor }]}
-                  accessibilityLabel={typeMeta.law || typeMeta.label}>
-                  {IconAsset && <IconAsset width={14} height={14} />}
-                </View>
+                {/* First, and solid white on the ribbon's hue where the other
+                    chips are pale tints — the alarm has to survive the
+                    collapse and lead it. */}
+                {urgency.level !== 'none' && (
+                  <View
+                    style={[styles.badgeIcon, { backgroundColor: urgencyTone.fill }]}
+                    accessibilityLabel={urgencySpokenLabel(urgency)}>
+                    <Ionicons name="alert-circle" size={14} color={Colors.textWhite} />
+                  </View>
+                )}
                 <View
                   style={[
                     styles.badgeIcon,
@@ -369,15 +349,6 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
                     color={isSubmitted ? Colors.green : Colors.warning.text}
                   />
                 </View>
-                {/* Solid, white on the ribbon's hue, where the other chips are
-                    pale tints — the alarm has to survive the collapse. */}
-                {urgency.level !== 'none' && (
-                  <View
-                    style={[styles.badgeIcon, { backgroundColor: urgencyTone.fill }]}
-                    accessibilityLabel={urgencySpokenLabel(urgency)}>
-                    <Ionicons name="alert-circle" size={14} color={Colors.textWhite} />
-                  </View>
-                )}
                 {syncStatus === 'pending' && (
                   <View
                     style={[styles.badgeIcon, { backgroundColor: Colors.pendingMuted }]}
@@ -403,12 +374,23 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
               </>
             ) : (
               <>
-                <View style={[styles.pill, { backgroundColor: typeMeta.bgColor }]}>
-                  {IconAsset && <IconAsset width={11} height={11} />}
-                  <Text style={[styles.pillText, { color: typeMeta.textColor }]} numberOfLines={1}>
-                    {typeMeta.law || typeMeta.label}
-                  </Text>
-                </View>
+                {/* How the draft sits against its filing deadline, at the top
+                    of the column — the slot the eye goes to for a card's
+                    status. Solid, white on the ribbon's hue, where the Draft
+                    pill below is pale: the two are different facts and should
+                    not read as twins, and a draft nearing its deadline should
+                    look alarming, not calm. Same short wording as the corner
+                    ribbon its card wears in the list. It fits here because
+                    the law pill is gone: tile, pin, chips, edge and tabs all
+                    say the type, and the law is a function of the type. */}
+                {urgency.level !== 'none' && (
+                  <View
+                    style={[styles.urgencyStrip, { backgroundColor: urgencyTone.fill }]}
+                    accessibilityLabel={urgencySpokenLabel(urgency)}>
+                    <Ionicons name="alert-circle" size={12} color={Colors.textWhite} />
+                    <Text style={styles.urgencyStripText}>{urgencyShortLabel(urgency)}</Text>
+                  </View>
+                )}
                 {/* Pale amber on a pale amber tint is invisible, so on a
                     flagged card the pill goes white with an outline in its
                     own colour. Submitted never flags, but the rule is
@@ -589,19 +571,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pill: {
-    flexShrink: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 20,
-  },
-  pillText: {
-    fontSize: 10.5,
-    fontWeight: '700',
-  },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -622,17 +591,13 @@ const styles = StyleSheet.create({
   locationContainer: {
     flex: 1,
   },
-  // A solid strip, not a text row: its fill is applied inline from
-  // urgencyTone since it differs by level, and the text is white on it.
-  // alignSelf keeps it hugging its content rather than spanning the title
-  // column, so it reads as a stamp on the card rather than a banner across
-  // it. Sits on the same 4dp top rhythm as the sync line below it.
+  // A solid stamp at the head of the badge column: its fill is applied
+  // inline from urgencyTone since it differs by level, and the text is white
+  // on it. The column's own gap spaces it from the status pill below.
   urgencyStrip: {
-    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: 6,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
