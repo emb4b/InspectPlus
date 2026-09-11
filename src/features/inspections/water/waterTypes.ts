@@ -3,6 +3,7 @@ import {
   DAO_2005_10_CHECKLIST,
   NON_WWTP_TREATMENT_OTHERS,
   TREATMENT_OTHERS,
+  WWTP_TYPE_OTHERS,
   PRIMARY_TREATMENT_OPTIONS,
   BIOLOGICAL_TREATMENT_OPTIONS,
   CHEMICAL_TREATMENT_OPTIONS,
@@ -345,10 +346,10 @@ export function describeTreatment(selected: string[], other: string): string {
 // record.
 
 export function wwtpTypeOtherForSave(wwtpType: string, other: string): string {
-  return wwtpType === 'Others' ? other.trim() : '';
+  return wwtpType === WWTP_TYPE_OTHERS ? other.trim() : '';
 }
 
 export function describeWwtpType(wwtpType: string, other: string): string {
   if (!wwtpType) return '—';
-  return wwtpType === 'Others' && other ? `${wwtpType}: ${other}` : wwtpType;
+  return wwtpType === WWTP_TYPE_OTHERS && other ? `${wwtpType}: ${other}` : wwtpType;
 }

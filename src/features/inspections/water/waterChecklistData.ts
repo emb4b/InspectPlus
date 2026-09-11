@@ -79,7 +79,12 @@ export const NON_WWTP_TREATMENT_PROMPT =
 
 export const NON_WWTP_TREATMENT_OTHER_LABEL = 'Others (specify)';
 
-export const WWTP_TYPE_OPTIONS = ['Physical', 'Biological', 'Chemical', 'Combined', 'Others'];
+// Section 5B's escape hatch. Named so the two entry paths and the save rule
+// (wwtpTypeOtherForSave) compare against the same value the option list
+// actually offers, rather than each restating a literal.
+export const WWTP_TYPE_OTHERS = 'Others';
+
+export const WWTP_TYPE_OPTIONS = ['Physical', 'Biological', 'Chemical', 'Combined', WWTP_TYPE_OTHERS];
 
 export const WWTP_CONDITION_OPTIONS = [
   'Properly Maintained',

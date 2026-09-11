@@ -45,6 +45,7 @@ import {
   BIOLOGICAL_TREATMENT_OPTIONS,
   CHEMICAL_TREATMENT_OPTIONS,
   WWTP_TYPE_OPTIONS,
+  WWTP_TYPE_OTHERS,
   WWTP_CONDITION_OPTIONS,
 } from './waterChecklistData';
 import { TreatmentCheckboxGroup } from './TreatmentCheckboxGroup';
@@ -409,7 +410,7 @@ export const WwtpTypeSection: React.FC<{
             options={WWTP_TYPE_OPTIONS}
             onSelect={v => section.setDraft({ ...section.draft, wwtpType: v })}
           />
-          {section.draft.wwtpType === 'Others' && (
+          {section.draft.wwtpType === WWTP_TYPE_OTHERS && (
             <TextField
               label="Specify the type of WWTP"
               value={section.draft.wwtpTypeOther}
