@@ -256,6 +256,24 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
                 />
               </View>
             </View>
+            {/* How the draft sits against its filing deadline — a text row
+                under the address rather than a third pill in the badge
+                column. Three stacked pills ran taller than this two-line
+                title block and left a dead band beneath the address; here it
+                fills that band, and being a row rather than a pill also
+                stops it reading as a twin of the amber Draft chip beside it.
+                Same short wording as the corner ribbon its card wears in the
+                list, so the report reads the same in both places. Collapsed,
+                it joins the badge group as an icon chip like the sync line
+                below, so the collapsed header's height never depends on it. */}
+            {!badgesCollapsed && urgency.level !== 'none' && (
+              <View style={styles.urgencyRow} accessibilityLabel={urgencySpokenLabel(urgency)}>
+                <Ionicons name="alert-circle" size={10} color={urgencyTone.text} />
+                <Text style={[styles.urgencyText, { color: urgencyTone.text }]}>
+                  {urgencyShortLabel(urgency)}
+                </Text>
+              </View>
+            )}
             {/* Spelled out while there's room. Collapsed, this moves into the
                 badge group as a chip instead of staying a third line in a
                 column that has already shrunk to two — otherwise the
@@ -369,20 +387,6 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
                     {isSubmitted ? 'Submitted' : 'Draft'}
                   </Text>
                 </View>
-                {/* A single report has no count to give, so it carries the
-                    state instead — same wording as the corner ribbon its card
-                    wears in the list, so the report reads the same in both
-                    places. */}
-                {urgency.level !== 'none' && (
-                  <View
-                    style={[styles.statusBadge, { backgroundColor: urgencyTone.badgeBg }]}
-                    accessibilityLabel={urgencySpokenLabel(urgency)}>
-                    <Ionicons name="alert-circle" size={11} color={urgencyTone.text} />
-                    <Text style={[styles.statusBadgeText, { color: urgencyTone.text }]}>
-                      {urgencyShortLabel(urgency)}
-                    </Text>
-                  </View>
-                )}
               </>
             )}
           </View>
@@ -560,6 +564,20 @@ const styles = StyleSheet.create({
   },
   locationContainer: {
     flex: 1,
+  },
+  // The urgency line shares the sync line's shape exactly — same gap, same
+  // top margin, same size and weight — so when both show they read as two
+  // entries of one list under the address, not two unrelated markers. Its
+  // colour is applied inline from urgencyTone, since it differs by level.
+  urgencyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 4,
+  },
+  urgencyText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   syncRow: {
     flexDirection: 'row',

@@ -99,11 +99,21 @@ describe('InspectionReportHeader due indicator', () => {
     expect(findUrgencyChip(r)).toBeUndefined();
   });
 
+  // The urgency line is a text row, not a pill: it carries its tone in the
+  // text and icon colour and has no chip background of its own. A third
+  // pill in the badge column stacked taller than the two-line title block
+  // beside it and left a dead band under the address; as a row under the
+  // address it fills that band instead — the same idiom the card already
+  // uses for its sync-state line.
+  const urgencyText = (r: Renderer, chip: TestRenderer.ReactTestInstance) =>
+    chip.findAllByType(Text).find((n) => !iconGlyphTexts(r).has(n))!;
+
   it('carries the overdue state in the ribbon\'s own wording', () => {
     const r = renderHeader({ inspectionDate: daysAgo(45) });
     const chip = findUrgencyChip(r);
 
-    expect(flattenStyle(chip.props.style).backgroundColor).toBe(Colors.hazwaste.badgeBg);
+    expect(flattenStyle(chip.props.style).backgroundColor).toBeUndefined();
+    expect(flattenStyle(urgencyText(r, chip).props.style).color).toBe(Colors.hazwaste.badgeText);
     expect(chip.props.accessibilityLabel).toBe('Overdue by 15 days');
     expect(labels(r)).toContain('15d late');
   });
@@ -112,17 +122,28 @@ describe('InspectionReportHeader due indicator', () => {
     const r = renderHeader({ inspectionDate: daysAgo(15) });
     const chip = findUrgencyChip(r);
 
-    expect(flattenStyle(chip.props.style).backgroundColor).toBe(Colors.warning.badgeBg);
+    expect(flattenStyle(chip.props.style).backgroundColor).toBeUndefined();
+    expect(flattenStyle(urgencyText(r, chip).props.style).color).toBe(Colors.warning.text);
     expect(chip.props.accessibilityLabel).toBe('Due in 15 days');
     expect(labels(r)).toContain('15d left');
   });
 
   // The Draft/Submitted chip says where the report stands with filing; the
-  // urgency chip says how that is going against the clock. They are different
+  // urgency line says how that is going against the clock. They are different
   // facts and both belong.
   it('sits beside the Draft chip rather than replacing it', () => {
     const r = renderHeader({ inspectionDate: daysAgo(45) });
     expect(labels(r)).toContain('Draft');
     expect(labels(r)).toContain('15d late');
+  });
+
+  // Placement: under the address in the title column, not stacked as a third
+  // pill in the badge column. The title column renders before the badge
+  // column, so in render order the urgency text precedes the law pill's.
+  it('sits in the title column, ahead of the badge column', () => {
+    const r = renderHeader({ inspectionDate: daysAgo(15) });
+    const order = labels(r);
+    expect(order.indexOf('15d left')).toBeGreaterThan(-1);
+    expect(order.indexOf('15d left')).toBeLessThan(order.indexOf('R.A. 9275'));
   });
 });
