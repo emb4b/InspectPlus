@@ -2,6 +2,7 @@ import React from 'react';
 import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { Colors } from '../../../constants/colors';
 import { AppText } from '../../../components/AppText';
+import { useReportAccent } from '../../../core/providers/ReportThemeProvider';
 
 export interface TwoRowSubTabDef {
   key: string;
@@ -36,6 +37,10 @@ interface TwoRowTabsProps {
 // two), so the 3-tab menu other report kinds still use keeps its original
 // single-row look.
 export const TwoRowTabs: React.FC<TwoRowTabsProps> = ({ tabs, activeMain, onMainChange }) => {
+  // The active tab's top edge and label carry the report's accent - the
+  // one tab that can't share a colour with the resting ones is where the
+  // identity goes. Resting tabs are structure and keep their muted grey.
+  const accent = useReportAccent(Colors.green);
   // The shorter row goes first: with 7 tabs that's 3 then 4, so the opening
   // tabs get a third of the width each instead of a quarter.
   const rows: TwoRowMainTabDef[][] =
@@ -56,6 +61,7 @@ export const TwoRowTabs: React.FC<TwoRowTabsProps> = ({ tabs, activeMain, onMain
                   styles.tab,
                   tabIndex > 0 && styles.tabCollapsed,
                   isActive && styles.tabActive,
+                  isActive && { borderTopColor: accent },
                 ]}
                 activeOpacity={0.7}
                 onPress={() => onMainChange(tab.key)}>
@@ -68,7 +74,7 @@ export const TwoRowTabs: React.FC<TwoRowTabsProps> = ({ tabs, activeMain, onMain
                   variant="multiline"
                   lines={3}
                   text={tab.label}
-                  style={[styles.tabText, isActive && styles.tabTextActive]}
+                  style={[styles.tabText, isActive && styles.tabTextActive, isActive && { color: accent }]}
                 />
               </TouchableOpacity>
             );

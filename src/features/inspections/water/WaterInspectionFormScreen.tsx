@@ -34,6 +34,7 @@ import type { EstablishmentDTO } from '../../establishments/types';
 import { useHeaderScroll } from '../../home/context/HeaderScrollContext';
 import { useScreenFooter } from '../../home/context/ScreenFooterContext';
 import { AttachmentsSection } from '../../attachments/components/AttachmentsSection';
+import { ReportThemeProvider } from '../../../core/providers/ReportThemeProvider';
 
 const REPORT_TYPE = 'water_monitoring';
 
@@ -183,55 +184,57 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
   const activeMainTab = tabs.find(t => t.key === activeMain) ?? tabs[0];
 
   return (
-    <View style={styles.flex}>
-      <ReportFormHeader
-        establishmentName={generalInfo.name || 'New Establishment'}
-        establishmentLocation={formatEstablishmentLocation(generalInfo)}
-        reportType={REPORT_TYPE}
-        tabs={tabs}
-        activeMain={activeMainTab.key}
-        onMainChange={setActiveMain}
-      />
+    <ReportThemeProvider reportType={REPORT_TYPE}>
+      <View style={styles.flex}>
+        <ReportFormHeader
+          establishmentName={generalInfo.name || 'New Establishment'}
+          establishmentLocation={formatEstablishmentLocation(generalInfo)}
+          reportType={REPORT_TYPE}
+          tabs={tabs}
+          activeMain={activeMainTab.key}
+          onMainChange={setActiveMain}
+        />
 
-      <KeyboardAwareScrollView
-        ref={scrollRef as unknown as React.Ref<KeyboardAwareScrollViewRef>}
-        style={styles.body}
-        contentContainerStyle={styles.bodyContent}
-        bottomOffset={150}
-        keyboardShouldPersistTaps="handled"
-        onScroll={onScroll}
-        scrollEventThrottle={16}>
-        {activeMainTab.key === 'geninfo' && (
-          <GeneralInformationTab value={generalInfo} onChange={setGeneralInfo} />
-        )}
-        {activeMainTab.key === 'purpose' && (
-          <PurposeOfInspectionTab value={purpose} onChange={setPurpose} />
-        )}
-        {activeMainTab.key === 'compliance' && (
-          <DenrPermitsFormSection
-            value={generalInfo.denrPermits}
-            onChange={denrPermits => setGeneralInfo({ ...generalInfo, denrPermits })}
-          />
-        )}
-        {(activeMainTab.key === 'watersupply' || activeMainTab.key === 'wastewaterpollution' || activeMainTab.key === 'samplingfindings') && (
-          <WaterExtraFormSectionsView
-            value={waterCompliance}
-            onChange={setWaterCompliance}
-            mainTab={activeMainTab}
-            hasDp={hasDp}
-            province={generalInfo.province}
-          />
-        )}
-        {activeMainTab.key === 'attachments' && (
-          <AttachmentsSection
-            parentType="inspection"
-            parentId={draftReportId ?? undefined}
-            ensureParentId={ensureDraftReport}
-            canEdit
-          />
-        )}
-      </KeyboardAwareScrollView>
-    </View>
+        <KeyboardAwareScrollView
+          ref={scrollRef as unknown as React.Ref<KeyboardAwareScrollViewRef>}
+          style={styles.body}
+          contentContainerStyle={styles.bodyContent}
+          bottomOffset={150}
+          keyboardShouldPersistTaps="handled"
+          onScroll={onScroll}
+          scrollEventThrottle={16}>
+          {activeMainTab.key === 'geninfo' && (
+            <GeneralInformationTab value={generalInfo} onChange={setGeneralInfo} />
+          )}
+          {activeMainTab.key === 'purpose' && (
+            <PurposeOfInspectionTab value={purpose} onChange={setPurpose} />
+          )}
+          {activeMainTab.key === 'compliance' && (
+            <DenrPermitsFormSection
+              value={generalInfo.denrPermits}
+              onChange={denrPermits => setGeneralInfo({ ...generalInfo, denrPermits })}
+            />
+          )}
+          {(activeMainTab.key === 'watersupply' || activeMainTab.key === 'wastewaterpollution' || activeMainTab.key === 'samplingfindings') && (
+            <WaterExtraFormSectionsView
+              value={waterCompliance}
+              onChange={setWaterCompliance}
+              mainTab={activeMainTab}
+              hasDp={hasDp}
+              province={generalInfo.province}
+            />
+          )}
+          {activeMainTab.key === 'attachments' && (
+            <AttachmentsSection
+              parentType="inspection"
+              parentId={draftReportId ?? undefined}
+              ensureParentId={ensureDraftReport}
+              canEdit
+            />
+          )}
+        </KeyboardAwareScrollView>
+      </View>
+    </ReportThemeProvider>
   );
 }
 

@@ -17,6 +17,7 @@ import { ComplianceStatusView } from './ComplianceStatusView';
 import { DenrPermitsSection } from './DenrPermitsSection';
 import { useHeaderScroll } from '../../home/context/HeaderScrollContext';
 import { WaterExtraSectionsView } from '../water/WaterComplianceEditSections';
+import { ReportThemeProvider } from '../../../core/providers/ReportThemeProvider';
 import { buildWaterReportTabs, establishmentHasDischargePermit } from '../water/waterReportTabs';
 import { AttachmentsSection } from '../../attachments/components/AttachmentsSection';
 
@@ -135,108 +136,110 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
   const activeWaterMainTab = waterTabs.find(t => t.key === activeMain) ?? waterTabs[0];
 
   return (
-    <View style={styles.flex}>
-      <InspectionReportHeader
-        reportId={reportId}
-        establishmentName={report.establishmentSnapshot.name}
-        establishmentLocation={location}
-        reportType={report.reportType}
-        reportControlNo={report.reportControlNo}
-        inspectionDate={report.inspectionDate}
-        reportStatus={report.reportStatus}
-        syncStatus={report.syncStatus}
-        inspectorUid={report.inspectorUid}
-        tabs={tabs}
-        activeMain={activeMainTab.key}
-        onMainChange={setActiveMain}
-        onBack={() => router.back()}
-        onDelete={handleDelete}
-        collapsed={collapsed}
-      />
+    <ReportThemeProvider reportType={report.reportType}>
+      <View style={styles.flex}>
+        <InspectionReportHeader
+          reportId={reportId}
+          establishmentName={report.establishmentSnapshot.name}
+          establishmentLocation={location}
+          reportType={report.reportType}
+          reportControlNo={report.reportControlNo}
+          inspectionDate={report.inspectionDate}
+          reportStatus={report.reportStatus}
+          syncStatus={report.syncStatus}
+          inspectorUid={report.inspectorUid}
+          tabs={tabs}
+          activeMain={activeMainTab.key}
+          onMainChange={setActiveMain}
+          onBack={() => router.back()}
+          onDelete={handleDelete}
+          collapsed={collapsed}
+        />
 
-      {!noteBarDismissed && (
-        <View style={styles.noteBar}>
-          <Ionicons name="information-circle-outline" size={13} color={Colors.navy} />
-          <Text style={styles.noteText}>
-            {canEdit ? (
-              <>
-                Use <Text style={styles.noteTextStrong}>Edit</Text> on any section below to make changes, then{' '}
-                <Text style={styles.noteTextStrong}>Save</Text> to update just that section.
-              </>
-            ) : (
-              <>
-                This report is <Text style={styles.noteTextStrong}>view only</Text> — only the inspector who
-                created it can make changes{report.reportStatus === 'submitted' ? ', and it has already been submitted' : ''}.
-              </>
-            )}
-          </Text>
-          <TouchableOpacity
-            onPress={() => setNoteBarDismissed(true)}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            activeOpacity={0.7}>
-            <Ionicons name="close" size={14} color={Colors.navy} />
-          </TouchableOpacity>
-        </View>
-      )}
-
-      <KeyboardAwareScrollView
-        ref={scrollRef as unknown as React.Ref<KeyboardAwareScrollViewRef>}
-        style={styles.body}
-        contentContainerStyle={styles.bodyContent}
-        showsVerticalScrollIndicator={false}
-        bottomOffset={150}
-        keyboardShouldPersistTaps="handled"
-        onScroll={onScroll}
-        scrollEventThrottle={16}>
-        {activeMainTab.key === 'geninfo' && (
-          <GeneralInformationView
-            reportId={report.reportId}
-            snapshot={report.establishmentSnapshot}
-            permits={report.permitsSnapshot}
-            canEdit={canEdit}
-            onSaved={refetch}
-            liveEstablishment={liveEstablishment}
-            liveEstablishmentLoading={liveEstablishmentLoading}
-            showPermits={!isWater}
-          />
+        {!noteBarDismissed && (
+          <View style={styles.noteBar}>
+            <Ionicons name="information-circle-outline" size={13} color={Colors.navy} />
+            <Text style={styles.noteText}>
+              {canEdit ? (
+                <>
+                  Use <Text style={styles.noteTextStrong}>Edit</Text> on any section below to make changes, then{' '}
+                  <Text style={styles.noteTextStrong}>Save</Text> to update just that section.
+                </>
+              ) : (
+                <>
+                  This report is <Text style={styles.noteTextStrong}>view only</Text> — only the inspector who
+                  created it can make changes{report.reportStatus === 'submitted' ? ', and it has already been submitted' : ''}.
+                </>
+              )}
+            </Text>
+            <TouchableOpacity
+              onPress={() => setNoteBarDismissed(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              activeOpacity={0.7}>
+              <Ionicons name="close" size={14} color={Colors.navy} />
+            </TouchableOpacity>
+          </View>
         )}
-        {activeMainTab.key === 'purpose' &&
-          (purpose ? (
-            <PurposeOfInspectionView
-              purposeId={report.purposeId}
-              value={purpose}
-              canEdit={canEdit}
-              onSaved={refetch}
-            />
-          ) : (
-            <Text style={styles.stateText}>No purpose of inspection recorded for this report.</Text>
-          ))}
-        {activeMainTab.key === 'compliance' &&
-          (isWater ? (
-            <DenrPermitsSection
+
+        <KeyboardAwareScrollView
+          ref={scrollRef as unknown as React.Ref<KeyboardAwareScrollViewRef>}
+          style={styles.body}
+          contentContainerStyle={styles.bodyContent}
+          showsVerticalScrollIndicator={false}
+          bottomOffset={150}
+          keyboardShouldPersistTaps="handled"
+          onScroll={onScroll}
+          scrollEventThrottle={16}>
+          {activeMainTab.key === 'geninfo' && (
+            <GeneralInformationView
               reportId={report.reportId}
+              snapshot={report.establishmentSnapshot}
               permits={report.permitsSnapshot}
               canEdit={canEdit}
               onSaved={refetch}
+              liveEstablishment={liveEstablishment}
+              liveEstablishmentLoading={liveEstablishmentLoading}
+              showPermits={!isWater}
             />
-          ) : (
-            <ComplianceStatusView compliance={compliance} />
-          ))}
-        {isWater && compliance.kind === 'water' && (activeMainTab.key === 'watersupply' || activeMainTab.key === 'wastewaterpollution' || activeMainTab.key === 'samplingfindings') && (
-          <WaterExtraSectionsView
-            compliance={compliance}
-            canEdit={canEdit}
-            onSaved={refetch}
-            mainTab={activeWaterMainTab}
-            hasDp={hasDp}
-            province={report.establishmentSnapshot.province}
-          />
-        )}
-        {activeMainTab.key === 'attachments' && (
-          <AttachmentsSection parentType="inspection" parentId={report.reportId} canEdit={canEdit} />
-        )}
-      </KeyboardAwareScrollView>
-    </View>
+          )}
+          {activeMainTab.key === 'purpose' &&
+            (purpose ? (
+              <PurposeOfInspectionView
+                purposeId={report.purposeId}
+                value={purpose}
+                canEdit={canEdit}
+                onSaved={refetch}
+              />
+            ) : (
+              <Text style={styles.stateText}>No purpose of inspection recorded for this report.</Text>
+            ))}
+          {activeMainTab.key === 'compliance' &&
+            (isWater ? (
+              <DenrPermitsSection
+                reportId={report.reportId}
+                permits={report.permitsSnapshot}
+                canEdit={canEdit}
+                onSaved={refetch}
+              />
+            ) : (
+              <ComplianceStatusView compliance={compliance} />
+            ))}
+          {isWater && compliance.kind === 'water' && (activeMainTab.key === 'watersupply' || activeMainTab.key === 'wastewaterpollution' || activeMainTab.key === 'samplingfindings') && (
+            <WaterExtraSectionsView
+              compliance={compliance}
+              canEdit={canEdit}
+              onSaved={refetch}
+              mainTab={activeWaterMainTab}
+              hasDp={hasDp}
+              province={report.establishmentSnapshot.province}
+            />
+          )}
+          {activeMainTab.key === 'attachments' && (
+            <AttachmentsSection parentType="inspection" parentId={report.reportId} canEdit={canEdit} />
+          )}
+        </KeyboardAwareScrollView>
+      </View>
+    </ReportThemeProvider>
   );
 };
 
