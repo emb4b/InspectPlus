@@ -99,12 +99,13 @@ describe('InspectionReportHeader due indicator', () => {
     expect(findUrgencyChip(r)).toBeUndefined();
   });
 
-  // The urgency line is a text row, not a pill: it carries its tone in the
-  // text and icon colour and has no chip background of its own. A third
-  // pill in the badge column stacked taller than the two-line title block
-  // beside it and left a dead band under the address; as a row under the
-  // address it fills that band instead — the same idiom the card already
-  // uses for its sync-state line.
+  // The urgency line is a solid strip under the address — the saturated hue
+  // the list card's ribbon paints with, white text on it — rather than a
+  // third pill in the badge column. Stacked as a pill it ran the column
+  // taller than the two-line title block and left a dead band under the
+  // address, and it was the same pale amber as the Draft pill beside it, so
+  // the two read as one. As a saturated strip it fills that band and is
+  // meant to alarm: a draft nearing its deadline should not look calm.
   const urgencyText = (r: Renderer, chip: TestRenderer.ReactTestInstance) =>
     chip.findAllByType(Text).find((n) => !iconGlyphTexts(r).has(n))!;
 
@@ -112,8 +113,8 @@ describe('InspectionReportHeader due indicator', () => {
     const r = renderHeader({ inspectionDate: daysAgo(45) });
     const chip = findUrgencyChip(r);
 
-    expect(flattenStyle(chip.props.style).backgroundColor).toBeUndefined();
-    expect(flattenStyle(urgencyText(r, chip).props.style).color).toBe(Colors.hazwaste.badgeText);
+    expect(flattenStyle(chip.props.style).backgroundColor).toBe(Colors.hazwaste.text);
+    expect(flattenStyle(urgencyText(r, chip).props.style).color).toBe(Colors.textWhite);
     expect(chip.props.accessibilityLabel).toBe('Overdue by 15 days');
     expect(labels(r)).toContain('15d late');
   });
@@ -122,10 +123,42 @@ describe('InspectionReportHeader due indicator', () => {
     const r = renderHeader({ inspectionDate: daysAgo(15) });
     const chip = findUrgencyChip(r);
 
-    expect(flattenStyle(chip.props.style).backgroundColor).toBeUndefined();
-    expect(flattenStyle(urgencyText(r, chip).props.style).color).toBe(Colors.warning.text);
+    expect(flattenStyle(chip.props.style).backgroundColor).toBe(Colors.warning.text);
+    expect(flattenStyle(urgencyText(r, chip).props.style).color).toBe(Colors.textWhite);
     expect(chip.props.accessibilityLabel).toBe('Due in 15 days');
     expect(labels(r)).toContain('15d left');
+  });
+
+  // The whole card takes the list card's flagged tint and a thick edge in
+  // the ribbon's hue, so the report is visibly flagged the moment the screen
+  // opens and stays flagged through the collapse — the edge and tint are the
+  // parts of the card that never change shape.
+  const findCard = (r: Renderer) =>
+    r.root.find(
+      (n) =>
+        n.type === View &&
+        flattenStyle(n.props.style).marginHorizontal === 12 &&
+        flattenStyle(n.props.style).borderRadius === 14,
+    );
+
+  it('tints the card and thickens its edge for a due-soon draft', () => {
+    const card = flattenStyle(findCard(renderHeader({ inspectionDate: daysAgo(15) })).props.style);
+    expect(card.backgroundColor).toBe(Colors.warning.bg);
+    expect(card.borderColor).toBe(Colors.warning.border);
+    expect(card.borderLeftWidth).toBe(5);
+    expect(card.borderLeftColor).toBe(Colors.warning.text);
+  });
+
+  it('tints the card red for an overdue draft', () => {
+    const card = flattenStyle(findCard(renderHeader({ inspectionDate: daysAgo(45) })).props.style);
+    expect(card.backgroundColor).toBe(Colors.hazwaste.bg);
+    expect(card.borderLeftColor).toBe(Colors.hazwaste.text);
+  });
+
+  it('leaves an unflagged card plain', () => {
+    const card = flattenStyle(findCard(renderHeader({ inspectionDate: daysAgo(2) })).props.style);
+    expect(card.backgroundColor).toBe(Colors.white);
+    expect(card.borderLeftWidth).toBeUndefined();
   });
 
   // The Draft/Submitted chip says where the report stands with filing; the

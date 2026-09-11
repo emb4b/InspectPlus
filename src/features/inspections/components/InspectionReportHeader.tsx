@@ -94,12 +94,14 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
   const IconAsset = typeMeta.iconAsset;
   const isSubmitted = reportStatus === 'submitted';
   // Same computation the report's own card runs in the list — a report that
-  // shows a ribbon there must show the matching chip here.
+  // shows a ribbon there must be flagged just as plainly here. `fill` is the
+  // saturated hue the list card's ribbon paints with; `bg`/`border` are the
+  // tint the list card wears. A flagged draft should alarm, not murmur.
   const urgency = getReportUrgency(inspectionDate, reportStatus);
   const urgencyTone =
     urgency.level === 'overdue'
-      ? { badgeBg: Colors.hazwaste.badgeBg, text: Colors.hazwaste.badgeText }
-      : { badgeBg: Colors.warning.badgeBg, text: Colors.warning.text };
+      ? { fill: Colors.hazwaste.text, bg: Colors.hazwaste.bg, border: Colors.hazwaste.border }
+      : { fill: Colors.warning.text, bg: Colors.warning.bg, border: Colors.warning.border };
 
   // collapsed is HeaderScrollContext's own animated 0..1 value (a single,
   // bounded transition per threshold crossing — see HeaderScrollContext) —
@@ -227,7 +229,23 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
         )}
       </View>
 
-      <View style={styles.card}>
+      {/* A flagged draft takes the list card's tint and border, plus a thick
+          leading edge in the ribbon's saturated hue — so the report is
+          visibly flagged the moment the screen opens, and stays flagged
+          through the collapse, since tint and edge are the parts of the card
+          that never change shape. The ribbon itself is not borrowed: its
+          geometry is calibrated to the list card's centred tile and would
+          cross the header's top-pinned one. */}
+      <View
+        style={[
+          styles.card,
+          urgency.level !== 'none' && {
+            backgroundColor: urgencyTone.bg,
+            borderColor: urgencyTone.border,
+            borderLeftWidth: 5,
+            borderLeftColor: urgencyTone.fill,
+          },
+        ]}>
         {/* Hidden until the title block's height is measured, so the icon
             appears at its final size instead of visibly popping from the 44
             default to the measured size once layout settles — see
@@ -256,22 +274,24 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
                 />
               </View>
             </View>
-            {/* How the draft sits against its filing deadline — a text row
+            {/* How the draft sits against its filing deadline — a solid strip
                 under the address rather than a third pill in the badge
                 column. Three stacked pills ran taller than this two-line
-                title block and left a dead band beneath the address; here it
-                fills that band, and being a row rather than a pill also
-                stops it reading as a twin of the amber Draft chip beside it.
-                Same short wording as the corner ribbon its card wears in the
-                list, so the report reads the same in both places. Collapsed,
-                it joins the badge group as an icon chip like the sync line
+                title block and left a dead band beneath the address; the
+                strip fills that band. It is saturated, white on the ribbon's
+                hue, where the Draft pill beside it is pale: the two are
+                different facts and should not read as twins, and a draft
+                nearing its deadline should look alarming, not calm. Same
+                short wording as the corner ribbon its card wears in the list,
+                so the report reads the same in both places. Collapsed, it
+                joins the badge group as a solid icon chip like the sync line
                 below, so the collapsed header's height never depends on it. */}
             {!badgesCollapsed && urgency.level !== 'none' && (
-              <View style={styles.urgencyRow} accessibilityLabel={urgencySpokenLabel(urgency)}>
-                <Ionicons name="alert-circle" size={10} color={urgencyTone.text} />
-                <Text style={[styles.urgencyText, { color: urgencyTone.text }]}>
-                  {urgencyShortLabel(urgency)}
-                </Text>
+              <View
+                style={[styles.urgencyStrip, { backgroundColor: urgencyTone.fill }]}
+                accessibilityLabel={urgencySpokenLabel(urgency)}>
+                <Ionicons name="alert-circle" size={12} color={Colors.textWhite} />
+                <Text style={styles.urgencyStripText}>{urgencyShortLabel(urgency)}</Text>
               </View>
             )}
             {/* Spelled out while there's room. Collapsed, this moves into the
@@ -327,11 +347,13 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
                     color={isSubmitted ? Colors.green : Colors.warning.text}
                   />
                 </View>
+                {/* Solid, white on the ribbon's hue, where the other chips are
+                    pale tints — the alarm has to survive the collapse. */}
                 {urgency.level !== 'none' && (
                   <View
-                    style={[styles.badgeIcon, { backgroundColor: urgencyTone.badgeBg }]}
+                    style={[styles.badgeIcon, { backgroundColor: urgencyTone.fill }]}
                     accessibilityLabel={urgencySpokenLabel(urgency)}>
-                    <Ionicons name="alert-circle" size={14} color={urgencyTone.text} />
+                    <Ionicons name="alert-circle" size={14} color={Colors.textWhite} />
                   </View>
                 )}
                 {syncStatus === 'pending' && (
@@ -565,19 +587,26 @@ const styles = StyleSheet.create({
   locationContainer: {
     flex: 1,
   },
-  // The urgency line shares the sync line's shape exactly — same gap, same
-  // top margin, same size and weight — so when both show they read as two
-  // entries of one list under the address, not two unrelated markers. Its
-  // colour is applied inline from urgencyTone, since it differs by level.
-  urgencyRow: {
+  // A solid strip, not a text row: its fill is applied inline from
+  // urgencyTone since it differs by level, and the text is white on it.
+  // alignSelf keeps it hugging its content rather than spanning the title
+  // column, so it reads as a stamp on the card rather than a banner across
+  // it. Sits on the same 4dp top rhythm as the sync line below it.
+  urgencyStrip: {
+    alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
-    marginTop: 4,
+    gap: 4,
+    marginTop: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
-  urgencyText: {
-    fontSize: 10,
-    fontWeight: '600',
+  urgencyStripText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Colors.textWhite,
+    letterSpacing: 0.2,
   },
   syncRow: {
     flexDirection: 'row',
