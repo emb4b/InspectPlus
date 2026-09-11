@@ -78,11 +78,29 @@ D, SA, SB, SC`, with no `SD`, matching the summary's `SD = 0` row.
 
 The extraction is committed as `scripts/generate_waterbodies.py`, following
 the precedent of `scripts/generate_app_icon.py`. It reads the source PDF and
-emits `src/data/mimaropaWaterbodies.ts`, re-running both extraction passes
-and **failing loudly if any of the three summary cross-checks does not
-match**. When EMB publishes an updated list, the dataset is regenerated
-rather than hand-edited, and the checks either pass against the new
-summary's own totals or the script refuses to write.
+emits `src/data/mimaropaWaterbodies.ts`. It re-runs only the
+coordinate-based `pdfplumber` pass — the Xpdf `pdftotext -table` pass was a
+one-off planning check, not encoded, because it would pin a dependency on a
+tool that is not portable. What the script does encode is a set of gates
+against the PDF's own summary table, and it **refuses to write if any of
+them fails**:
+
+- total waterbody count (102) and per-province counts (13/24/8/7/50);
+- total classification tokens (125);
+- the per-class histogram — `AA 1, A 24, B 19, C 51, D 3, SA 4, SB 14,
+  SC 9, SD 0` — which catches a class read as another, or dropped or
+  doubled in one row, where two such errors would cancel in the total;
+- section-heading text bleeding into a name band;
+- vocabulary: no province outside the five, no blank name or class.
+
+Every one of those is count-invariant under a permutation: if two rows swap
+their classifications, all gates pass and both rows are wrong. The 2020
+pairing was verified by the manual two-method diff described above; that
+check is not encoded. So when EMB publishes an updated list, the dataset is
+regenerated rather than hand-edited, the `EXPECT_*` constants are updated
+from the new summary table first, and after the script writes, **a sample of
+rows — every multi-line name and every multi-class row at minimum — is
+cross-checked by hand against the PDF**.
 
 The script depends on `pdfplumber`, which is *not* added to the project's
 dependencies — it is a one-off authoring tool, documented in the script's

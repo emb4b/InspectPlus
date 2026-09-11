@@ -1,12 +1,31 @@
 #!/usr/bin/env python3
 """Regenerate src/data/mimaropaWaterbodies.ts from EMB's classified-waterbodies PDF.
 
-The source PDF's text layer is row-misaligned: a naive extraction pairs a
-river with a classification belonging to a different row, which would be
-invisible in the app and would misstate which effluent standards apply. So
-this reads the table by word coordinates, then refuses to write unless three
-totals it did not compute itself -- the ones printed in the PDF's own
-CLASSIFICATION STAT summary -- all match.
+The source PDF's text layer is row-misaligned: a naive `pdftotext -layout`
+pairs a river with a classification belonging to a different row, which
+would be invisible in the app and would misstate which effluent standards
+apply. This script makes one coordinate-based pass with pdfplumber -- words
+are clustered into visual lines and assigned to columns by x-position bands
+taken from each page's header row -- and then refuses to write unless a set
+of gates pass.
+
+What the gates guard, all against figures printed in the PDF's own
+CLASSIFICATION STAT summary rather than computed here:
+
+  - dropped or duplicated rows (total waterbody count, per-province counts);
+  - the total number of classification tokens across all rows;
+  - the per-class histogram (how many rows carry AA, A, B, ... SD);
+  - section headings bleeding into a name band;
+  - vocabulary (no province outside the five, no blank name/class).
+
+What the gates CANNOT catch: a permutation. If two rows swap their
+classifications, every count above is unchanged and the file is written
+with both rows wrong. The 2020 pairing was verified at authoring time by a
+manual diff against an independent table-mode extraction; that check is not
+encoded here. So when regenerating against a new EMB list, after the script
+writes, open the PDF and cross-check a sample of rows -- including every
+multi-line name and every multi-class row -- against the emitted file by
+hand, and update the EXPECT_* constants from the new summary table first.
 
 Not part of the app or its test run. Needs `pdfplumber` (pip install
 pdfplumber) and is run by hand when EMB publishes an updated list:
@@ -33,6 +52,13 @@ EXPECT_TOTAL = 102
 EXPECT_CLASSIFICATIONS = 125
 EXPECT_PER_PROVINCE = {'Occidental Mindoro': 13, 'Oriental Mindoro': 24,
                        'Marinduque': 8, 'Romblon': 7, 'Palawan': 50}
+# The summary's own per-class row. Update these when the source changes.
+# This catches token-level corruption (a class read as another, a class
+# dropped or doubled in one row) that the total above would miss when two
+# such errors cancel out. It still cannot catch two rows swapping their
+# classifications -- see the module docstring for the manual cross-check.
+EXPECT_PER_CLASS = {'AA': 1, 'A': 24, 'B': 19, 'C': 51, 'D': 3,
+                    'SA': 4, 'SB': 14, 'SC': 9, 'SD': 0}
 
 # Section-heading tokens that have been observed (or could plausibly) bleed
 # into a name band during coordinate-based extraction. A name containing one
@@ -129,13 +155,28 @@ def clean(records):
     return records
 
 
+def class_tokens(record):
+    """The bare class tokens of one row, qualifier stripped: 'SC (brackish mangrove)' -> ['SC']."""
+    return re.split(r',\s*', re.sub(r'\s*\(.*', '', record['classification']))
+
+
 def verify(records):
     problems = []
     if len(records) != EXPECT_TOTAL:
         problems.append('waterbody count {}, expected {}'.format(len(records), EXPECT_TOTAL))
-    tokens = sum(len(re.split(r',\s*', re.sub(r'\s*\(.*', '', r['classification']))) for r in records)
+    tokens = sum(len(class_tokens(r)) for r in records)
     if tokens != EXPECT_CLASSIFICATIONS:
         problems.append('classification count {}, expected {}'.format(tokens, EXPECT_CLASSIFICATIONS))
+    histogram = {}
+    for r in records:
+        for tok in class_tokens(r):
+            histogram[tok] = histogram.get(tok, 0) + 1
+    for cls in sorted(set(histogram) | set(EXPECT_PER_CLASS)):
+        got, expected = histogram.get(cls, 0), EXPECT_PER_CLASS.get(cls)
+        if expected is None:
+            problems.append('class {!r} is not in the summary vocabulary ({} row(s))'.format(cls, got))
+        elif got != expected:
+            problems.append('class {} appears {} time(s), expected {}'.format(cls, got, expected))
     for province, expected in EXPECT_PER_PROVINCE.items():
         got = sum(1 for r in records if r['province'] == province)
         if got != expected:
