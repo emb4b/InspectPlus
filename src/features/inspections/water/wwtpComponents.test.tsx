@@ -7,6 +7,7 @@ import {
   BIOLOGICAL_TREATMENT_OPTIONS,
   CHEMICAL_TREATMENT_OPTIONS,
   TREATMENT_OTHERS,
+  TREATMENT_OTHER_LABEL,
 } from './waterChecklistData';
 import {
   decodeTreatment,
@@ -73,6 +74,13 @@ describe('treatment option lists', () => {
   it('corrects the printed form’s "Tricking Filter" typo', () => {
     expect(BIOLOGICAL_TREATMENT_OPTIONS).not.toContain('Tricking Filter');
   });
+
+  // The record stores the bare word, as NON_WWTP_TREATMENT_OTHERS does; the
+  // "(specify)" prompt is a label for the checkbox row, not a stored value.
+  it('stores Others as a bare value, separate from its display label', () => {
+    expect(TREATMENT_OTHERS).toBe('Others');
+    expect(TREATMENT_OTHER_LABEL).toBe('Others (specify)');
+  });
 });
 
 const renderGroup = (props: Partial<React.ComponentProps<typeof TreatmentCheckboxGroup>> = {}) => {
@@ -99,7 +107,20 @@ const box = (tree: renderer.ReactTestRenderer, label: string) =>
 describe('TreatmentCheckboxGroup', () => {
   it('offers every option as a checkbox', () => {
     const tree = renderGroup();
-    PRIMARY_TREATMENT_OPTIONS.forEach(o => expect(box(tree, o)).toBeTruthy());
+    PRIMARY_TREATMENT_OPTIONS.filter(o => o !== TREATMENT_OTHERS).forEach(o =>
+      expect(box(tree, o)).toBeTruthy(),
+    );
+    expect(box(tree, TREATMENT_OTHER_LABEL)).toBeTruthy();
+    expect(tree.root.findAll(n => n.type === CheckboxRow)).toHaveLength(PRIMARY_TREATMENT_OPTIONS.length);
+  });
+
+  // The row reads "Others (specify)" but ticking it records TREATMENT_OTHERS.
+  it('labels the Others row with the specify prompt but records the stored value', () => {
+    const onChangeSelected = jest.fn();
+    const tree = renderGroup({ onChangeSelected });
+    expect(tree.root.findAll(n => n.type === CheckboxRow && n.props.label === TREATMENT_OTHERS)).toHaveLength(0);
+    act(() => { box(tree, TREATMENT_OTHER_LABEL).props.onToggle(); });
+    expect(onChangeSelected).toHaveBeenCalledWith([TREATMENT_OTHERS]);
   });
 
   it('ticks the options already selected', () => {
@@ -169,6 +190,20 @@ describe('decoding treatment stored by an older build', () => {
 
   it('reads a missing value as nothing selected', () => {
     expect(decodeTreatment(undefined, PRIMARY_TREATMENT_OPTIONS)).toEqual({ selected: [], other: '' });
+  });
+
+  // A legacy string that named "Others" outright ticks the box; the label
+  // text "Others (specify)" was never a stored value, so if a string does
+  // hold it, it is treated like any other unrecognised fragment and kept.
+  it('ticks Others for a legacy "others" fragment but keeps the label text as words', () => {
+    expect(decodeTreatment('Screening, others', PRIMARY_TREATMENT_OPTIONS)).toEqual({
+      selected: ['Screening', TREATMENT_OTHERS],
+      other: '',
+    });
+    expect(decodeTreatment('Others (specify)', PRIMARY_TREATMENT_OPTIONS)).toEqual({
+      selected: [TREATMENT_OTHERS],
+      other: 'Others (specify)',
+    });
   });
 });
 
@@ -296,7 +331,7 @@ describe('summarising for a read-only card', () => {
 
   it('folds the free text into the Others tick it belongs to', () => {
     expect(describeTreatment(['Screening', TREATMENT_OTHERS], 'Sedimentation')).toBe(
-      'Screening, Others (specify): Sedimentation',
+      'Screening, Others: Sedimentation',
     );
   });
 
@@ -425,7 +460,7 @@ describe('Components of the WWTP (edit screen, section 5D)', () => {
     const tree = renderComponentsSection([
       { outletNo: '1', primaryTreatment: 'Screening, Sedimentation' },
     ]);
-    expect(JSON.stringify(tree.toJSON())).toContain('Screening, Others (specify): Sedimentation');
+    expect(JSON.stringify(tree.toJSON())).toContain('Screening, Others: Sedimentation');
   });
 
   // A report written by an older build stored one comma-separated string.

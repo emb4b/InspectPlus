@@ -4,7 +4,7 @@ import { CheckboxRow, TextField } from '../../../components/form';
 import { Spacing } from '../../../design/spacing';
 import { Type } from '../../../design/typography';
 import { Colors } from '../../../constants/colors';
-import { TREATMENT_OTHERS } from './waterChecklistData';
+import { TREATMENT_OTHERS, TREATMENT_OTHER_LABEL } from './waterChecklistData';
 
 interface TreatmentCheckboxGroupProps {
   label: string;
@@ -34,17 +34,20 @@ export const TreatmentCheckboxGroup: React.FC<TreatmentCheckboxGroupProps> = ({
   return (
     <View style={styles.group}>
       <Text style={styles.label}>{label}</Text>
+      {/* The record stores TREATMENT_OTHERS; only the row an inspector reads
+          carries the "(specify)" prompt - same split as the non-WWTP
+          treatment list in WaterExtraFormSections. */}
       {options.map(option => (
         <CheckboxRow
           key={option}
-          label={option}
+          label={option === TREATMENT_OTHERS ? TREATMENT_OTHER_LABEL : option}
           checked={selected.includes(option)}
           onToggle={() => toggle(option)}
         />
       ))}
       {selected.includes(TREATMENT_OTHERS) && (
         <TextField
-          label={`${label} — specify`}
+          label={`${label} — ${TREATMENT_OTHER_LABEL}`}
           value={other}
           onChangeText={onChangeOther}
           placeholder="e.g. Sedimentation"

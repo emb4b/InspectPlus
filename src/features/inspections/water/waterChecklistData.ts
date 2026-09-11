@@ -94,7 +94,13 @@ export const SAMPLE_TYPE_OPTIONS = ['Grab', 'Composite'];
 // stage at once - a screen and a grit chamber ahead of an equalization tank
 // is an ordinary train - so these are checkboxes rather than one choice,
 // matching the printed inspection form.
-export const TREATMENT_OTHERS = 'Others (specify)';
+// Stored value and display label are separate, as they are for
+// NON_WWTP_TREATMENT_OTHERS above: the record holds 'Others' and the read-only
+// card renders a ticked Others as `Others: <text>`; only the checkbox row
+// shows the "(specify)" prompt.
+export const TREATMENT_OTHERS = 'Others';
+
+export const TREATMENT_OTHER_LABEL = 'Others (specify)';
 
 export const PRIMARY_TREATMENT_OPTIONS = [
   'Screening',
