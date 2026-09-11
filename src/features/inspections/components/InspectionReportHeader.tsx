@@ -102,6 +102,14 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
     urgency.level === 'overdue'
       ? { fill: Colors.hazwaste.text, bg: Colors.hazwaste.bg, border: Colors.hazwaste.border }
       : { fill: Colors.warning.text, bg: Colors.warning.bg, border: Colors.warning.border };
+  const flagged = urgency.level !== 'none';
+  // The meta chips follow the card: the type's tint while the card is plain,
+  // white once it is tinted so they sit on the alarm colour rather than
+  // sinking into it.
+  const chipTone = flagged
+    ? { backgroundColor: Colors.white, borderColor: Colors.border }
+    : { backgroundColor: typeMeta.bgColor, borderColor: typeMeta.borderColor };
+  const chipIconColor = flagged ? Colors.textLight : typeMeta.textColor;
 
   // collapsed is HeaderScrollContext's own animated 0..1 value (a single,
   // bounded transition per threshold crossing — see HeaderScrollContext) —
@@ -229,22 +237,26 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
         )}
       </View>
 
-      {/* A flagged draft takes the list card's tint and border, plus a thick
-          leading edge in the ribbon's saturated hue — so the report is
-          visibly flagged the moment the screen opens, and stays flagged
-          through the collapse, since tint and edge are the parts of the card
-          that never change shape. The ribbon itself is not borrowed: its
-          geometry is calibrated to the list card's centred tile and would
-          cross the header's top-pinned one. */}
+      {/* Identity versus alarm. The border and the thick leading edge always
+          say what kind of report this is, in the type's own colours on a
+          white ground. A flagged draft hands both over to the urgency hue and
+          adds the list card's tint — so it is visibly flagged the moment the
+          screen opens and stays flagged through the collapse, since tint and
+          edge are the parts of the card that never change shape. The type
+          never tints on its own: hazwaste's red is the overdue red, and an
+          overdue hazwaste report has to look different from a hazwaste one.
+          The list card's ribbon is not borrowed: its geometry is calibrated
+          to that card's centred tile and would cross this top-pinned one. */}
       <View
         style={[
           styles.card,
-          urgency.level !== 'none' && {
-            backgroundColor: urgencyTone.bg,
-            borderColor: urgencyTone.border,
-            borderLeftWidth: 5,
-            borderLeftColor: urgencyTone.fill,
-          },
+          flagged
+            ? {
+                backgroundColor: urgencyTone.bg,
+                borderColor: urgencyTone.border,
+                borderLeftColor: urgencyTone.fill,
+              }
+            : { borderColor: typeMeta.borderColor, borderLeftColor: typeMeta.textColor },
         ]}>
         {/* Hidden until the title block's height is measured, so the icon
             appears at its final size instead of visibly popping from the 44
@@ -387,10 +399,20 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
                     {typeMeta.law || typeMeta.label}
                   </Text>
                 </View>
+                {/* Pale amber on a pale amber tint is invisible, so on a
+                    flagged card the pill goes white with an outline in its
+                    own colour. Submitted never flags, but the rule is
+                    written for both so it can't diverge if that changes. */}
                 <View
                   style={[
                     styles.statusBadge,
-                    { backgroundColor: isSubmitted ? Colors.greenMuted : Colors.warning.badgeBg },
+                    flagged
+                      ? {
+                          backgroundColor: Colors.white,
+                          borderWidth: 1,
+                          borderColor: isSubmitted ? Colors.green : Colors.warning.text,
+                        }
+                      : { backgroundColor: isSubmitted ? Colors.greenMuted : Colors.warning.badgeBg },
                   ]}>
                   {/* Same glyph the collapsed chip uses, so the badge reads as
                       the same thing in both states rather than as two
@@ -418,8 +440,8 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
           <View style={styles.divider} />
 
           <View style={styles.metaRow}>
-            <View style={[styles.metaChip, styles.metaChipNarrow]}>
-              <Ionicons name="calendar-outline" size={11} color={Colors.textLight} />
+            <View style={[styles.metaChip, styles.metaChipNarrow, chipTone]}>
+              <Ionicons name="calendar-outline" size={11} color={chipIconColor} />
               <Text style={styles.metaText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.92}>
                 {formatDate(inspectionDate)}
               </Text>
@@ -428,14 +450,14 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
                 chips' content ("Control No. 2026-08-09-000123") — giving this
                 one more of the row's width means it doesn't need to shrink
                 its text nearly as much to fit, unlike the other two. */}
-            <View style={[styles.metaChip, styles.metaChipWide]}>
-              <Ionicons name="pricetag-outline" size={11} color={Colors.textLight} />
+            <View style={[styles.metaChip, styles.metaChipWide, chipTone]}>
+              <Ionicons name="pricetag-outline" size={11} color={chipIconColor} />
               <Text style={styles.metaText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.92}>
                 {reportControlNo ? `Control No. ${reportControlNo}` : 'No control number yet'}
               </Text>
             </View>
-            <View style={[styles.metaChip, styles.metaChipNarrow]}>
-              <Ionicons name="person-circle-outline" size={12} color={Colors.textLight} />
+            <View style={[styles.metaChip, styles.metaChipNarrow, chipTone]}>
+              <Ionicons name="person-circle-outline" size={12} color={chipIconColor} />
               <Text style={styles.metaText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.92}>
                 {inspectorLabel}
               </Text>
@@ -491,6 +513,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderWidth: 1,
     borderColor: Colors.border,
+    // Always present; its colour is the card's identity (the report type)
+    // or its alarm (the urgency), set inline above.
+    borderLeftWidth: 5,
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 10,

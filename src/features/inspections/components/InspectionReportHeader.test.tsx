@@ -155,10 +155,66 @@ describe('InspectionReportHeader due indicator', () => {
     expect(card.borderLeftColor).toBe(Colors.hazwaste.text);
   });
 
-  it('leaves an unflagged card plain', () => {
+  // Identity versus alarm. Border and edge always say what kind of report
+  // this is; tint and stamp say only that its deadline is close. So an
+  // unflagged card wears its type's colours on a white ground, and a flagged
+  // one hands border and edge over to the urgency hue along with the tint.
+  // Hazwaste's own red is the overdue red, which is exactly why the type
+  // never tints: an overdue hazwaste report has to look different from a
+  // hazwaste report.
+  it('gives an unflagged card its type’s border and edge on a white ground', () => {
     const card = flattenStyle(findCard(renderHeader({ inspectionDate: daysAgo(2) })).props.style);
     expect(card.backgroundColor).toBe(Colors.white);
-    expect(card.borderLeftWidth).toBeUndefined();
+    expect(card.borderColor).toBe(Colors.water.border);
+    expect(card.borderLeftWidth).toBe(5);
+    expect(card.borderLeftColor).toBe(Colors.water.text);
+  });
+
+  // The three meta chips (date, control number, inspector) follow the card:
+  // type tint when it is plain, white when it is tinted so they sit on the
+  // alarm colour rather than sinking into it.
+  const findMetaChips = (r: Renderer) =>
+    r.root.findAll(
+      (n) =>
+        n.type === View &&
+        flattenStyle(n.props.style).borderRadius === 8 &&
+        flattenStyle(n.props.style).paddingHorizontal === 9,
+    );
+
+  it('tints the meta chips with the report type on an unflagged card', () => {
+    const chips = findMetaChips(renderHeader({ inspectionDate: daysAgo(2) }));
+    expect(chips).toHaveLength(3);
+    chips.forEach((chip) => {
+      expect(flattenStyle(chip.props.style).backgroundColor).toBe(Colors.water.bg);
+      expect(flattenStyle(chip.props.style).borderColor).toBe(Colors.water.border);
+    });
+  });
+
+  it('turns the meta chips white on a flagged card', () => {
+    const chips = findMetaChips(renderHeader({ inspectionDate: daysAgo(15) }));
+    expect(chips).toHaveLength(3);
+    chips.forEach((chip) => {
+      expect(flattenStyle(chip.props.style).backgroundColor).toBe(Colors.white);
+    });
+  });
+
+  // The Draft pill is pale amber; the due-soon tint is pale amber. On a
+  // flagged card the pill goes white with an outline in its own colour so
+  // the two stop being the same colour.
+  const findStatusPill = (r: Renderer) =>
+    r.root.findAll((n) => n.type === Text && n.props.children === 'Draft')[0].parent!;
+
+  it('outlines the Draft pill on a flagged card so it does not sink into the tint', () => {
+    const pill = flattenStyle(findStatusPill(renderHeader({ inspectionDate: daysAgo(15) })).props.style);
+    expect(pill.backgroundColor).toBe(Colors.white);
+    expect(pill.borderWidth).toBe(1);
+    expect(pill.borderColor).toBe(Colors.warning.text);
+  });
+
+  it('leaves the Draft pill filled on an unflagged card', () => {
+    const pill = flattenStyle(findStatusPill(renderHeader({ inspectionDate: daysAgo(2) })).props.style);
+    expect(pill.backgroundColor).toBe(Colors.warning.badgeBg);
+    expect(pill.borderWidth).toBeUndefined();
   });
 
   // The Draft/Submitted chip says where the report stands with filing; the
