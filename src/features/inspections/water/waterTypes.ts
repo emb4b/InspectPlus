@@ -297,13 +297,16 @@ export function decodeTreatment(
   return { selected, other: unmatched.join(', ') };
 }
 
-// A stage's specify text can arrive two ways, and only one of them at a
-// time. A legacy row has no specify key at all - its unrecognised fragments
-// are what decodeTreatment recovered. A row this build wrote keeps the text
-// in its own key, and the array beside it holds nothing but the Others tick,
-// so there is nothing to recover and the stored key is the only copy.
+// A stage's specify text can arrive two ways. A legacy row has no specify
+// key at all - its unrecognised fragments are what decodeTreatment
+// recovered. A row this build wrote keeps the text in its own key, and the
+// array beside it normally holds nothing but ticks. Normally: if an option
+// is later renamed, that array also carries an entry the list no longer
+// knows, and then both parts are the inspector's words. So they are joined
+// rather than one preferred - anything unrecognised is preserved verbatim,
+// never displaced by the other copy.
 const treatmentOtherFor = (recovered: string, stored: unknown): string =>
-  recovered || String(stored ?? '');
+  [recovered, String(stored ?? '')].filter(Boolean).join(', ');
 
 export function decodeWwtpComponent(stored: Record<string, unknown>): WwtpComponentCard {
   const primary = decodeTreatment(stored.primaryTreatment, PRIMARY_TREATMENT_OPTIONS);

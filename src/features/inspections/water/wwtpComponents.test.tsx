@@ -246,6 +246,21 @@ describe('decoding a whole stored component row', () => {
       primaryTreatmentOther: 'Sedimentation',
     });
   });
+
+  // If an option is later renamed, a row saved under the old name carries an
+  // array entry the list no longer recognises *and* a specify text of its
+  // own. Both are the inspector's words; the recovered fragment must not
+  // displace the stored text, or the text vanishes on re-open.
+  it('keeps both a retired array entry and the stored specify text', () => {
+    const decoded = decodeWwtpComponent({
+      outletNo: '1',
+      primaryTreatment: ['Screening', 'Retired Option Name'],
+      primaryTreatmentOther: 'Sedimentation',
+    });
+    expect(decoded.primaryTreatment).toEqual(['Screening', TREATMENT_OTHERS]);
+    expect(decoded.primaryTreatmentOther).toContain('Retired Option Name');
+    expect(decoded.primaryTreatmentOther).toContain('Sedimentation');
+  });
 });
 
 describe('what reaches the record', () => {
