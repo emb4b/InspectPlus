@@ -474,8 +474,15 @@ report-creation time. Deliberately excludes `product`, `year_established`,
   establishment's wastewater when `has_wwtp` is false. `{}` on any report that
   records a WWTP.
 - `wwtp_type`
+- `wwtp_type_other` — text, nullable; what "Others" means when that is the
+  `wwtp_type`. Empty or `NULL` on any other type, and `NULL` on rows written
+  before the column existed. Additive.
 - `wwtp_details`
-- `wwtp_components`
+- `wwtp_components` — jsonb array of camelCase items. Rows written by older
+  builds hold comma-separated strings where `primaryTreatment`,
+  `biologicalTreatment` and `chemicalTreatment` now hold arrays; the client
+  decodes both on read (`decodeWwtpComponent`) and never rewrites a row it
+  does not re-save, so two item shapes are in flight in this column.
 - `wwtp_condition`
 - `wwtp_under_construction`
 - `sampling_points`

@@ -406,7 +406,7 @@ summary, which this work repeats four more times.
 | SelectField groups | Headers render and are not selectable; search drops emptied headers; existing `options` callers unchanged |
 | Type of WWTP | Reveals on Others; dropped unless Others; round-trips through the new column |
 | Components | Legacy string splits to ticks; unmatched fragments land in Others; new shape round-trips; each section's Others independent |
-| Migration | Schema v13 applies; a row written pre-migration reads back correctly |
+| Migration | Not written. The repo has no WatermelonDB migration test and no harness for one, so none was added here; the v12→v13 step follows the `non_wwtp_treatment` precedent line for line. A migration-test harness, and this case under it, is a follow-up outside this branch. |
 
 `npm run lint`, `npm run typecheck`, and `npm test` must all pass before the
 branch is considered done.
