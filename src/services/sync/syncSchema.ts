@@ -227,6 +227,8 @@ export const syncSchema: Record<SyncEntityName, SyncEntitySchema> = {
       wwtp_construction_units:     'wwtpConstructionUnits',
       wwtp_construction_completion_date: 'wwtpConstructionCompletionDate',
       wwtp_treatment_units_utilized: 'wwtpTreatmentUnitsUtilized',
+      sampling_conducted:          'samplingConducted',
+      sampling_classification:     'samplingClassification',
       sampling_points:             'samplingPoints',
       previous_inspection_summary: 'previousInspectionSummary',
       checklist_dao_2005_10:       'checklistDao200510',

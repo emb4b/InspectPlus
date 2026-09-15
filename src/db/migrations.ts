@@ -61,6 +61,12 @@ import { schemaMigrations, addColumns, createTable, unsafeExecuteSql } from '@no
 // WWTP under construction or rehabilitation (reported to EMB/LLDA, which
 // units, estimated completion, treatment units in use meanwhile). Existing
 // rows get NULL - correct, since no inspection before this was ever asked.
+//
+// v14 -> v15: compliance_water gains section 6I's gate - whether the
+// inspector conducted water quality sampling, and if so its classification
+// (ambient, effluent or both). Existing rows get NULL - correct, since no
+// inspection before this was ever asked; their sampling points stand as
+// they are.
 export const migrations = schemaMigrations({
   migrations: [
     {
@@ -184,6 +190,18 @@ export const migrations = schemaMigrations({
             { name: 'wwtpConstructionUnits', type: 'string', isOptional: true },
             { name: 'wwtpConstructionCompletionDate', type: 'string', isOptional: true },
             { name: 'wwtpTreatmentUnitsUtilized', type: 'string', isOptional: true },
+          ],
+        }),
+      ],
+    },
+    {
+      toVersion: 15,
+      steps: [
+        addColumns({
+          table: 'compliance_water',
+          columns: [
+            { name: 'samplingConducted', type: 'boolean', isOptional: true },
+            { name: 'samplingClassification', type: 'string', isOptional: true },
           ],
         }),
       ],

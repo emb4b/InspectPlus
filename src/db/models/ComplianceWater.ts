@@ -58,6 +58,12 @@ export class ComplianceWater extends Model {
   @field('wwtpTreatmentUnitsUtilized')       wwtpTreatmentUnitsUtilized!: string | null;
 
   // ── Sampling ─────────────────────────────────────────────────────────────────
+  // Whether the inspector conducted water quality sampling at all, and if
+  // so its classification: 'Ambient' | 'Effluent' | 'Both'. samplingPoints
+  // is [] and the classification null whenever this is not true - see
+  // samplingForSave in src/features/inspections/water/waterTypes.ts.
+  @field('samplingConducted')                samplingConducted!: boolean | null;
+  @field('samplingClassification')           samplingClassification!: string | null;
   // Each item: { point_no, sampling_station, sampling_time, type_of_sample,
   //   parameters[{ parameter_name, value, unit, denr_standard, compliant, remarks }],
   //   remarks }

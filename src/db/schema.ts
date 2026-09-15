@@ -25,7 +25,7 @@ import { appSchema, tableSchema } from '@nozbe/watermelondb';
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const schema = appSchema({
-  version: 14,
+  version: 15,
   tables: [
 
     // ── ESTABLISHMENTS ───────────────────────────────────────────────────────
@@ -220,6 +220,11 @@ export const schema = appSchema({
         { name: 'wwtpConstructionUnits',      type: 'string', isOptional: true },
         { name: 'wwtpConstructionCompletionDate', type: 'string', isOptional: true },
         { name: 'wwtpTreatmentUnitsUtilized', type: 'string', isOptional: true },
+        // Section 6I's gate: whether the inspector sampled at all, and if
+        // so whether ambient, effluent or both. samplingPoints is only ever
+        // populated while samplingConducted is true - see samplingForSave.
+        { name: 'samplingConducted',          type: 'boolean', isOptional: true },
+        { name: 'samplingClassification',     type: 'string', isOptional: true },
         { name: 'samplingPoints',             type: 'string', isOptional: true },
         { name: 'previousInspectionSummary',  type: 'string', isOptional: true },
         { name: 'checklistDao200510',         type: 'string', isOptional: true },

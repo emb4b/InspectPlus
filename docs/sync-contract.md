@@ -493,7 +493,12 @@ report-creation time. Deliberately excludes `product`, `year_established`,
   section 5E questions 3-6, asked only of a WWTP under construction or
   rehabilitation. All `NULL` unless `wwtp_under_construction` is true, and
   `NULL` on rows written before the columns existed. Additive.
-- `sampling_points`
+- `sampling_conducted` — boolean, nullable; whether the inspector conducted
+  water quality sampling (section 6I). `NULL` on rows written before the
+  column existed, whose `sampling_points` stand as they are. Additive.
+- `sampling_classification` — text, nullable; `Ambient`, `Effluent` or
+  `Both` when `sampling_conducted` is true, `NULL` otherwise. Additive.
+- `sampling_points` — `[]` whenever `sampling_conducted` is false.
 - `previous_inspection_summary`
 - `checklist_dao_2005_10`
 - `dp_conditions`
