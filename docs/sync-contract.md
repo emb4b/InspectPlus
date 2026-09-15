@@ -484,7 +484,15 @@ report-creation time. Deliberately excludes `product`, `year_established`,
   decodes both on read (`decodeWwtpComponent`) and never rewrites a row it
   does not re-save, so two item shapes are in flight in this column.
 - `wwtp_condition`
+- `wwtp_condition_other` — text, nullable; what "Others" means when that is
+  the `wwtp_condition`. Empty or `NULL` otherwise, and `NULL` on rows written
+  before the column existed. Additive.
 - `wwtp_under_construction`
+- `wwtp_construction_reported`, `wwtp_construction_units`,
+  `wwtp_construction_completion_date`, `wwtp_treatment_units_utilized` —
+  section 5E questions 3-6, asked only of a WWTP under construction or
+  rehabilitation. All `NULL` unless `wwtp_under_construction` is true, and
+  `NULL` on rows written before the columns existed. Additive.
 - `sampling_points`
 - `previous_inspection_summary`
 - `checklist_dao_2005_10`

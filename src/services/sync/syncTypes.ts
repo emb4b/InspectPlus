@@ -271,7 +271,12 @@ export interface ComplianceWaterDTO {
   wwtp_details?: JsonArray;
   wwtp_components?: JsonArray;
   wwtp_condition?: string | null;
+  wwtp_condition_other?: string | null;
   wwtp_under_construction?: boolean;
+  wwtp_construction_reported?: boolean | null;
+  wwtp_construction_units?: string | null;
+  wwtp_construction_completion_date?: ISODateString | null;
+  wwtp_treatment_units_utilized?: string | null;
   sampling_points?: JsonArray;
   previous_inspection_summary?: JsonObject;
   checklist_dao_2005_10?: JsonArray;

@@ -44,7 +44,18 @@ export class ComplianceWater extends Model {
   // wwtpCondition: 'Properly Maintained' | 'Inadequately Maintained' |
   //                'Poor Maintenance' | 'Others'
   @field('wwtpCondition')                    wwtpCondition!: string | null;
+  // What "Others" means, when that's the condition. Empty otherwise - see
+  // wwtpConditionOtherForSave in src/features/inspections/water/waterTypes.ts.
+  @field('wwtpConditionOther')               wwtpConditionOther!: string | null;
   @field('wwtpUnderConstruction')            wwtpUnderConstruction!: boolean | null;
+  // Section 5E questions 3-6, asked only of a WWTP under construction or
+  // rehabilitation. All null when wwtpUnderConstruction is not true - see
+  // wwtpConstructionForSave.
+  @field('wwtpConstructionReported')         wwtpConstructionReported!: boolean | null;
+  @field('wwtpConstructionUnits')            wwtpConstructionUnits!: string | null;
+  // ISO date string, same as every other date on the record.
+  @field('wwtpConstructionCompletionDate')   wwtpConstructionCompletionDate!: string | null;
+  @field('wwtpTreatmentUnitsUtilized')       wwtpTreatmentUnitsUtilized!: string | null;
 
   // ── Sampling ─────────────────────────────────────────────────────────────────
   // Each item: { point_no, sampling_station, sampling_time, type_of_sample,
