@@ -2,6 +2,7 @@ import React from 'react';
 import { Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../../constants/colors';
+import { describeAppVersion } from '../../../utils/version';
 
 interface HomeFooterProps {
   // Full credits line is only for non-authenticated pages (e.g. login).
@@ -10,6 +11,10 @@ interface HomeFooterProps {
 }
 
 export const HomeFooter: React.FC<HomeFooterProps> = ({ showCredits = false }) => {
+  // The one place the running version is visible - the recovery guide and
+  // support both ask for it, and the footer is on every screen including
+  // login, where an inspector who can't get in still needs to read it.
+  const version = describeAppVersion();
   return (
     <LinearGradient
       colors={[Colors.navy, '#0a7a3e']}
@@ -28,7 +33,13 @@ export const HomeFooter: React.FC<HomeFooterProps> = ({ showCredits = false }) =
             Developed by Jonathan Remonte and Stephanie Kim Pineda
           </Text>
           <Text style={styles.line}>All Rights Reserved</Text>
+          <Text style={[styles.line, styles.versionLine]}>InspectPlus {version}</Text>
         </>
+      )}
+      {!showCredits && (
+        // Absolutely placed so the bar keeps the 20px height the app's
+        // chrome insets are measured against (see appChromeFooterInset).
+        <Text style={styles.versionStamp}>{version}</Text>
       )}
     </LinearGradient>
   );
@@ -48,5 +59,20 @@ const styles = StyleSheet.create({
     lineHeight: 9,
     color: 'rgba(255,255,255,0.7)',
     textAlign: 'center',
+  },
+  versionLine: {
+    marginTop: 2,
+    fontVariant: ['tabular-nums'],
+    color: 'rgba(255,255,255,0.85)',
+  },
+  versionStamp: {
+    position: 'absolute',
+    right: 10,
+    top: 0,
+    height: 20,
+    lineHeight: 20,
+    fontSize: 9,
+    fontVariant: ['tabular-nums'],
+    color: 'rgba(255,255,255,0.7)',
   },
 });
