@@ -1158,6 +1158,17 @@ export const SamplingPointsSection: React.FC<{
                     placeholder="DENR Standard"
                     placeholderTextColor={Colors.textLight}
                     multiline
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    onSubmitEditing={() => focus(pk(pi, 'remarks'))}
+                  />
+                  <TextInput
+                    ref={setRef(pk(pi, 'remarks'))}
+                    style={styles.paramRemarksInput}
+                    value={param.remarks}
+                    onChangeText={t => updateParameter(i, pi, { remarks: t })}
+                    placeholder="Remarks"
+                    placeholderTextColor={Colors.textLight}
                     returnKeyType={isLastParam ? 'done' : 'next'}
                     blurOnSubmit={isLastParam}
                     onSubmitEditing={() => focus(pk(pi + 1, 'name'))}
@@ -1179,6 +1190,7 @@ export const SamplingPointsSection: React.FC<{
                   <Text style={styles.paramValueText}>{param.value} {param.unit}</Text>
                 </View>
                 <Text style={sharedStyles.checklistRef}>Standard: {param.denrStandard || '—'}</Text>
+                {!!param.remarks && <Text style={sharedStyles.checklistRemarks}>{param.remarks}</Text>}
               </View>
             ))}
           </View>
@@ -1871,6 +1883,16 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     minHeight: 48,
     textAlignVertical: 'top',
+    marginBottom: 6,
+  },
+  paramRemarksInput: {
+    fontSize: 11.5,
+    color: Colors.textPrimary,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
   },
   paramSmallInput: {
     flex: 1,
