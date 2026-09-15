@@ -50,6 +50,12 @@ function normalise(xml) {
     const endRe = new RegExp(`<w:bookmarkEnd w:id="(?:${checkIds.join('|')})"\\s*/>`, 'g');
     out = out.replace(endRe, '');
   }
+  // A wholly-empty paragraph (no run, no content) is written by Word as a
+  // self-closing <w:p .../>. cell/loop/cloneRowAfter locate a paragraph's end
+  // by subtracting the length of the literal "</w:p>" from its span end —
+  // which only holds for the open/close form. Expand every self-closing
+  // <w:p/> up front so that assumption is always true.
+  out = out.replace(/<w:p((?:\s+[^<>]*)?)\/>/g, '<w:p$1></w:p>');
   return out;
 }
 
