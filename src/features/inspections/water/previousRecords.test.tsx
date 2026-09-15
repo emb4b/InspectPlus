@@ -141,14 +141,23 @@ describe('II. Previous Inspection — records? (edit screen)', () => {
     expect(flatten(tree.toJSON())).not.toContain('Outfall');
   });
 
-  it('still shows the fields of a report that was never asked', () => {
+  // The read-only card never hides what a report recorded: one written
+  // before the question existed still shows its summary.
+  it('still shows the recorded summary of a report that was never asked', () => {
     expect(flatten(renderSection(previous(null)).toJSON())).toContain('Outfall');
   });
 
-  it('hides the fields while editing a No', () => {
-    const tree = startEdit(renderSection(previous('no')));
-    expect(radios(tree, HAS_RECORDS)).toHaveLength(1);
-    expect(dateFields(tree)).toHaveLength(0);
+  // Editing is the other way round: the fields appear on a Yes, not by
+  // default - so an unanswered report opens on the question alone.
+  it('keeps the fields hidden while editing until Yes is chosen', () => {
+    for (const answer of [null, 'no'] as const) {
+      const tree = startEdit(renderSection(previous(answer)));
+      expect(radios(tree, HAS_RECORDS)).toHaveLength(1);
+      expect(dateFields(tree)).toHaveLength(0);
+    }
+    const tree = startEdit(renderSection(previous(null)));
+    act(() => { radios(tree, HAS_RECORDS)[0].props.onChange('yes'); });
+    expect(dateFields(tree).length).toBeGreaterThanOrEqual(1);
   });
 
   it('drops the fields when flipped to No before saving', async () => {

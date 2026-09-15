@@ -1244,10 +1244,14 @@ export const PreviousInspectionSection: React.FC<{
     section.setDraft(d => ({ ...d, parameters: d.parameters.filter((_, idx) => idx !== i) }));
 
   const hasData = !!section.draft.dateOfSampling || section.draft.parameters.length > 0;
-  // The gate answers for the whole section: a No shows only the not-
-  // applicable note, on the read-only card too. A report never asked
-  // (null) still shows what it recorded.
+  // The gate answers for the whole section. While editing, the fields
+  // appear on a Yes and not before - an unanswered report opens on the
+  // question alone. The read-only card is more lenient: a No shows only
+  // the not-applicable note, but a report never asked (null) still shows
+  // whatever it recorded rather than hiding data behind a question it
+  // was never asked.
   const noRecords = section.draft.hasRecords === 'no';
+  const showFields = section.editing ? section.draft.hasRecords === 'yes' : !noRecords;
 
   return (
     <FormSection
@@ -1273,7 +1277,7 @@ export const PreviousInspectionSection: React.FC<{
       {noRecords && (
         <Text style={sharedStyles.emptyText}>No previous sampling inspection records — this section is not applicable.</Text>
       )}
-      {noRecords ? null : !hasData && !section.editing ? (
+      {!showFields ? null : !hasData && !section.editing ? (
         <Text style={sharedStyles.emptyText}>No previous inspection summary recorded.</Text>
       ) : (
         <>
