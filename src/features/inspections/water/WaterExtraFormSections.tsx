@@ -850,13 +850,14 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
               return (
                 <View key={pi} style={styles.paramRow}>
                   <View style={styles.paramTopLine}>
-                    <TextInput
+                    <ComboInput
                       ref={setRef(pk('name'))}
                       style={styles.paramNameInput}
+                      title="Parameter"
+                      options={WATER_QUALITY_PARAMETERS}
                       value={param.parameterName}
                       onChangeText={t => updatePrevParameter(pi, { parameterName: t })}
                       placeholder="Parameter name"
-                      placeholderTextColor={Colors.textLight}
                       returnKeyType="next"
                       blurOnSubmit={false}
                       onSubmitEditing={() => focus(pk('value'))}
@@ -889,18 +890,31 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                       blurOnSubmit={false}
                       onSubmitEditing={() => focus(pk('standard'))}
                     />
-                    <TextInput
-                      ref={setRef(pk('standard'))}
-                      style={styles.paramSmallInput}
-                      value={param.denrStandard}
-                      onChangeText={t => updatePrevParameter(pi, { denrStandard: t })}
-                      placeholder="DENR Standard"
-                      placeholderTextColor={Colors.textLight}
-                      returnKeyType={isLastParam ? 'done' : 'next'}
-                      blurOnSubmit={isLastParam}
-                      onSubmitEditing={() => focus(`prevparam:${pi + 1}:name`)}
-                    />
                   </View>
+                  {/* Same row as section I's - see the note there. */}
+                  <TextInput
+                    ref={setRef(pk('standard'))}
+                    style={styles.paramStandardInput}
+                    value={param.denrStandard}
+                    onChangeText={t => updatePrevParameter(pi, { denrStandard: t })}
+                    placeholder="DENR Standard"
+                    placeholderTextColor={Colors.textLight}
+                    multiline
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    onSubmitEditing={() => focus(pk('remarks'))}
+                  />
+                  <TextInput
+                    ref={setRef(pk('remarks'))}
+                    style={styles.paramRemarksInput}
+                    value={param.remarks}
+                    onChangeText={t => updatePrevParameter(pi, { remarks: t })}
+                    placeholder="Remarks"
+                    placeholderTextColor={Colors.textLight}
+                    returnKeyType={isLastParam ? 'done' : 'next'}
+                    blurOnSubmit={isLastParam}
+                    onSubmitEditing={() => focus(`prevparam:${pi + 1}:name`)}
+                  />
                 </View>
               );
             })}

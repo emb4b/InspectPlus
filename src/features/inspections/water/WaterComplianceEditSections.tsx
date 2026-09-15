@@ -1308,17 +1308,17 @@ export const PreviousInspectionSection: React.FC<{
                 return (
                   <View key={pi} style={styles.paramEditRow}>
                     <View style={styles.paramTopLine}>
-                      <TextInput
+                      <ComboInput
                         ref={setRef(pk('name'))}
                         style={styles.paramNameInput}
+                        title="Parameter"
+                        options={WATER_QUALITY_PARAMETERS}
                         value={param.parameterName}
                         onChangeText={t => updateParameter(pi, { parameterName: t })}
                         placeholder="Parameter name"
-                        placeholderTextColor={Colors.textLight}
                         returnKeyType="next"
                         blurOnSubmit={false}
                         onSubmitEditing={() => focus(pk('value'))}
-
                       />
                       <YesNoNAToggle value={param.compliant} onChange={c => updateParameter(pi, { compliant: c })} />
                       <TouchableOpacity onPress={() => removeParameter(pi)}>
@@ -1348,21 +1348,32 @@ export const PreviousInspectionSection: React.FC<{
                         returnKeyType="next"
                         blurOnSubmit={false}
                         onSubmitEditing={() => focus(pk('standard'))}
-
-                      />
-                      <TextInput
-                        ref={setRef(pk('standard'))}
-                        style={styles.paramSmallInput}
-                        value={param.denrStandard}
-                        onChangeText={t => updateParameter(pi, { denrStandard: t })}
-                        placeholder="DENR Standard"
-                        placeholderTextColor={Colors.textLight}
-                        returnKeyType={isLastParam ? 'done' : 'next'}
-                        blurOnSubmit={isLastParam}
-                        onSubmitEditing={() => focus(`prevparam:${pi + 1}:name`)}
-
                       />
                     </View>
+                    {/* Same row as section I's - see the note there. */}
+                    <TextInput
+                      ref={setRef(pk('standard'))}
+                      style={styles.paramStandardInput}
+                      value={param.denrStandard}
+                      onChangeText={t => updateParameter(pi, { denrStandard: t })}
+                      placeholder="DENR Standard"
+                      placeholderTextColor={Colors.textLight}
+                      multiline
+                      returnKeyType="next"
+                      blurOnSubmit={false}
+                      onSubmitEditing={() => focus(pk('remarks'))}
+                    />
+                    <TextInput
+                      ref={setRef(pk('remarks'))}
+                      style={styles.paramRemarksInput}
+                      value={param.remarks}
+                      onChangeText={t => updateParameter(pi, { remarks: t })}
+                      placeholder="Remarks"
+                      placeholderTextColor={Colors.textLight}
+                      returnKeyType={isLastParam ? 'done' : 'next'}
+                      blurOnSubmit={isLastParam}
+                      onSubmitEditing={() => focus(`prevparam:${pi + 1}:name`)}
+                    />
                   </View>
                 );
               })}
@@ -1373,9 +1384,13 @@ export const PreviousInspectionSection: React.FC<{
               <View key={pi} style={sharedStyles.paramRow}>
                 <View style={sharedStyles.checklistTopLine}>
                   <Text style={sharedStyles.checklistRequirement}>{param.parameterName || '—'}</Text>
-                  <Text style={styles.paramValueText}>{param.value} {param.unit}</Text>
+                  <View style={styles.paramResult}>
+                    <Text style={styles.paramValueText}>{param.value} {param.unit}</Text>
+                    <YnBadge value={param.compliant} />
+                  </View>
                 </View>
                 <Text style={sharedStyles.checklistRef}>Standard: {param.denrStandard || '—'}</Text>
+                {!!param.remarks && <Text style={sharedStyles.checklistRemarks}>{param.remarks}</Text>}
               </View>
             ))
           )}
