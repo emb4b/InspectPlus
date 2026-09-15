@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
+    "tag-templates": "node scripts/docx-tag.js all",
     "prepare": "husky install"
   },
   "lint-staged": {
