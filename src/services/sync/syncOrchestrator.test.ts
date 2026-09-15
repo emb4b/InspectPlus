@@ -1,8 +1,12 @@
-import { runManagedSync } from './syncOrchestrator';
+import { runManagedSync, runResetAndRedownload } from './syncOrchestrator';
 import { checkOnline } from '../../utils/network';
 import { assertAppVersionSupported } from './appVersionGate';
 import { refreshUrgencyConfig } from '../config/urgencyConfig';
 import { syncClient } from './syncClient';
+import { clearSyncedRecords } from '../../db/sync/watermelonAdapter';
+import { resetSyncMetadata, setLastSyncedUserId } from './syncState';
+import { uploadPendingAttachments } from '../../features/attachments/attachmentUploadQueue';
+import { notifySyncDataChanged } from './syncEvents';
 
 // runManagedSync is pure wiring over these collaborators — every one of them
 // reaches the network, the database or native storage, so they are all
@@ -79,5 +83,78 @@ describe('runManagedSync urgency config refresh', () => {
 
     await expect(runManagedSync('uid-1')).resolves.not.toBeNull();
     expect(mockedRunFullSync).toHaveBeenCalled();
+  });
+});
+
+// ── Reset & re-download ─────────────────────────────────────────────────────
+// The recovery action for a local copy that is empty or wrong: push what's
+// pending, throw away the synced cache and the pull watermark, pull
+// everything from scratch. The order is the whole point - nothing local is
+// removed until the server has what this device was holding.
+
+const mockedClear = clearSyncedRecords as jest.Mock;
+const mockedResetMeta = resetSyncMetadata as jest.Mock;
+const mockedSetUser = setLastSyncedUserId as jest.Mock;
+const mockedUpload = uploadPendingAttachments as jest.Mock;
+const mockedNotify = notifySyncDataChanged as jest.Mock;
+
+describe('runResetAndRedownload', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockedCheckOnline.mockResolvedValue(true);
+    mockedRunFullSync
+      .mockResolvedValueOnce({ pushed: true, pulled: false })
+      .mockResolvedValueOnce({ pushed: false, pulled: true, pullResponse: { changes: {}, timestamp: 5 } });
+  });
+
+  it('pushes first, then clears, then pulls from scratch', async () => {
+    await runResetAndRedownload('uid-1');
+
+    expect(mockedRunFullSync).toHaveBeenNthCalledWith(1, { skipPull: true });
+    expect(mockedRunFullSync).toHaveBeenNthCalledWith(2, { skipPush: true });
+    const order = (fn: jest.Mock, n = 0) => fn.mock.invocationCallOrder[n];
+    expect(order(mockedUpload)).toBeLessThan(order(mockedRunFullSync, 0));
+    expect(order(mockedRunFullSync, 0)).toBeLessThan(order(mockedClear));
+    expect(order(mockedClear)).toBeLessThan(order(mockedResetMeta));
+    expect(order(mockedResetMeta)).toBeLessThan(order(mockedRunFullSync, 1));
+  });
+
+  it('keeps the device attributed to the same user after the metadata reset', async () => {
+    await runResetAndRedownload('uid-1');
+    // resetSyncMetadata clears lastSyncedUserId too; without re-setting it
+    // the next sync would read as a user switch and clear again.
+    expect(mockedSetUser).toHaveBeenLastCalledWith('uid-1');
+    expect(mockedSetUser.mock.invocationCallOrder.at(-1)).toBeGreaterThan(mockedResetMeta.mock.invocationCallOrder[0]);
+  });
+
+  it('reports the push and the full pull together', async () => {
+    await expect(runResetAndRedownload('uid-1')).resolves.toEqual(
+      expect.objectContaining({ pushed: true, pulled: true }),
+    );
+  });
+
+  it('touches nothing local when the push fails', async () => {
+    mockedRunFullSync.mockReset().mockRejectedValueOnce(new Error('server said no'));
+
+    await expect(runResetAndRedownload('uid-1')).rejects.toThrow('server said no');
+    expect(mockedClear).not.toHaveBeenCalled();
+    expect(mockedResetMeta).not.toHaveBeenCalled();
+    expect(mockedNotify).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing while offline', async () => {
+    mockedCheckOnline.mockResolvedValue(false);
+
+    await expect(runResetAndRedownload('uid-1')).resolves.toBeNull();
+    expect(mockedRunFullSync).not.toHaveBeenCalled();
+    expect(mockedClear).not.toHaveBeenCalled();
+  });
+
+  it('is turned away by the version gate before anything runs', async () => {
+    mockedAssertVersion.mockRejectedValueOnce(new Error('update required'));
+
+    await expect(runResetAndRedownload('uid-1')).rejects.toThrow('update required');
+    expect(mockedRunFullSync).not.toHaveBeenCalled();
+    expect(mockedClear).not.toHaveBeenCalled();
   });
 });

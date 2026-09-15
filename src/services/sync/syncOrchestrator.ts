@@ -102,3 +102,44 @@ export async function runManagedSync(
     notifySyncDataChanged();
   }
 }
+
+// The recovery action behind "Reset and re-download" in the sync dialog -
+// for a local copy that is empty or wrong (cleared app data, a store reset
+// by a bad build, drift from the server). Everyday syncs are incremental:
+// they ask for what changed since the watermark, which can't repair a
+// cache that lost rows older than it. This one pushes what's pending,
+// throws away the synced cache and the watermark, and pulls everything the
+// inspector can see from the beginning.
+//
+// The order is the whole point. Nothing local is removed until the push
+// has succeeded, so a failure - offline mid-way, server refusing - leaves
+// the device exactly as it was and the error reaches the caller. And what
+// is removed is only rows already confirmed synced (clearSyncedRecords):
+// pending and conflict rows survive whatever happens.
+//
+// resetSyncMetadata clears lastSyncedUserId along with the watermark, so
+// the user is re-attributed afterwards; otherwise the next sync would read
+// as a user switch and clear the synced cache a second time.
+export async function runResetAndRedownload(userId: string): Promise<RunSyncResult | null> {
+  if (!(await checkOnline())) {
+    return null;
+  }
+
+  await assertAppVersionSupported(supabase);
+  await refreshUrgencyConfig(supabase).catch(() => {});
+  await ensureSyncScopedToUser(userId);
+
+  try {
+    await uploadPendingAttachments();
+    const push = await syncClient.runFullSync({ skipPull: true });
+
+    await clearSyncedRecords();
+    await resetSyncMetadata();
+    await setLastSyncedUserId(userId);
+
+    const pull = await syncClient.runFullSync({ skipPush: true });
+    return { ...pull, pushed: push.pushed, pushResponse: push.pushResponse };
+  } finally {
+    notifySyncDataChanged();
+  }
+}

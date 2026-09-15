@@ -247,6 +247,20 @@ export async function clearSyncedRecords(): Promise<void> {
   });
 }
 
+// How much unsynced work this device is holding, across every table. The
+// confirmation before "Reset and re-download" quotes it so the inspector
+// knows what the push step is about to carry - and what would be at stake
+// if it couldn't.
+export async function countPendingRecords(): Promise<number> {
+  const entities = Object.keys(syncSchema) as SyncEntityName[];
+  const counts = await Promise.all(
+    entities.map(entity =>
+      collectionFor(entity).query(Q.where('syncState', Q.oneOf(PENDING_SYNC_STATES))).fetchCount(),
+    ),
+  );
+  return counts.reduce((sum, n) => sum + n, 0);
+}
+
 // ── Post-push bookkeeping ───────────────────────────────────────────────────
 
 // Flips the local records that were just successfully pushed back to

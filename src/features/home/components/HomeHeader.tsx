@@ -12,7 +12,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../../../constants/colors';
 import { Logo } from '../../../components/Logo';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
-import { runManagedSync } from '../../../services/sync/syncOrchestrator';
+import { runManagedSync, runResetAndRedownload } from '../../../services/sync/syncOrchestrator';
+import { countPendingRecords } from '../../../db/sync/watermelonAdapter';
 import { UpdateRequiredError } from '../../../services/sync/appVersionGate';
 import { subscribeToUpdateRequired } from '../../../services/sync/syncEvents';
 import { SyncOptionsModal, SyncDirection } from './SyncOptionsModal';
@@ -73,6 +74,62 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
     } finally {
       setSyncing(false);
     }
+  };
+
+  // The recovery path. Confirms with the pending count first - that number
+  // is what the push step carries and what would be at stake if it
+  // couldn't - then runs runResetAndRedownload, which only clears anything
+  // once the push has succeeded. Failures report exactly what was and
+  // wasn't done, since "did my entries get deleted?" is the question an
+  // inspector will have at that moment.
+  const handleReset = async () => {
+    if (syncing || !uid) return;
+    const pending = await countPendingRecords().catch(() => 0);
+    const stake =
+      pending === 0
+        ? 'Nothing on this phone is waiting to sync.'
+        : `${pending} ${pending === 1 ? 'entry' : 'entries'} on this phone ${pending === 1 ? 'hasn\u2019t' : 'haven\u2019t'} synced yet. ${pending === 1 ? 'It' : 'They'} will be sent to the server first; if that fails, nothing is reset.`;
+    Alert.alert(
+      'Reset and re-download?',
+      `${stake}\n\nEverything already synced will be removed from this phone and downloaded again from the server. This can take a few minutes on a slow connection.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset and re-download',
+          style: 'destructive',
+          onPress: async () => {
+            setSyncing(true);
+            try {
+              const result = await runResetAndRedownload(uid);
+              setSyncModalVisible(false);
+              if (!result) {
+                Alert.alert('Reset skipped', 'No internet connection right now. Nothing was changed.');
+                return;
+              }
+              Alert.alert(
+                'Reset complete',
+                `Pushed: ${result.pushed ? 'yes' : 'no changes'}\nRe-downloaded everything you have access to.`,
+              );
+            } catch (err) {
+              if (err instanceof UpdateRequiredError) {
+                Alert.alert(
+                  'Update required',
+                  `This app version is no longer supported for sync. Please update to at least version ${err.minVersion}. Nothing was changed.`,
+                );
+                return;
+              }
+              console.error('[HomeHeader] Reset and re-download failed:', err);
+              Alert.alert(
+                'Reset not done',
+                `${err instanceof Error ? err.message : 'Something went wrong.'}\n\nYour unsynced entries are still on this phone and nothing was removed.`,
+              );
+            } finally {
+              setSyncing(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   // Surfaces the same failure when it happens from the post-login sync
@@ -188,6 +245,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
         syncing={syncing}
         onCancel={() => setSyncModalVisible(false)}
         onSync={handleSyncNow}
+        onReset={handleReset}
       />
     </LinearGradient>
   );
