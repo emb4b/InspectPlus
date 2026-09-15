@@ -106,3 +106,6 @@ build/
 # capture whatever inspection data was on screen when they were taken
 *-window.xml
 window_dump.xml
+
+# Subagent-driven-development scratch (ledgers, briefs, review packages)
+.superpowers/
