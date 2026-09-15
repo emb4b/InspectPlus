@@ -81,6 +81,17 @@ describe('applyRecipe', () => {
     expect(out).toContain('ATTACHMENTS</w:t></w:r></w:p><w:tbl>T</w:tbl>');
   });
 
+  it('find: "" targets the last paragraph in the body, not the first empty one', () => {
+    // Some forms (e.g. Survey) have no ATTACHMENTS heading at all, and their
+    // final paragraph before <w:sectPr> is wholly empty — there's no literal
+    // text to match on, and the body has other empty paragraphs earlier too.
+    const xml = doc(`${P(null)}${P('middle')}${P(null)}`);
+    const out = applyRecipe(xml, { checkboxes: [], ops: [{ op: 'insertAfterParagraph', find: '', xml: '<w:tbl>LAST</w:tbl>' }] });
+    expect(out).toContain('<w:tbl>LAST</w:tbl>');
+    expect(out.indexOf('middle')).toBeLessThan(out.indexOf('<w:tbl>LAST</w:tbl>'));
+    expect(out.lastIndexOf('</w:p>') + '</w:p>'.length).toBe(out.indexOf('<w:tbl>LAST</w:tbl>'));
+  });
+
   it('unwraps checkbox content controls and names the glyphs in order, after deletions', () => {
     const xml = doc(`<w:tbl>${TR(SDT(TC(P(null).replace('</w:p>', CB + '</w:p>'))))}${TR(TC(`<w:p>${SDT(CB)}${SDT(CB)}</w:p>`))}${TR(TC(`<w:p>${SDT(CB)}</w:p>`))}</w:tbl>`);
     const out = applyRecipe(xml, { checkboxes: ['one', 'two', 'three'], ops: [{ op: 'deleteRows', table: 1, rows: [3] }] });

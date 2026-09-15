@@ -1,0 +1,216 @@
+{
+  "original": "Survey.docx",
+  "output": "Survey.docx",
+  "checkboxes": [],
+  "ops": [
+    {
+      "op": "replaceText",
+      "find": " __________",
+      "with": " {survey_report_control_no}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": " ____________",
+      "with": " {survey_inspection_date}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "Project Name:",
+      "with": "Project Name: {survey_project_name}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "Reference Code:",
+      "with": "Reference Code: {survey_reference_code}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "Date:",
+      "with": "Date: {survey_date}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "Proponent Name:",
+      "with": "Proponent Name: {survey_proponent_name}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "Contact Person:",
+      "with": "Contact Person: {survey_contact_person}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "Position:",
+      "with": "Position: {survey_contact_position}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "Contact No.:",
+      "with": "Contact No.: {survey_contact_number}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "Email Address:",
+      "with": "Email Address: {survey_email}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "Project Location:",
+      "with": "Project Location: {survey_project_location}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "Geo Coordinates:",
+      "with": "Geo Coordinates: {survey_geo}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "Area Size:",
+      "with": "Area Size: {survey_area_size}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "__",
+      "with": "{cb_survey_purpose_ecc_application}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "__",
+      "with": "{cb_survey_purpose_ecc_amendment}",
+      "nth": 2
+    },
+    {
+      "op": "replaceText",
+      "find": "_",
+      "with": "{cb_survey_doc_iee}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "_",
+      "with": "",
+      "nth": 2
+    },
+    {
+      "op": "replaceText",
+      "find": "__",
+      "with": "{cb_survey_doc_eis}",
+      "nth": 3
+    },
+    {
+      "op": "replaceText",
+      "find": "__ ",
+      "with": "{cb_survey_doc_eprmp} ",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "__ ",
+      "with": "{cb_survey_doc_peis} ",
+      "nth": 2
+    },
+    {
+      "op": "replaceText",
+      "find": "     __ ",
+      "with": "{cb_survey_doc_permp} ",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "  Others: ________________________________________________________________________________",
+      "with": "  {cb_survey_doc_others} Others: {survey_doc_others}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "__ ",
+      "with": "{cb_survey_status_baseline} ",
+      "nth": 3
+    },
+    {
+      "op": "replaceText",
+      "find": "__ ",
+      "with": "{cb_survey_status_preconstruction} ",
+      "nth": 4
+    },
+    {
+      "op": "replaceText",
+      "find": "__ ",
+      "with": "{cb_survey_status_construction} ",
+      "nth": 5
+    },
+    {
+      "op": "replaceText",
+      "find": "__ ",
+      "with": "{cb_survey_status_operation} ",
+      "nth": 6
+    },
+    {
+      "op": "replaceText",
+      "find": "__ ",
+      "with": "{cb_survey_status_suspended} ",
+      "nth": 7
+    },
+    {
+      "op": "replaceText",
+      "find": "                __ ",
+      "with": "{cb_survey_status_abandoned} ",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "Other Findings and Observations:",
+      "with": "Other Findings and Observations: {survey_other_findings}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "Remarks and Recommendation:",
+      "with": "Remarks and Recommendation: {survey_remarks_recommendations}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "NAME OF INSPECTOR",
+      "with": "{sig_inspector_name}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "Position/Designation of Inspector",
+      "with": "{sig_inspector_position}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "NAME OF IMMEDIATE SUPERVISOR",
+      "with": "{sig_supervisor_name}",
+      "nth": 1
+    },
+    {
+      "op": "replaceText",
+      "find": "Position/Designation of Immediate Supervisor",
+      "with": "{sig_supervisor_position}",
+      "nth": 1
+    },
+    {
+      "op": "insertAfterParagraph",
+      "find": "",
+      "xml": "<w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t>ATTACHMENTS</w:t></w:r></w:p><w:tbl><w:tblPr><w:tblW w:w=\"5000\" w:type=\"pct\"/><w:tblLook w:val=\"04A0\"/></w:tblPr><w:tblGrid><w:gridCol w:w=\"4680\"/><w:gridCol w:w=\"4680\"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w=\"2500\" w:type=\"pct\"/></w:tcPr><w:p><w:r><w:t>{#photo_rows}{#left}</w:t></w:r></w:p><w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr><w:r><w:t>{@photo_drawing}</w:t></w:r></w:p><w:p><w:pPr><w:jc w:val=\"center\"/><w:rPr><w:sz w:val=\"18\"/></w:rPr></w:pPr><w:r><w:rPr><w:sz w:val=\"18\"/></w:rPr><w:t>{caption}{/left}</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w=\"2500\" w:type=\"pct\"/></w:tcPr><w:p><w:r><w:t>{#right}</w:t></w:r></w:p><w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr><w:r><w:t>{@photo_drawing}</w:t></w:r></w:p><w:p><w:pPr><w:jc w:val=\"center\"/><w:rPr><w:sz w:val=\"18\"/></w:rPr></w:pPr><w:r><w:rPr><w:sz w:val=\"18\"/></w:rPr><w:t>{caption}{/right}{/photo_rows}</w:t></w:r></w:p></w:tc></w:tr></w:tbl>"
+    }
+  ]
+}
