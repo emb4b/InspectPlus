@@ -7,6 +7,7 @@ import { Type } from '../../../design/typography';
 import {
   FormSection,
   TextField,
+  ComboInput,
   SelectField,
   DateField,
   RadioGroup,
@@ -36,6 +37,7 @@ import {
   WWTP_CONDITION_OPTIONS,
   WWTP_CONDITION_OTHERS,
   SAMPLING_CLASSIFICATION_OPTIONS,
+  WATER_QUALITY_PARAMETERS,
 } from './waterChecklistData';
 import { TreatmentCheckboxGroup } from './TreatmentCheckboxGroup';
 import {
@@ -703,7 +705,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                   <View style={styles.row}>
                     <TextField
                       ref={setRef(k('remarks'))}
-                      label="Remarks"
+                      label="Result Analysis"
                       value={pt.remarks}
                       onChangeText={t => updateSamplingPoint(i, { remarks: t })}
                       returnKeyType={pt.parameters.length > 0 ? 'next' : 'done'}
@@ -718,13 +720,14 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                     return (
                       <View key={pi} style={styles.paramRow}>
                         <View style={styles.paramTopLine}>
-                          <TextInput
+                          <ComboInput
                             ref={setRef(pk(pi, 'name'))}
                             style={styles.paramNameInput}
+                            title="Parameter"
+                            options={WATER_QUALITY_PARAMETERS}
                             value={param.parameterName}
                             onChangeText={t => updateParameter(i, pi, { parameterName: t })}
                             placeholder="Parameter name"
-                            placeholderTextColor={Colors.textLight}
                             returnKeyType="next"
                             blurOnSubmit={false}
                             onSubmitEditing={() => focus(pk(pi, 'value'))}
@@ -757,18 +760,23 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                             blurOnSubmit={false}
                             onSubmitEditing={() => focus(pk(pi, 'standard'))}
                           />
-                          <TextInput
-                            ref={setRef(pk(pi, 'standard'))}
-                            style={styles.paramSmallInput}
-                            value={param.denrStandard}
-                            onChangeText={t => updateParameter(i, pi, { denrStandard: t })}
-                            placeholder="DENR Standard"
-                            placeholderTextColor={Colors.textLight}
-                            returnKeyType={isLastParam ? 'done' : 'next'}
-                            blurOnSubmit={isLastParam}
-                            onSubmitEditing={() => focus(pk(pi + 1, 'name'))}
-                          />
                         </View>
+                        {/* Its own line, not a third of one: a standard is
+                            rarely a bare number ("50 mg/L (Class C, DAO
+                            2016-08)"), so it gets the width and the height
+                            to hold that. */}
+                        <TextInput
+                          ref={setRef(pk(pi, 'standard'))}
+                          style={styles.paramStandardInput}
+                          value={param.denrStandard}
+                          onChangeText={t => updateParameter(i, pi, { denrStandard: t })}
+                          placeholder="DENR Standard"
+                          placeholderTextColor={Colors.textLight}
+                          multiline
+                          returnKeyType="next"
+                          blurOnSubmit={false}
+                          onSubmitEditing={() => focus(pk(pi, 'remarks'))}
+                        />
                         <TextInput
                           ref={setRef(pk(pi, 'remarks'))}
                           style={styles.paramRemarksInput}
@@ -1109,15 +1117,10 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 6,
   },
+  // ComboInput brings its own border, padding and type; only the flex
+  // placement in the top line is this file's to set.
   paramNameInput: {
     flex: 1,
-    fontSize: 12,
-    color: Colors.textPrimary,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
   },
   paramFieldsRow: {
     flexDirection: 'row',
@@ -1133,6 +1136,18 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 6,
+  },
+  paramStandardInput: {
+    fontSize: 11.5,
+    color: Colors.textPrimary,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    minHeight: 48,
+    textAlignVertical: 'top',
+    marginBottom: 6,
   },
   paramRemarksInput: {
     fontSize: 11.5,

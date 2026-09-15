@@ -1,6 +1,7 @@
 export { FormSection } from './FormSection';
 export { TextField } from './TextField';
 export { SelectField } from './SelectField';
+export { ComboInput } from './ComboInput';
 export { DateField } from './DateField';
 export { CheckboxRow } from './CheckboxRow';
 export { RadioGroup } from './RadioGroup';

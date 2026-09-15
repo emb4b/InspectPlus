@@ -96,6 +96,44 @@ export const WWTP_CONDITION_OPTIONS = [
 
 export const SAMPLE_TYPE_OPTIONS = ['Grab', 'Composite'];
 
+// Section 6I's parameter dropdown. The printed form leaves the Parameter
+// column blank, so this is seeded from DAO 2016-08's General Effluent
+// Standards - the parameters an effluent sample is routinely analysed for -
+// rather than from the template. It's a convenience list behind a typeable
+// input (see ComboInput), so anything not here can still be written in.
+export const WATER_QUALITY_PARAMETERS = [
+  'pH',
+  'Temperature',
+  'Color',
+  'BOD',
+  'COD',
+  'TSS',
+  'Oil and Grease',
+  'Fecal Coliform',
+  'Total Coliform',
+  'Dissolved Oxygen',
+  'Ammonia as NH3-N',
+  'Nitrate as NO3-N',
+  'Phosphate',
+  'Surfactants (MBAS)',
+  'Chloride',
+  'Sulfate',
+  'Fluoride',
+  'Cyanide',
+  'Boron',
+  'Arsenic',
+  'Cadmium',
+  'Chromium (Hexavalent)',
+  'Copper',
+  'Lead',
+  'Mercury',
+  'Nickel',
+  'Selenium',
+  'Zinc',
+  'Iron',
+  'Manganese',
+];
+
 // Section 6I's gate: what kind of sampling the inspector conducted, asked
 // only once they say they conducted any. Stored as the label.
 export const SAMPLING_CLASSIFICATION_OPTIONS = ['Ambient', 'Effluent', 'Both'];
