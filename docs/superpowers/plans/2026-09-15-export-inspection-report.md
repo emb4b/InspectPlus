@@ -5045,5 +5045,36 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 
 ## Spike findings
 
-_Filled in by Task 5._
+**Result: GO.** pizzip + docxtemplater + our hand-rolled image XML render correctly under Hermes on a real Android device, well inside the time budget, and survive a 20-photo run without the process being killed.
+
+- **Device:** Redmi Note 8 Pro, Android 10 (`ro.product.model` / `ro.build.version.release`).
+- **Template load:** 65,409 bytes (the tagged spike copy of `Water Monitoring.docx`, `word/document.xml` ≈ 371 KB) in **621 ms** (`Asset.downloadAsync` + `File.bytes()`).
+- **Photo prep:** `expo-image-manipulator` on the bundled `denr_logo.png` → 284×284 JPEG, 20,670 bytes, compress 0.8.
+- **Render, 1 photo:** 86,535 bytes in **1,654 ms**.
+- **Render, 20 photos:** 482,043 bytes in **1,507 ms** (rendering is not photo-count-bound in this range — both runs re-embed the same JPEG bytes, so this mainly measures pizzip's per-part zip overhead, not JPEG encode cost).
+- **Sharing:** `Sharing.isAvailableAsync()` → `true` (module links; the actual share sheet was left commented out per the unattended-run adaptation).
+- **Memory after the 20-photo run:** `dumpsys meminfo` TOTAL PSS ≈ 420,876 KB (~411 MB); process stayed alive (`pidof` returned a pid matching the run) — not killed.
+- **Host-side checks** (`tmp/verify-docx.js`, pizzip + docxtemplater re-open) — both files:
+  - `word/document.xml` has no leftover `{tag}` pattern.
+  - `word/media/export_1.jpeg` present; `[Content_Types].xml` has `Extension="jpeg"`.
+  - Every `r:embed` in `document.xml` has a matching `rId` in `word/_rels/document.xml.rels`.
+  - `new Docxtemplater(new PizZip(bytes))` re-opens both without error.
+  - `spike.docx`: 1 `<w:drawing>`, 1 `r:embed` — **PASS**.
+  - `spike20.docx`: 10 `<w:drawing>`, 10 `r:embed` (not 20) — **PASS once the expectation is corrected** (see deviation below); separately confirmed 21 `word/media/*` parts (20 new `export_N.jpeg` + 1 pre-existing template image) and 31 total `rId`s, so all 20 images *were* embedded as media parts + relationships — pizzip handled 20 image parts without issue.
+- Checkbox-glyph rendering and "opens in Word without a repair prompt" are **deferred to the user's own check**, per the adapted pass criteria — not evaluated here.
+
+### Deviations from the brief / adaptations
+
+1. **`spike20.docx` has 10 drawings, not 20, by template design, not a rendering bug.** The brief's own four-paragraph raw-tag XML (Step 2) only places `{@photo_drawing}` inside the `{#left}…{/left}` loop; the `{#right}…{/right}` loop only prints `{caption}`, no drawing tag. With 10 rows of `{left:[odd], right:[even]}`, that's 10 `{@photo_drawing}` expansions by construction — the "right" column's images are embedded as media parts/rels (proving pizzip scales past a handful of images) but never referenced by a `<w:drawing>` because the template never asks for one. Confirmed via `embedImages`' output: `images.length === 20` in both zip.file() calls and the rels file, only the document.xml reference count is template-bound. Not a code defect; noted here so nobody re-diagnoses it as one.
+2. **JDK/Windows Gradle blocker and fix.** Every Gradle-driven Android build in this tool environment (Bash-tool shells on this Windows host) initially failed with `java.io.IOException: Unable to establish loopback connection` (root cause: the JDK's Windows NIO `Selector`/`Pipe` implementation creates an AF_UNIX-domain loopback socket for its internal wakeup pipe, and that `connect()` call fails here — reproduced identically across Temurin 17.0.18 and Android Studio's bundled JBR 21.0.9, and across `npx expo run:android`, direct `gradlew`, and `--no-daemon`). Fix, confirmed working (`gradlew help --offline` → `BUILD SUCCESSFUL`) and then used for the real build: set `JAVA_TOOL_OPTIONS='-Djdk.net.unixdomain.tmpdir=D:\tmp'` (with `D:\tmp` created) in the **same** shell invocation as the Gradle/Expo command, since env vars don't persist between separate tool calls. With that set, `npx expo run:android --no-bundler` (the `--device <serial>` flag failed with "Could not find device with name" — Expo CLI wants a device *name*, not the adb serial, but there was only one device attached so omitting `--device` worked) succeeded: `BUILD SUCCESSFUL in 6m 22s`, `Installed on 1 device`. **Future builds in this repo/environment should export that `JAVA_TOOL_OPTIONS` value before any `gradlew`/`expo run:android` invocation.**
+3. **Metro's live resolver predates `metro.config.js`'s `docx` assetExt.** The already-running Metro instance (per the task's own "do NOT start another Metro; do not kill it" constraint) was started before commit `4c27dc6` added `'docx'` to `resolver.assetExts` — Metro loads its config once at process start and does not hot-reload it. Requiring `assets/templates/spike.docx` (and even the long-tracked `Water Monitoring.docx`) therefore failed at bundle time with `Cannot find module '...'` (surfaced as a runtime-catchable error because the `require()` sits inside a `try { … } catch` block, which Metro treats as an "optional dependency" instead of a hard build failure). Renaming the on-device asset to `.png` hit a second issue — Expo's asset transformer runs `image-size` on any image extension, which throws on non-image bytes (`unsupported file type: undefined`). Fixed by copying the packed template to **`assets/templates/spike_template.zip`** (a `.docx` *is* a zip, and `zip` is already in Expo's *default* `assetExts` list, independent of the custom `docx` addition, and isn't treated as an image) and pointing the spike's `require()` at that instead — no Metro restart needed, no change to `metro.config.js`, and the bytes flowing into `renderDocx`/pizzip are identical to the real `.docx` path. This is a spike-environment workaround only; `assets/templates/spike_template.zip` and the original `assets/templates/spike.docx` are both left on disk, uncommitted, alongside `export-spike.tsx`. Anyone restarting Metro in this checkout should not hit this — the committed `metro.config.js` already has `docx` in `assetExts`.
+4. **Pull method matters.** `adb shell run-as com.inspectplus cat cache/<file> > out` (as literally instructed) corrupted the binary output under this Bash tool (extra bytes — 86,933 vs. the on-device 86,535; 484,171 vs. 482,043 — consistent with LF→CRLF translation over the `adb shell` PTY). Re-pulling with `adb exec-out run-as com.inspectplus cat cache/<file> > out` produced byte-exact files (sizes matching the on-device `renderDocx` output logged by the app). Worth carrying forward to any later task that pulls binary files off-device through this tool.
+
+### Pass criteria — result
+
+1. No `[spike] ERROR`; render time under 5 s — **PASS** (no ERROR line; 1,654 ms for 1 photo, 1,507 ms for 20).
+2. Pulled files pass the host-side pizzip/docxtemplater checks — **PASS** (see above; `spike20.docx`'s drawing count matches the template's actual tag layout, not a fixed 20).
+3. 20-photo run completes, process survives, file passes checks — **PASS** (`spike20.docx` written, `pidof` alive post-run, all host checks pass).
+
+Checkbox glyph rendering and "opens in Word without a repair prompt" — deferred to the user's own check, as instructed.
 
