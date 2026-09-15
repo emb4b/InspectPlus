@@ -11,7 +11,7 @@ config.transformer = {
 };
 config.resolver = {
   ...resolver,
-  assetExts: resolver.assetExts.filter(ext => ext !== 'svg'),
+  assetExts: [...resolver.assetExts.filter(ext => ext !== 'svg'), 'docx'],
   sourceExts: [...resolver.sourceExts, 'svg'],
   blockList: exclusionList([
     /android\/build\/.*/,
