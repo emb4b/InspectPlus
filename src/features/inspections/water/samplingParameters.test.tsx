@@ -2,6 +2,8 @@ import React from 'react';
 import { TextInput } from 'react-native';
 import renderer, { act } from 'react-test-renderer';
 import { ComboInput, TextField } from '../../../components/form';
+import type { YnValue } from '../../../components/form';
+import { YnBadge } from '../components/ComplianceReadPrimitives';
 import { WaterExtraFormSectionsView } from './WaterExtraFormSections';
 import { SamplingPointsSection } from './WaterComplianceEditSections';
 import { buildWaterReportTabs } from './waterReportTabs';
@@ -34,9 +36,9 @@ jest.mock('react-native-keyboard-controller', () => ({
 
 const samplingTab = buildWaterReportTabs().find(t => t.key === 'samplingfindings')!;
 
-const pointWithParam = (remarks = '') => ({
+const pointWithParam = (remarks = '', compliant: YnValue = null) => ({
   ...emptySamplingPoint('1'),
-  parameters: [{ ...emptySamplingParameter(), remarks }],
+  parameters: [{ ...emptySamplingParameter(), remarks, compliant }],
 });
 
 const renderForm = (onChange: (v: WaterComplianceFormState) => void = () => {}) => {
@@ -54,13 +56,13 @@ const renderForm = (onChange: (v: WaterComplianceFormState) => void = () => {}) 
   return tree;
 };
 
-const renderEditSection = (remarks = '') => {
+const renderEditSection = (remarks = '', compliant: YnValue = null) => {
   let tree!: renderer.ReactTestRenderer;
   act(() => {
     tree = renderer.create(
       <SamplingPointsSection
         complianceId="c1"
-        value={{ samplingConducted: true, samplingClassification: 'Effluent', samplingPoints: [pointWithParam(remarks)] }}
+        value={{ samplingConducted: true, samplingClassification: 'Effluent', samplingPoints: [pointWithParam(remarks, compliant)] }}
         canEdit
         onSaved={() => {}}
       />,
@@ -156,5 +158,19 @@ describe('per-parameter remarks on the edit screen', () => {
         samplingPoints: [expect.objectContaining({ parameters: [expect.objectContaining({ remarks: 'Exceeds Class C limit' })] })],
       }),
     ]);
+  });
+});
+
+describe('per-parameter compliance on the read-only card', () => {
+  const badges = (tree: renderer.ReactTestRenderer) => tree.root.findAllByType(YnBadge);
+
+  it("shows each parameter's Compliant? answer as the same badge the checklists use", () => {
+    const tree = renderEditSection('', 'N');
+    expect(badges(tree)).toHaveLength(1);
+    expect(badges(tree)[0].props.value).toBe('N');
+  });
+
+  it('still renders the badge slot when the answer was never given', () => {
+    expect(badges(renderEditSection('', null))[0].props.value).toBeNull();
   });
 });

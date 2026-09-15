@@ -28,6 +28,7 @@ import {
   ChecklistList,
   ConditionsList,
   DocumentsChips,
+  YnBadge,
   styles as sharedStyles,
 } from '../components/ComplianceReadPrimitives';
 import type { WaterComplianceView as WaterComplianceData } from '../hooks/useInspectionReport';
@@ -1187,7 +1188,10 @@ export const SamplingPointsSection: React.FC<{
               <View key={pi} style={sharedStyles.paramRow}>
                 <View style={sharedStyles.checklistTopLine}>
                   <Text style={sharedStyles.checklistRequirement}>{param.parameterName || '—'}</Text>
-                  <Text style={styles.paramValueText}>{param.value} {param.unit}</Text>
+                  <View style={styles.paramResult}>
+                    <Text style={styles.paramValueText}>{param.value} {param.unit}</Text>
+                    <YnBadge value={param.compliant} />
+                  </View>
                 </View>
                 <Text style={sharedStyles.checklistRef}>Standard: {param.denrStandard || '—'}</Text>
                 {!!param.remarks && <Text style={sharedStyles.checklistRemarks}>{param.remarks}</Text>}
@@ -1903,6 +1907,13 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 6,
+  },
+  // Value and its Compliant? badge sit together at the line's end, so the
+  // eye reads "what was measured -> did it pass" in one sweep.
+  paramResult: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   paramValueText: {
     fontSize: 11.5,
