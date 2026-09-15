@@ -16,14 +16,19 @@ const render = (element: React.ReactElement) => {
 const texts = (r: TestRenderer.ReactTestRenderer) =>
   r.root.findAllByType(Text).map(t => [t.props.children].flat().join(''));
 
+jest.mock('../../../db/schema', () => ({ schema: { version: 15 } }));
+
 // An inspector asking for help - or reading the recovery guide - needs to
-// say which version they're on, and the app never showed it anywhere.
+// say which version they're on, and the app never showed it anywhere. The
+// database schema version rides along: it is the number that decides
+// whether an update migrates the store or resets it, so a support
+// screenshot showing "db 15" settles that question on the spot.
 describe('HomeFooter version stamp', () => {
-  it('prints the app version and build on the login footer', () => {
-    expect(texts(render(<HomeFooter showCredits />))).toContain('InspectPlus v1.0.3 (12)');
+  it('shares the rights line on the login footer', () => {
+    expect(texts(render(<HomeFooter showCredits />))).toContain('All Rights Reserved · v1.0.3 (12) · db 15');
   });
 
   it('prints it on the plain bar every signed-in screen carries', () => {
-    expect(texts(render(<HomeFooter />))).toContain('v1.0.3 (12)');
+    expect(texts(render(<HomeFooter />))).toContain('v1.0.3 (12) · db 15');
   });
 });
