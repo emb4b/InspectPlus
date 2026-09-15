@@ -86,11 +86,12 @@ export const WWTP_TYPE_OTHERS = 'Others';
 
 export const WWTP_TYPE_OPTIONS = ['Physical', 'Biological', 'Chemical', 'Combined', WWTP_TYPE_OTHERS];
 
+export const WWTP_CONDITION_OTHERS = 'Others';
 export const WWTP_CONDITION_OPTIONS = [
   'Properly Maintained',
   'Inadequately Maintained',
   'Poor Maintenance',
-  'Others',
+  WWTP_CONDITION_OTHERS,
 ];
 
 export const SAMPLE_TYPE_OPTIONS = ['Grab', 'Composite'];

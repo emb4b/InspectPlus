@@ -28,6 +28,8 @@ import {
   wwtpDetailForSave,
   wwtpComponentForSave,
   wwtpTypeOtherForSave,
+  wwtpConditionOtherForSave,
+  wwtpConstructionForSave,
   WaterComplianceFormState,
 } from './waterTypes';
 import { buildWaterReportTabs, establishmentHasDischargePermit } from './waterReportTabs';
@@ -85,7 +87,10 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
         wwtpDetails: waterCompliance.wwtpDetails.map(d => wwtpDetailForSave(d)),
         wwtpComponents: waterCompliance.wwtpComponents.map(c => wwtpComponentForSave(c)),
         wwtpCondition: waterCompliance.wwtpCondition || null,
+        wwtpConditionOther:
+          wwtpConditionOtherForSave(waterCompliance.wwtpCondition, waterCompliance.wwtpConditionOther) || null,
         wwtpUnderConstruction: waterCompliance.wwtpUnderConstruction === 'yes',
+        ...wwtpConstructionForSave(waterCompliance.wwtpUnderConstruction, waterCompliance),
         samplingPoints: waterCompliance.samplingPoints,
         previousInspectionSummary: waterCompliance.previousInspection.dateOfSampling
           ? waterCompliance.previousInspection

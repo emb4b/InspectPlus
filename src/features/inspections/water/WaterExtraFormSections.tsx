@@ -34,6 +34,7 @@ import {
   WWTP_TYPE_OPTIONS,
   WWTP_TYPE_OTHERS,
   WWTP_CONDITION_OPTIONS,
+  WWTP_CONDITION_OTHERS,
 } from './waterChecklistData';
 import { TreatmentCheckboxGroup } from './TreatmentCheckboxGroup';
 import {
@@ -564,6 +565,57 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                 onChange={v => set('wwtpUnderConstruction', v as 'yes' | 'no')}
               />
             </View>
+            {value.wwtpCondition === WWTP_CONDITION_OTHERS && (
+              <TextField
+                ref={setRef('wwtpConditionOther')}
+                label="Specify the condition"
+                value={value.wwtpConditionOther}
+                onChangeText={t => set('wwtpConditionOther', t)}
+                placeholder="e.g. Under repair"
+                returnKeyType="done"
+              />
+            )}
+            {/* Questions 3-6 on the printed form only apply to a plant under
+                construction or rehabilitation, so they follow question 2. */}
+            {value.wwtpUnderConstruction === 'yes' && (
+              <>
+                <RadioGroup
+                  label="Reported to EMB/LLDA?"
+                  options={YES_NO}
+                  value={value.wwtpConstructionReported}
+                  onChange={v => set('wwtpConstructionReported', v as 'yes' | 'no')}
+                />
+                <TextField
+                  ref={setRef('wwtpConstructionUnits')}
+                  label="Units under construction or being modified"
+                  value={value.wwtpConstructionUnits}
+                  onChangeText={t => set('wwtpConstructionUnits', t)}
+                  placeholder="e.g. Aeration tank, clarifier"
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => focus('wwtpConstructionCompletionDate')}
+                />
+                <View style={styles.row}>
+                  <DateField
+                    ref={setRef('wwtpConstructionCompletionDate')}
+                    label="Estimated date of completion"
+                    value={value.wwtpConstructionCompletionDate}
+                    onChange={t => set('wwtpConstructionCompletionDate', t)}
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    onSubmitEditing={() => focus('wwtpTreatmentUnitsUtilized')}
+                  />
+                  <TextField
+                    ref={setRef('wwtpTreatmentUnitsUtilized')}
+                    label="Treatment units utilized to treat wastewater"
+                    value={value.wwtpTreatmentUnitsUtilized}
+                    onChangeText={t => set('wwtpTreatmentUnitsUtilized', t)}
+                    placeholder="e.g. Septic tank"
+                    returnKeyType="done"
+                  />
+                </View>
+              </>
+            )}
           </FormSection>
         );
 

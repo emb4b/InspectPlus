@@ -4,6 +4,7 @@ import {
   NON_WWTP_TREATMENT_OTHERS,
   TREATMENT_OTHERS,
   WWTP_TYPE_OTHERS,
+  WWTP_CONDITION_OTHERS,
   PRIMARY_TREATMENT_OPTIONS,
   BIOLOGICAL_TREATMENT_OPTIONS,
   CHEMICAL_TREATMENT_OPTIONS,
@@ -83,7 +84,16 @@ export interface WaterComplianceFormState {
   wwtpDetails: WwtpDetailCard[];
   wwtpComponents: WwtpComponentCard[];
   wwtpCondition: string;
+  wwtpConditionOther: string;
   wwtpUnderConstruction: 'yes' | 'no' | null;
+  // Section 5E questions 3-6. Only asked while wwtpUnderConstruction is
+  // 'yes', but kept in state regardless so flipping the answer doesn't
+  // destroy what was typed - see wwtpConstructionForSave for where the
+  // record stops being that lenient.
+  wwtpConstructionReported: 'yes' | 'no' | null;
+  wwtpConstructionUnits: string;
+  wwtpConstructionCompletionDate: string;
+  wwtpTreatmentUnitsUtilized: string;
   samplingPoints: SamplingPointCard[];
   previousInspection: PreviousInspectionState;
   checklistDao200510: ChecklistValue[];
@@ -156,7 +166,12 @@ export function emptyWaterComplianceForm(): WaterComplianceFormState {
     wwtpDetails: [],
     wwtpComponents: [],
     wwtpCondition: '',
+    wwtpConditionOther: '',
     wwtpUnderConstruction: null,
+    wwtpConstructionReported: null,
+    wwtpConstructionUnits: '',
+    wwtpConstructionCompletionDate: '',
+    wwtpTreatmentUnitsUtilized: '',
     samplingPoints: [],
     previousInspection: {
       dateOfSampling: '',
@@ -372,4 +387,59 @@ export function wwtpTypeOtherForSave(wwtpType: string, other: string): string {
 export function describeWwtpType(wwtpType: string, other: string): string {
   if (!wwtpType) return '—';
   return wwtpType === WWTP_TYPE_OTHERS && other ? `${wwtpType}: ${other}` : wwtpType;
+}
+
+// ── Condition of the WWTP ────────────────────────────────────────────────────
+// Section 5E. Question 1's "Others" and questions 3-6 follow the same rule
+// as wwtpTypeOtherForSave: an answer is only recorded while the answer it
+// hangs off still calls for it, so the record can't describe two answers at
+// once - specify text for a listed condition, or construction work on a
+// plant it also says is not under construction.
+
+export function wwtpConditionOtherForSave(condition: string, other: string): string {
+  return condition === WWTP_CONDITION_OTHERS ? other.trim() : '';
+}
+
+export function describeWwtpCondition(condition: string, other: string): string {
+  if (!condition) return '—';
+  return condition === WWTP_CONDITION_OTHERS && other ? `${condition}: ${other}` : condition;
+}
+
+export interface WwtpConstructionAnswers {
+  wwtpConstructionReported: 'yes' | 'no' | null;
+  wwtpConstructionUnits: string;
+  wwtpConstructionCompletionDate: string;
+  wwtpTreatmentUnitsUtilized: string;
+}
+
+export interface WwtpConstructionRecord {
+  wwtpConstructionReported: boolean | null;
+  wwtpConstructionUnits: string | null;
+  wwtpConstructionCompletionDate: string | null;
+  wwtpTreatmentUnitsUtilized: string | null;
+}
+
+// `underConstruction` is question 2 as the caller holds it - the form's
+// 'yes'/'no'/null or the record's boolean/null; only a definite yes keeps
+// questions 3-6. Question 3 stays null when unanswered rather than
+// collapsing to No, since "not asked" and "No" are different answers.
+export function wwtpConstructionForSave(
+  underConstruction: 'yes' | 'no' | boolean | null,
+  answers: WwtpConstructionAnswers,
+): WwtpConstructionRecord {
+  if (underConstruction !== true && underConstruction !== 'yes') {
+    return {
+      wwtpConstructionReported: null,
+      wwtpConstructionUnits: null,
+      wwtpConstructionCompletionDate: null,
+      wwtpTreatmentUnitsUtilized: null,
+    };
+  }
+  return {
+    wwtpConstructionReported:
+      answers.wwtpConstructionReported == null ? null : answers.wwtpConstructionReported === 'yes',
+    wwtpConstructionUnits: answers.wwtpConstructionUnits.trim() || null,
+    wwtpConstructionCompletionDate: answers.wwtpConstructionCompletionDate.trim() || null,
+    wwtpTreatmentUnitsUtilized: answers.wwtpTreatmentUnitsUtilized.trim() || null,
+  };
 }

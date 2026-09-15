@@ -86,7 +86,12 @@ export interface WaterComplianceView {
   // on read — see decodeWwtpComponent in waterTypes.ts.
   wwtpComponents: Record<string, unknown>[];
   wwtpCondition: string | null;
+  wwtpConditionOther: string | null;
   wwtpUnderConstruction: boolean | null;
+  wwtpConstructionReported: boolean | null;
+  wwtpConstructionUnits: string | null;
+  wwtpConstructionCompletionDate: string | null;
+  wwtpTreatmentUnitsUtilized: string | null;
   samplingPoints: SamplingPointCard[];
   previousInspectionSummary: PreviousInspectionState;
   checklistDao200510: ChecklistEntry[];
@@ -261,7 +266,12 @@ export function useInspectionReport(reportId: string | undefined): UseInspection
               wwtpDetails: c.wwtpDetails ?? [],
               wwtpComponents: c.wwtpComponents ?? [],
               wwtpCondition: c.wwtpCondition,
+              wwtpConditionOther: c.wwtpConditionOther,
               wwtpUnderConstruction: c.wwtpUnderConstruction,
+              wwtpConstructionReported: c.wwtpConstructionReported,
+              wwtpConstructionUnits: c.wwtpConstructionUnits,
+              wwtpConstructionCompletionDate: c.wwtpConstructionCompletionDate,
+              wwtpTreatmentUnitsUtilized: c.wwtpTreatmentUnitsUtilized,
               samplingPoints: c.samplingPoints ?? [],
               previousInspectionSummary: {
                 dateOfSampling: c.previousInspectionSummary?.dateOfSampling ?? '',

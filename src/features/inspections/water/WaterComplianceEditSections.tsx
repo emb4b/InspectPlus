@@ -47,6 +47,7 @@ import {
   WWTP_TYPE_OPTIONS,
   WWTP_TYPE_OTHERS,
   WWTP_CONDITION_OPTIONS,
+  WWTP_CONDITION_OTHERS,
 } from './waterChecklistData';
 import { TreatmentCheckboxGroup } from './TreatmentCheckboxGroup';
 import {
@@ -71,6 +72,9 @@ import {
   describeTreatment,
   wwtpTypeOtherForSave,
   describeWwtpType,
+  wwtpConditionOtherForSave,
+  describeWwtpCondition,
+  wwtpConstructionForSave,
 } from './waterTypes';
 import type { ComplianceWater } from '../../../db/models';
 import type { WaterMainTabDef } from './waterReportTabs';
@@ -769,8 +773,28 @@ export const WwtpComponentsSection: React.FC<{
 
 interface WwtpConditionFields {
   wwtpCondition: string | null;
+  wwtpConditionOther: string | null;
   wwtpUnderConstruction: boolean | null;
+  wwtpConstructionReported: boolean | null;
+  wwtpConstructionUnits: string | null;
+  wwtpConstructionCompletionDate: string | null;
+  wwtpTreatmentUnitsUtilized: string | null;
 }
+
+// The draft holds the record's nulls as the form's empty strings so the
+// inputs below never see null; wwtpConstructionForSave turns them back.
+interface WwtpConditionDraft {
+  wwtpCondition: string;
+  wwtpConditionOther: string;
+  wwtpUnderConstruction: boolean | null;
+  wwtpConstructionReported: boolean | null;
+  wwtpConstructionUnits: string;
+  wwtpConstructionCompletionDate: string;
+  wwtpTreatmentUnitsUtilized: string;
+}
+
+const yesNo = (v: boolean | null): 'yes' | 'no' | null => (v == null ? null : v ? 'yes' : 'no');
+const yesNoLabel = (v: boolean | null): string => (v == null ? '—' : v ? 'Yes' : 'No');
 
 export const WwtpConditionSection: React.FC<{
   complianceId: string;
@@ -778,16 +802,35 @@ export const WwtpConditionSection: React.FC<{
   canEdit: boolean;
   onSaved: () => void;
 }> = ({ complianceId, value, canEdit, onSaved }) => {
-  const section = useEditableSection<WwtpConditionFields>({
-    value,
-    onSave: async fields => {
+  const section = useEditableSection<WwtpConditionDraft>({
+    value: {
+      wwtpCondition: value.wwtpCondition || '',
+      wwtpConditionOther: value.wwtpConditionOther || '',
+      wwtpUnderConstruction: value.wwtpUnderConstruction,
+      wwtpConstructionReported: value.wwtpConstructionReported,
+      wwtpConstructionUnits: value.wwtpConstructionUnits || '',
+      wwtpConstructionCompletionDate: value.wwtpConstructionCompletionDate || '',
+      wwtpTreatmentUnitsUtilized: value.wwtpTreatmentUnitsUtilized || '',
+    },
+    onSave: async draft => {
       await patchComplianceWater(complianceId, {
-        wwtpCondition: fields.wwtpCondition || null,
-        wwtpUnderConstruction: fields.wwtpUnderConstruction,
+        wwtpCondition: draft.wwtpCondition || null,
+        wwtpConditionOther: wwtpConditionOtherForSave(draft.wwtpCondition, draft.wwtpConditionOther) || null,
+        wwtpUnderConstruction: draft.wwtpUnderConstruction,
+        ...wwtpConstructionForSave(draft.wwtpUnderConstruction, {
+          ...draft,
+          wwtpConstructionReported: yesNo(draft.wwtpConstructionReported),
+        }),
       });
       onSaved();
     },
   });
+
+  const { draft } = section;
+  // Questions 3-6 on the printed form only apply to a plant under
+  // construction or rehabilitation, so they follow question 2 - on the
+  // read-only view too, where a stale answer would otherwise sit under a No.
+  const underConstruction = draft.wwtpUnderConstruction === true;
 
   return (
     <FormSection
@@ -796,27 +839,76 @@ export const WwtpConditionSection: React.FC<{
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
-      <View style={styles.row}>
-        {section.editing ? (
-          <SelectField label="WWTP Condition" value={section.draft.wwtpCondition || ''} options={WWTP_CONDITION_OPTIONS} onSelect={v => section.setDraft(d => ({ ...d, wwtpCondition: v }))} />
-        ) : (
-          <TextField label="WWTP Condition" value={section.draft.wwtpCondition || '—'} readOnly />
-        )}
-        {section.editing ? (
-          <RadioGroup
-            label="Under Construction / Rehabilitation?"
-            options={YES_NO}
-            value={section.draft.wwtpUnderConstruction == null ? null : section.draft.wwtpUnderConstruction ? 'yes' : 'no'}
-            onChange={v => section.setDraft(d => ({ ...d, wwtpUnderConstruction: v === 'yes' }))}
-          />
-        ) : (
-          <TextField
-            label="Under Construction?"
-            value={section.draft.wwtpUnderConstruction == null ? '—' : section.draft.wwtpUnderConstruction ? 'Yes' : 'No'}
-            readOnly
-          />
-        )}
-      </View>
+      {section.editing ? (
+        <>
+          <View style={styles.row}>
+            <SelectField label="WWTP Condition" value={draft.wwtpCondition} options={WWTP_CONDITION_OPTIONS} onSelect={v => section.setDraft(d => ({ ...d, wwtpCondition: v }))} />
+            <RadioGroup
+              label="Under Construction / Rehabilitation?"
+              options={YES_NO}
+              value={yesNo(draft.wwtpUnderConstruction)}
+              onChange={v => section.setDraft(d => ({ ...d, wwtpUnderConstruction: v === 'yes' }))}
+            />
+          </View>
+          {draft.wwtpCondition === WWTP_CONDITION_OTHERS && (
+            <TextField
+              label="Specify the condition"
+              value={draft.wwtpConditionOther}
+              onChangeText={t => section.setDraft(d => ({ ...d, wwtpConditionOther: t }))}
+              placeholder="e.g. Under repair"
+              returnKeyType="done"
+            />
+          )}
+          {underConstruction && (
+            <>
+              <RadioGroup
+                label="Reported to EMB/LLDA?"
+                options={YES_NO}
+                value={yesNo(draft.wwtpConstructionReported)}
+                onChange={v => section.setDraft(d => ({ ...d, wwtpConstructionReported: v === 'yes' }))}
+              />
+              <TextField
+                label="Units under construction or being modified"
+                value={draft.wwtpConstructionUnits}
+                onChangeText={t => section.setDraft(d => ({ ...d, wwtpConstructionUnits: t }))}
+                placeholder="e.g. Aeration tank, clarifier"
+                returnKeyType="next"
+              />
+              <View style={styles.row}>
+                <DateField
+                  label="Estimated date of completion"
+                  value={draft.wwtpConstructionCompletionDate}
+                  onChange={t => section.setDraft(d => ({ ...d, wwtpConstructionCompletionDate: t }))}
+                />
+                <TextField
+                  label="Treatment units utilized to treat wastewater"
+                  value={draft.wwtpTreatmentUnitsUtilized}
+                  onChangeText={t => section.setDraft(d => ({ ...d, wwtpTreatmentUnitsUtilized: t }))}
+                  placeholder="e.g. Septic tank"
+                  returnKeyType="done"
+                />
+              </View>
+            </>
+          )}
+        </>
+      ) : (
+        <>
+          <View style={styles.row}>
+            <TextField label="WWTP Condition" value={describeWwtpCondition(draft.wwtpCondition, draft.wwtpConditionOther)} readOnly />
+            <TextField label="Under Construction?" value={yesNoLabel(draft.wwtpUnderConstruction)} readOnly />
+          </View>
+          {underConstruction && (
+            <>
+              <View style={styles.row}>
+                <TextField label="Reported to EMB/LLDA?" value={yesNoLabel(draft.wwtpConstructionReported)} readOnly />
+                <TextField label="Estimated date of completion" value={draft.wwtpConstructionCompletionDate || '—'} readOnly />
+              </View>
+              <TextField label="Units under construction or being modified" value={draft.wwtpConstructionUnits || '—'} readOnly />
+              <TextField label="Treatment units utilized to treat wastewater" value={draft.wwtpTreatmentUnitsUtilized || '—'} readOnly />
+            </>
+          )}
+        </>
+      )}
       {section.error && <Text style={styles.errorText}>{section.error}</Text>}
     </FormSection>
   );
@@ -1563,7 +1655,15 @@ export const WaterExtraSectionsView: React.FC<WaterExtraSectionsViewProps> = ({
         ) : (
           <WwtpConditionSection
             complianceId={complianceId}
-            value={{ wwtpCondition: compliance.wwtpCondition, wwtpUnderConstruction: compliance.wwtpUnderConstruction }}
+            value={{
+              wwtpCondition: compliance.wwtpCondition,
+              wwtpConditionOther: compliance.wwtpConditionOther,
+              wwtpUnderConstruction: compliance.wwtpUnderConstruction,
+              wwtpConstructionReported: compliance.wwtpConstructionReported,
+              wwtpConstructionUnits: compliance.wwtpConstructionUnits,
+              wwtpConstructionCompletionDate: compliance.wwtpConstructionCompletionDate,
+              wwtpTreatmentUnitsUtilized: compliance.wwtpTreatmentUnitsUtilized,
+            }}
             canEdit={canEdit}
             onSaved={onSaved}
           />
