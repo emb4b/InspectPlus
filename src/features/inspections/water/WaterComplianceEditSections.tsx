@@ -48,6 +48,7 @@ import {
   WWTP_TYPE_OTHERS,
   WWTP_CONDITION_OPTIONS,
   WWTP_CONDITION_OTHERS,
+  SAMPLING_CLASSIFICATION_OPTIONS,
 } from './waterChecklistData';
 import { TreatmentCheckboxGroup } from './TreatmentCheckboxGroup';
 import {
@@ -75,6 +76,8 @@ import {
   wwtpConditionOtherForSave,
   describeWwtpCondition,
   wwtpConstructionForSave,
+  samplingForSave,
+  describeSampling,
 } from './waterTypes';
 import type { ComplianceWater } from '../../../db/models';
 import type { WaterMainTabDef } from './waterReportTabs';
@@ -916,9 +919,23 @@ export const WwtpConditionSection: React.FC<{
 
 // ── Sampling Points ─────────────────────────────────────────────────────────
 
+interface SamplingFields {
+  samplingConducted: boolean | null;
+  samplingClassification: string | null;
+  samplingPoints: SamplingPointCard[];
+}
+
+interface SamplingDraft {
+  conducted: boolean | null;
+  classification: string;
+  points: SamplingPointCard[];
+}
+
+const SAMPLING_CLASSIFICATION = SAMPLING_CLASSIFICATION_OPTIONS.map(o => ({ label: o, value: o }));
+
 export const SamplingPointsSection: React.FC<{
   complianceId: string;
-  value: SamplingPointCard[];
+  value: SamplingFields;
   canEdit: boolean;
   onSaved: () => void;
 }> = ({
@@ -931,38 +948,43 @@ export const SamplingPointsSection: React.FC<{
   const focus = (key: string) => focusInput(fieldRefs.current[key]);
   const setRef = (key: string) => (el: TextInput | null) => { fieldRefs.current[key] = el; };
 
-  const section = useEditableSection<SamplingPointCard[]>({
-    value,
-    onSave: async samplingPoints => {
-      await patchComplianceWater(complianceId, { samplingPoints });
+  const section = useEditableSection<SamplingDraft>({
+    value: {
+      conducted: value.samplingConducted,
+      classification: value.samplingClassification || '',
+      points: value.samplingPoints,
+    },
+    onSave: async draft => {
+      await patchComplianceWater(complianceId, samplingForSave(draft.conducted, draft.classification, draft.points));
       onSaved();
     },
   });
 
+  const setPoints = (points: SamplingPointCard[]) => section.setDraft(d => ({ ...d, points }));
   const updatePoint = (i: number, patch: Partial<SamplingPointCard>) => {
-    const rows = section.draft.slice();
+    const rows = section.draft.points.slice();
     rows[i] = { ...rows[i], ...patch };
-    section.setDraft(rows);
+    setPoints(rows);
   };
-  const removePoint = (i: number) => section.setDraft(section.draft.filter((_, idx) => idx !== i));
-  const addPoint = () => section.setDraft([...section.draft, emptySamplingPoint(String(section.draft.length + 1))]);
+  const removePoint = (i: number) => setPoints(section.draft.points.filter((_, idx) => idx !== i));
+  const addPoint = () => setPoints([...section.draft.points, emptySamplingPoint(String(section.draft.points.length + 1))]);
 
   const addParameter = (pointIndex: number) => {
-    const rows = section.draft.slice();
+    const rows = section.draft.points.slice();
     rows[pointIndex] = { ...rows[pointIndex], parameters: [...rows[pointIndex].parameters, emptySamplingParameter()] };
-    section.setDraft(rows);
+    setPoints(rows);
   };
   const updateParameter = (pointIndex: number, paramIndex: number, patch: Partial<SamplingParameterRow>) => {
-    const rows = section.draft.slice();
+    const rows = section.draft.points.slice();
     const params = rows[pointIndex].parameters.slice();
     params[paramIndex] = { ...params[paramIndex], ...patch };
     rows[pointIndex] = { ...rows[pointIndex], parameters: params };
-    section.setDraft(rows);
+    setPoints(rows);
   };
   const removeParameter = (pointIndex: number, paramIndex: number) => {
-    const rows = section.draft.slice();
+    const rows = section.draft.points.slice();
     rows[pointIndex] = { ...rows[pointIndex], parameters: rows[pointIndex].parameters.filter((_, idx) => idx !== paramIndex) };
-    section.setDraft(rows);
+    setPoints(rows);
   };
 
   return (
@@ -972,10 +994,40 @@ export const SamplingPointsSection: React.FC<{
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
-      {section.draft.length === 0 && !section.editing && (
+      {section.editing ? (
+        <>
+          <RadioGroup
+            label="Was water quality sampling conducted?"
+            options={YES_NO}
+            value={section.draft.conducted == null ? null : section.draft.conducted ? 'yes' : 'no'}
+            onChange={v => section.setDraft(d => ({ ...d, conducted: v === 'yes' }))}
+          />
+          {section.draft.conducted === true && (
+            <RadioGroup
+              label="Sampling classification"
+              options={SAMPLING_CLASSIFICATION}
+              value={section.draft.classification || null}
+              onChange={v => section.setDraft(d => ({ ...d, classification: v }))}
+            />
+          )}
+        </>
+      ) : (
+        <TextField
+          label="Sampling conducted?"
+          value={describeSampling(section.draft.conducted, section.draft.classification || null)}
+          readOnly
+        />
+      )}
+      {/* A No hides the points rather than clearing them; samplingForSave
+          drops them on save. A report never asked (null) still shows what
+          it recorded. */}
+      {section.draft.conducted === false && (
+        <Text style={sharedStyles.emptyText}>No sampling conducted — sampling points are not applicable.</Text>
+      )}
+      {section.draft.conducted !== false && section.draft.points.length === 0 && !section.editing && (
         <Text style={sharedStyles.emptyText}>No sampling points recorded.</Text>
       )}
-      {section.draft.map((pt, i) => {
+      {section.draft.conducted !== false && section.draft.points.map((pt, i) => {
         const k = (field: string) => `samplingPoint:${i}:${field}`;
         const pk = (pi: number, field: string) => `samplingParam:${i}:${pi}:${field}`;
         return section.editing ? (
@@ -1129,7 +1181,9 @@ export const SamplingPointsSection: React.FC<{
           </View>
         );
       })}
-      {section.editing && <AddRowButton style={styles.addBtn} label="Add Sampling Point" onPress={addPoint} />}
+      {section.editing && section.draft.conducted === true && (
+        <AddRowButton style={styles.addBtn} label="Add Sampling Point" onPress={addPoint} />
+      )}
       {section.error && <Text style={styles.errorText}>{section.error}</Text>}
     </FormSection>
   );
@@ -1669,7 +1723,18 @@ export const WaterExtraSectionsView: React.FC<WaterExtraSectionsViewProps> = ({
           />
         );
       case 'samplingPoints':
-        return <SamplingPointsSection complianceId={complianceId} value={compliance.samplingPoints} canEdit={canEdit} onSaved={onSaved} />;
+        return (
+          <SamplingPointsSection
+            complianceId={complianceId}
+            value={{
+              samplingConducted: compliance.samplingConducted,
+              samplingClassification: compliance.samplingClassification,
+              samplingPoints: compliance.samplingPoints,
+            }}
+            canEdit={canEdit}
+            onSaved={onSaved}
+          />
+        );
       case 'previousInspection':
         return <PreviousInspectionSection complianceId={complianceId} value={compliance.previousInspectionSummary} canEdit={canEdit} onSaved={onSaved} />;
       case 'summaryOfFindings': {

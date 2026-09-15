@@ -56,6 +56,8 @@ function baseCompliance(): WaterComplianceView {
     wwtpConstructionUnits: null,
     wwtpConstructionCompletionDate: null,
     wwtpTreatmentUnitsUtilized: null,
+    samplingConducted: null,
+    samplingClassification: null,
     samplingPoints: [],
     previousInspectionSummary: { dateOfSampling: '', samplingStation: '', samplingTime: '', typeOfSample: '', parameters: [] },
     checklistDao200510: [],

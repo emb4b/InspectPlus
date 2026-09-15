@@ -92,6 +92,8 @@ export interface WaterComplianceView {
   wwtpConstructionUnits: string | null;
   wwtpConstructionCompletionDate: string | null;
   wwtpTreatmentUnitsUtilized: string | null;
+  samplingConducted: boolean | null;
+  samplingClassification: string | null;
   samplingPoints: SamplingPointCard[];
   previousInspectionSummary: PreviousInspectionState;
   checklistDao200510: ChecklistEntry[];
@@ -272,6 +274,8 @@ export function useInspectionReport(reportId: string | undefined): UseInspection
               wwtpConstructionUnits: c.wwtpConstructionUnits,
               wwtpConstructionCompletionDate: c.wwtpConstructionCompletionDate,
               wwtpTreatmentUnitsUtilized: c.wwtpTreatmentUnitsUtilized,
+              samplingConducted: c.samplingConducted,
+              samplingClassification: c.samplingClassification,
               samplingPoints: c.samplingPoints ?? [],
               previousInspectionSummary: {
                 dateOfSampling: c.previousInspectionSummary?.dateOfSampling ?? '',

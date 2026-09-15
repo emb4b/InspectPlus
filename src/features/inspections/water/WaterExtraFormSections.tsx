@@ -35,6 +35,7 @@ import {
   WWTP_TYPE_OTHERS,
   WWTP_CONDITION_OPTIONS,
   WWTP_CONDITION_OTHERS,
+  SAMPLING_CLASSIFICATION_OPTIONS,
 } from './waterChecklistData';
 import { TreatmentCheckboxGroup } from './TreatmentCheckboxGroup';
 import {
@@ -53,6 +54,8 @@ const YES_NO = [
   { label: 'Yes', value: 'yes' },
   { label: 'No', value: 'no' },
 ];
+
+const SAMPLING_CLASSIFICATION = SAMPLING_CLASSIFICATION_OPTIONS.map(o => ({ label: o, value: o }));
 
 interface WaterExtraFormSectionsViewProps {
   value: WaterComplianceFormState;
@@ -622,7 +625,28 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
       case 'samplingPoints':
         return (
           <FormSection icon="flask-outline" title="I. Water Quality Sampling">
-            {value.samplingPoints.map((pt, i) => {
+            <RadioGroup
+              label="Was water quality sampling conducted?"
+              options={YES_NO}
+              value={value.samplingConducted}
+              onChange={v => set('samplingConducted', v as 'yes' | 'no')}
+            />
+            {value.samplingConducted === 'yes' && (
+              <RadioGroup
+                label="Sampling classification"
+                options={SAMPLING_CLASSIFICATION}
+                value={value.samplingClassification || null}
+                onChange={v => set('samplingClassification', v)}
+              />
+            )}
+            {/* Points are hidden rather than cleared when the answer flips
+                to No; samplingForSave is what keeps the stored report
+                consistent. Unanswered still shows nothing to add - the
+                question comes first. */}
+            {value.samplingConducted === 'no' && (
+              <Text style={styles.emptyText}>No sampling conducted — sampling points are not applicable.</Text>
+            )}
+            {value.samplingConducted === 'yes' && value.samplingPoints.map((pt, i) => {
               const k = (field: string) => `samplingPoint:${i}:${field}`;
               const pk = (pi: number, field: string) => `samplingParam:${i}:${pi}:${field}`;
               return (
@@ -763,7 +787,9 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                 </View>
               );
             })}
-            <AddRowButton style={styles.addBtn} label="Add Sampling Point" onPress={addSamplingPoint} />
+            {value.samplingConducted === 'yes' && (
+              <AddRowButton style={styles.addBtn} label="Add Sampling Point" onPress={addSamplingPoint} />
+            )}
           </FormSection>
         );
 

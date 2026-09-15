@@ -96,6 +96,10 @@ export const WWTP_CONDITION_OPTIONS = [
 
 export const SAMPLE_TYPE_OPTIONS = ['Grab', 'Composite'];
 
+// Section 6I's gate: what kind of sampling the inspector conducted, asked
+// only once they say they conducted any. Stored as the label.
+export const SAMPLING_CLASSIFICATION_OPTIONS = ['Ambient', 'Effluent', 'Both'];
+
 // Section 5D's three treatment columns. A WWTP runs several units in each
 // stage at once - a screen and a grit chamber ahead of an equalization tank
 // is an ordinary train - so these are checkboxes rather than one choice,

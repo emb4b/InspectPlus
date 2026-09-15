@@ -94,6 +94,11 @@ export interface WaterComplianceFormState {
   wwtpConstructionUnits: string;
   wwtpConstructionCompletionDate: string;
   wwtpTreatmentUnitsUtilized: string;
+  // Section 6I's gate. Points are kept in state whatever the answer so
+  // flipping it doesn't destroy them - see samplingForSave for where the
+  // record stops being that lenient.
+  samplingConducted: 'yes' | 'no' | null;
+  samplingClassification: string;
   samplingPoints: SamplingPointCard[];
   previousInspection: PreviousInspectionState;
   checklistDao200510: ChecklistValue[];
@@ -172,6 +177,8 @@ export function emptyWaterComplianceForm(): WaterComplianceFormState {
     wwtpConstructionUnits: '',
     wwtpConstructionCompletionDate: '',
     wwtpTreatmentUnitsUtilized: '',
+    samplingConducted: null,
+    samplingClassification: '',
     samplingPoints: [],
     previousInspection: {
       dateOfSampling: '',
@@ -417,6 +424,40 @@ export interface WwtpConstructionRecord {
   wwtpConstructionUnits: string | null;
   wwtpConstructionCompletionDate: string | null;
   wwtpTreatmentUnitsUtilized: string | null;
+}
+
+// ── Water Quality Sampling ───────────────────────────────────────────────────
+// Section 6I. A report that says no sampling happened can't also list
+// sampling points, so a No clears them and the classification on save. A
+// report that was never asked (null - written before the question existed)
+// keeps its points as they are.
+
+export interface SamplingRecord {
+  samplingConducted: boolean | null;
+  samplingClassification: string | null;
+  samplingPoints: SamplingPointCard[];
+}
+
+export function samplingForSave(
+  conducted: 'yes' | 'no' | boolean | null,
+  classification: string,
+  points: SamplingPointCard[],
+): SamplingRecord {
+  if (conducted === null) {
+    return { samplingConducted: null, samplingClassification: null, samplingPoints: points };
+  }
+  const yes = conducted === true || conducted === 'yes';
+  return {
+    samplingConducted: yes,
+    samplingClassification: yes ? classification.trim() || null : null,
+    samplingPoints: yes ? points : [],
+  };
+}
+
+export function describeSampling(conducted: boolean | null, classification: string | null): string {
+  if (conducted === null) return '—';
+  if (!conducted) return 'No — not applicable';
+  return classification ? `Yes — ${classification}` : 'Yes';
 }
 
 // `underConstruction` is question 2 as the caller holds it - the form's
