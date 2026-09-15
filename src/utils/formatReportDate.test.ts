@@ -13,4 +13,12 @@ describe('formatReportDate', () => {
     expect(formatReportDate('')).toBe('');
     expect(formatReportDate('not a date')).toBe('');
   });
+  it('rejects impossible calendar days', () => {
+    expect(formatReportDate('2026-02-30')).toBe('');
+    expect(formatReportDate('2026-09-99')).toBe('');
+    expect(formatReportDate('2026-00-10')).toBe('');
+  });
+  it('accepts leap day when valid', () => {
+    expect(formatReportDate('2024-02-29')).toBe('29 February 2024');
+  });
 });
