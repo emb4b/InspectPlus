@@ -8,6 +8,7 @@ import { Colors } from '../../../constants/colors';
 import { formatEstablishmentLocation } from '../../../utils/establishmentLocation';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { useInspectionReport } from '../hooks/useInspectionReport';
+import { useMainTabChange } from '../hooks/useMainTabChange';
 import { deleteInspectionReportRecord } from '../reportPersistence';
 import { INSPECTION_TYPE_LABELS, canManageAllRecords, useEstablishment } from '../../establishments/hooks/useEstablishment';
 import { InspectionReportHeader, DEFAULT_REPORT_DETAIL_TABS } from './InspectionReportHeader';
@@ -43,6 +44,7 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
   // tracked continuously (continuous per-frame updates forced a layout pass
   // on every scroll frame, which was expensive enough to drop frames).
   const { collapsed, onScroll } = useHeaderScroll();
+  const handleMainChange = useMainTabChange(activeMain, setActiveMain, scrollRef);
   const { session, role } = useAuthContext();
   const currentUid = (session as { user?: { id?: string } } | null)?.user?.id ?? '';
   // Developer accounts get unrestricted write access — including editing
@@ -150,7 +152,7 @@ export const InspectionReportDetailScreen: React.FC<InspectionReportDetailScreen
           inspectorUid={report.inspectorUid}
           tabs={tabs}
           activeMain={activeMainTab.key}
-          onMainChange={setActiveMain}
+          onMainChange={handleMainChange}
           onBack={() => router.back()}
           onDelete={handleDelete}
           collapsed={collapsed}

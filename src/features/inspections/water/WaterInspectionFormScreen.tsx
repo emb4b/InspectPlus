@@ -18,6 +18,7 @@ import { PurposeOfInspectionTab } from '../components/PurposeOfInspectionTab';
 import { DenrPermitsFormSection } from '../components/DenrPermitsFormSection';
 import { SaveBar } from '../components/SaveBar';
 import { useReportFormState } from '../hooks/useReportFormState';
+import { useMainTabChange } from '../hooks/useMainTabChange';
 import { createEstablishmentRecord } from '../establishmentPersistence';
 import { buildGeneralInfoFromEstablishment, GeneralInfoFormState, PurposeFormState } from '../types';
 import { WaterExtraFormSectionsView } from './WaterExtraFormSections';
@@ -53,6 +54,7 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
   );
   const scrollRef = useRef<ScrollView>(null);
   const { onScroll } = useHeaderScroll();
+  const handleMainChange = useMainTabChange(activeMain, setActiveMain, scrollRef);
   // Set on the first save() (silent or explicit) and reused on every save()
   // after that — save() itself updates rather than recreates once it sees
   // a complianceIdRef, matching the create-or-update pattern of save()'s own
@@ -192,7 +194,7 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
           reportType={REPORT_TYPE}
           tabs={tabs}
           activeMain={activeMainTab.key}
-          onMainChange={setActiveMain}
+          onMainChange={handleMainChange}
         />
 
         <KeyboardAwareScrollView
