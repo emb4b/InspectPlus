@@ -76,6 +76,10 @@ function mapPermits(permits: readonly PermitSnapshotItem[]): TemplateData {
 const DOC_ROWS: [string, string][] = [
   ['record_file_folder', 'Record File Folder'],
   ...DOCUMENTS_REVIEWED_OPTIONS.filter(o => o !== 'Others').map(o => [o.toLowerCase().replace(/[^a-z0-9]+/g, '_'), o] as [string, string]),
+  // Hazwaste's own form prints "HWMS" for its third documents-reviewed box
+  // where Water/Air/EIA print "OPMS" — every mapper output carries both
+  // keys so any of the four templates can print whichever one it has.
+  ['hwms', 'HWMS'],
 ];
 
 function mapDocuments(reviewed: unknown): TemplateData {

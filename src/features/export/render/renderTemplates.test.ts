@@ -3,7 +3,7 @@ import path from 'path';
 import PizZip from 'pizzip';
 import { renderDocx } from './renderDocx';
 import { mapBundle } from '../mappers';
-import { fullWaterBundle, emptyWaterBundle, signatories } from '../mappers/fixtures';
+import { emptyWaterBundle, fullSurveyBundle, fullWaterBundle, signatories } from '../mappers/fixtures';
 import { TICKED } from '../mappers/primitives';
 
 const TEMPLATES_DIR = path.join(__dirname, '..', '..', '..', '..', 'assets', 'templates');
@@ -33,5 +33,34 @@ describe('Water Monitoring.docx renders', () => {
     expect(xml).not.toMatch(/\{[#/@]?[A-Za-z0-9_]+\}/);
     // 3 outlet rows + 2 component rows survive padding
     expect(xml).toContain('Receiving Body of Water');
+  });
+});
+
+describe('the other tagged templates render', () => {
+  it('Air Monitoring.docx with no tag left behind', () => {
+    const bundle = { ...fullWaterBundle(), report: { ...fullWaterBundle().report, reportType: 'air_monitoring' }, compliance: { kind: 'none' as const } };
+    const xml = docXml(renderDocx(load('Air Monitoring.docx'), mapBundle(bundle, ctx), []));
+    expect(xml).not.toMatch(/\{[#/@]?[A-Za-z0-9_]+\}/);
+    expect(xml).toContain('Alpha Water Refilling');
+  });
+
+  it('EIA.docx with no tag left behind', () => {
+    const bundle = { ...fullWaterBundle(), report: { ...fullWaterBundle().report, reportType: 'eia' }, compliance: { kind: 'none' as const } };
+    const xml = docXml(renderDocx(load('EIA.docx'), mapBundle(bundle, ctx), []));
+    expect(xml).not.toMatch(/\{[#/@]?[A-Za-z0-9_]+\}/);
+    expect(xml).toContain('Alpha Water Refilling');
+  });
+
+  it('Hazardous Waste Generators.docx with no tag left behind', () => {
+    const bundle = { ...fullWaterBundle(), report: { ...fullWaterBundle().report, reportType: 'hazardous_waste' }, compliance: { kind: 'none' as const } };
+    const xml = docXml(renderDocx(load('Hazardous Waste Generators.docx'), mapBundle(bundle, ctx), []));
+    expect(xml).not.toMatch(/\{[#/@]?[A-Za-z0-9_]+\}/);
+    expect(xml).toContain('Alpha Water Refilling');
+  });
+
+  it('Survey.docx with no tag left behind', () => {
+    const xml = docXml(renderDocx(load('Survey.docx'), mapBundle(fullSurveyBundle(), ctx), []));
+    expect(xml).not.toMatch(/\{[#/@]?[A-Za-z0-9_]+\}/);
+    expect(xml).toContain('Bucayao Bridge');
   });
 });

@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import PizZip from 'pizzip';
 import { mapBundle } from '../mappers';
-import { fullWaterBundle, signatories } from '../mappers/fixtures';
+import { fullSurveyBundle, fullWaterBundle, signatories } from '../mappers/fixtures';
 import type { TemplateData } from '../types';
 
 const TEMPLATES_DIR = path.join(__dirname, '..', '..', '..', '..', 'assets', 'templates');
@@ -46,8 +46,20 @@ function keysOf(data: TemplateData) {
 
 const cases: [string, TemplateData][] = [
   ['Water Monitoring.docx', mapBundle(fullWaterBundle(), ctx)],
-  // Task 13 adds: Air Monitoring, EIA, Hazardous Waste Generators (mapCommon), Survey (mapSurvey)
+  ['Air Monitoring.docx', mapBundle({ ...fullWaterBundle(), report: { ...fullWaterBundle().report, reportType: 'air_monitoring' }, compliance: { kind: 'none' } }, ctx)],
+  ['EIA.docx', mapBundle({ ...fullWaterBundle(), report: { ...fullWaterBundle().report, reportType: 'eia' }, compliance: { kind: 'none' } }, ctx)],
+  ['Hazardous Waste Generators.docx', mapBundle({ ...fullWaterBundle(), report: { ...fullWaterBundle().report, reportType: 'hazardous_waste' }, compliance: { kind: 'none' } }, ctx)],
+  ['Survey.docx', mapBundle(fullSurveyBundle(), ctx)],
 ];
+
+// mapCommon's DOC_ROWS carries both `doc_cb_opms` and `doc_cb_hwms` on every
+// report type, because Hazwaste's own form prints "HWMS" where Water/Air/EIA
+// print "OPMS" for the same documents-reviewed box — one shared mapper, two
+// possible labels. No single template prints both: ignore whichever one a
+// given template doesn't use in the "prints every key" direction only (the
+// other direction, "has no tag the mapper does not fill", already passes
+// since neither key is ever a stray tag).
+const PRINTS_ONE_OF = new Set(['doc_cb_opms', 'doc_cb_hwms']);
 
 describe.each(cases)('%s', (file, data) => {
   const tags = tagsOf(file);
@@ -58,7 +70,7 @@ describe.each(cases)('%s', (file, data) => {
     expect([...tags.loops].filter(t => !keys.loops.has(t)).sort()).toEqual([]);
   });
   it('prints every key the mapper produces', () => {
-    expect([...keys.plain].filter(k => !tags.plain.has(k)).sort()).toEqual([]);
+    expect([...keys.plain].filter(k => !tags.plain.has(k) && !PRINTS_ONE_OF.has(k)).sort()).toEqual([]);
     expect([...keys.loops].filter(k => !tags.loops.has(k)).sort()).toEqual([]);
   });
   it('uses the photo drawing raw tag', () => {
