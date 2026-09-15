@@ -6,6 +6,7 @@ import { FormSection } from './FormSection';
 import { Colors } from '../../design/colors';
 import { Spacing } from '../../design/spacing';
 import { Type } from '../../design/typography';
+import { ReportThemeProvider } from '../../core/providers/ReportThemeProvider';
 
 type Renderer = TestRenderer.ReactTestRenderer;
 
@@ -109,5 +110,47 @@ describe('FormSection behavior (unchanged by this task)', () => {
       </FormSection>,
     );
     expect(r.root.findAll((n) => n.type === Text && n.props.testID === 'section-body')).toHaveLength(1);
+  });
+});
+
+// The section icon takes the report's accent when a report screen provides
+// one, so every section of a water form carries a trace of water blue. It is
+// the only thing that changes: the title stays navy and the rule stays grey,
+// because the icon is identity and those are structure. Off a report screen
+// there is no accent and the icon keeps its navy.
+describe('FormSection report accent', () => {
+  const iconColor = (element: React.ReactElement) => {
+    let r!: TestRenderer.ReactTestRenderer;
+    TestRenderer.act(() => { r = TestRenderer.create(element); });
+    return r.root.findByType(Ionicons).props.color;
+  };
+
+  it('paints the icon navy outside a report screen', () => {
+    expect(iconColor(<FormSection icon="water-outline" title="Water Sources"><Text>x</Text></FormSection>)).toBe(
+      Colors.navy,
+    );
+  });
+
+  it("paints the icon in the report type's accent inside one", () => {
+    expect(
+      iconColor(
+        <ReportThemeProvider reportType="water_monitoring">
+          <FormSection icon="water-outline" title="Water Sources"><Text>x</Text></FormSection>
+        </ReportThemeProvider>,
+      ),
+    ).toBe(Colors.water.text);
+  });
+
+  it('leaves the title navy even when the icon is accented', () => {
+    let r!: TestRenderer.ReactTestRenderer;
+    TestRenderer.act(() => {
+      r = TestRenderer.create(
+        <ReportThemeProvider reportType="water_monitoring">
+          <FormSection icon="water-outline" title="Water Sources"><Text>x</Text></FormSection>
+        </ReportThemeProvider>,
+      );
+    });
+    const title = r.root.findAll((n) => n.type === Text && n.props.children === 'Water Sources')[0];
+    expect(flattenStyle(title.props.style).color).toBe(Colors.navy);
   });
 });

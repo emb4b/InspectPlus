@@ -91,15 +91,26 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
   collapsed,
 }) => {
   const typeMeta = getReportTypeMeta(reportType);
-  const IconAsset = typeMeta.iconAsset;
   const isSubmitted = reportStatus === 'submitted';
   // Same computation the report's own card runs in the list — a report that
-  // shows a ribbon there must show the matching chip here.
+  // shows a ribbon there must be flagged just as plainly here. `fill` is the
+  // saturated hue the list card's ribbon paints with; `bg`/`border` are the
+  // tint the list card wears. A flagged draft should alarm, not murmur.
   const urgency = getReportUrgency(inspectionDate, reportStatus);
   const urgencyTone =
     urgency.level === 'overdue'
-      ? { badgeBg: Colors.hazwaste.badgeBg, text: Colors.hazwaste.badgeText }
-      : { badgeBg: Colors.warning.badgeBg, text: Colors.warning.text };
+      ? { fill: Colors.hazwaste.text, bg: Colors.hazwaste.bg, border: Colors.hazwaste.border }
+      : { fill: Colors.warning.text, bg: Colors.warning.bg, border: Colors.warning.border };
+  const flagged = urgency.level !== 'none';
+  // The meta chips wear the type's border and icon in both states, as the
+  // R.A. pill does; only their fill follows the card — the type's tint while
+  // it is plain, white once it is tinted so they sit on the alarm colour
+  // rather than sinking into it.
+  const chipTone = {
+    backgroundColor: flagged ? Colors.white : typeMeta.bgColor,
+    borderColor: typeMeta.borderColor,
+  };
+  const chipIconColor = typeMeta.textColor;
 
   // collapsed is HeaderScrollContext's own animated 0..1 value (a single,
   // bounded transition per threshold crossing — see HeaderScrollContext) —
@@ -227,15 +238,43 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
         )}
       </View>
 
-      <View style={styles.card}>
+      {/* Identity versus alarm. The border and the thick leading edge always
+          say what kind of report this is, in the type's own colours on a
+          white ground. A flagged draft hands both over to the urgency hue and
+          adds the list card's tint — so it is visibly flagged the moment the
+          screen opens and stays flagged through the collapse, since tint and
+          edge are the parts of the card that never change shape. The type
+          never tints on its own: hazwaste's red is the overdue red, and an
+          overdue hazwaste report has to look different from a hazwaste one.
+          The list card's ribbon is not borrowed: its geometry is calibrated
+          to that card's centred tile and would cross this top-pinned one. */}
+      <View
+        style={[
+          styles.card,
+          flagged
+            ? {
+                backgroundColor: urgencyTone.bg,
+                borderColor: urgencyTone.border,
+                borderLeftColor: urgencyTone.fill,
+              }
+            : { borderColor: typeMeta.borderColor, borderLeftColor: typeMeta.textColor },
+        ]}>
         {/* Hidden until the title block's height is measured, so the icon
             appears at its final size instead of visibly popping from the 44
             default to the measured size once layout settles — see
             EstablishmentHeaderCard for the same treatment. */}
         <View style={[styles.topRow, titleBlockHeight === null && styles.topRowMeasuring]}>
-          <Reanimated.View style={[styles.iconWrap, iconBoxStyle]}>
+          {/* The type's own glyph in the type's own colours — the same tile
+              the list card paints, so the report looks like one kind of
+              thing there and here. Type colours even on a flagged card: the
+              alarm lives on the card's ground, not on what the report is. */}
+          <Reanimated.View style={[styles.iconWrap, { backgroundColor: typeMeta.bgColor }, iconBoxStyle]}>
             <Reanimated.View style={iconGlyphStyle}>
-              <Ionicons name="document-text" size={iconGlyphSize} color={Colors.green} />
+              <Ionicons
+                name={typeMeta.iconName as keyof typeof Ionicons.glyphMap}
+                size={iconGlyphSize}
+                color={typeMeta.textColor}
+              />
             </Reanimated.View>
           </Reanimated.View>
           <View style={styles.titleInfo}>
@@ -247,7 +286,7 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
                   unlike the meta chips below, which repeat information the
                   form itself carries. */}
               <View style={styles.locationRow}>
-                <Ionicons name="location" size={11} color={Colors.green} style={styles.locationIcon} />
+                <Ionicons name="location" size={11} color={typeMeta.textColor} style={styles.locationIcon} />
                 <AppText
                   variant="marquee"
                   text={establishmentLocation}
@@ -278,25 +317,26 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
             )}
           </View>
           <View style={[styles.badgeGroup, badgesCollapsed && styles.badgeGroupInline]}>
-            {/* The law citation (e.g. "R.A. 9275") stands in for the full report
-                type name here. Stacked top-to-bottom rather than side by side —
-                a row of both pills was wide enough to squeeze the name/address
-                column into truncating; stacked, badgeGroup only needs to be as
-                wide as the wider single pill.
+            {/* Stacked top-to-bottom, urgency first then filing status. Two
+                pills fit beside a two-line title block; the law pill that
+                used to lead the stack is gone, its job done by every other
+                type-coloured element on the card.
 
-                Collapsed, both drop their labels and sit inline as icons: the
-                pair then costs one line instead of two, which is what let the
-                header actually compact down once the icon box stopped
-                reserving its expanded footprint. The labels they lose are
-                re-attached as accessibility names, since an icon alone still
-                has to announce which law and which status it stands for. */}
+                Collapsed, both drop their labels and sit inline as icons, so
+                the pair costs one line instead of two. The labels they lose
+                are re-attached as accessibility names. */}
             {badgesCollapsed ? (
               <>
-                <View
-                  style={[styles.badgeIcon, { backgroundColor: typeMeta.bgColor }]}
-                  accessibilityLabel={typeMeta.law || typeMeta.label}>
-                  {IconAsset && <IconAsset width={14} height={14} />}
-                </View>
+                {/* First, and solid white on the ribbon's hue where the other
+                    chips are pale tints — the alarm has to survive the
+                    collapse and lead it. */}
+                {urgency.level !== 'none' && (
+                  <View
+                    style={[styles.badgeIcon, { backgroundColor: urgencyTone.fill }]}
+                    accessibilityLabel={urgencySpokenLabel(urgency)}>
+                    <Ionicons name="alert-circle" size={14} color={Colors.textWhite} />
+                  </View>
+                )}
                 <View
                   style={[
                     styles.badgeIcon,
@@ -309,13 +349,6 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
                     color={isSubmitted ? Colors.green : Colors.warning.text}
                   />
                 </View>
-                {urgency.level !== 'none' && (
-                  <View
-                    style={[styles.badgeIcon, { backgroundColor: urgencyTone.badgeBg }]}
-                    accessibilityLabel={urgencySpokenLabel(urgency)}>
-                    <Ionicons name="alert-circle" size={14} color={urgencyTone.text} />
-                  </View>
-                )}
                 {syncStatus === 'pending' && (
                   <View
                     style={[styles.badgeIcon, { backgroundColor: Colors.pendingMuted }]}
@@ -341,16 +374,37 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
               </>
             ) : (
               <>
-                <View style={[styles.pill, { backgroundColor: typeMeta.bgColor }]}>
-                  {IconAsset && <IconAsset width={11} height={11} />}
-                  <Text style={[styles.pillText, { color: typeMeta.textColor }]} numberOfLines={1}>
-                    {typeMeta.law || typeMeta.label}
-                  </Text>
-                </View>
+                {/* How the draft sits against its filing deadline, at the top
+                    of the column — the slot the eye goes to for a card's
+                    status. Solid, white on the ribbon's hue, where the Draft
+                    pill below is pale: the two are different facts and should
+                    not read as twins, and a draft nearing its deadline should
+                    look alarming, not calm. Same short wording as the corner
+                    ribbon its card wears in the list. It fits here because
+                    the law pill is gone: tile, pin, chips, edge and tabs all
+                    say the type, and the law is a function of the type. */}
+                {urgency.level !== 'none' && (
+                  <View
+                    style={[styles.urgencyStrip, { backgroundColor: urgencyTone.fill }]}
+                    accessibilityLabel={urgencySpokenLabel(urgency)}>
+                    <Ionicons name="alert-circle" size={12} color={Colors.textWhite} />
+                    <Text style={styles.urgencyStripText}>{urgencyShortLabel(urgency)}</Text>
+                  </View>
+                )}
+                {/* Pale amber on a pale amber tint is invisible, so on a
+                    flagged card the pill goes white with an outline in its
+                    own colour. Submitted never flags, but the rule is
+                    written for both so it can't diverge if that changes. */}
                 <View
                   style={[
                     styles.statusBadge,
-                    { backgroundColor: isSubmitted ? Colors.greenMuted : Colors.warning.badgeBg },
+                    flagged
+                      ? {
+                          backgroundColor: Colors.white,
+                          borderWidth: 1,
+                          borderColor: isSubmitted ? Colors.green : Colors.warning.text,
+                        }
+                      : { backgroundColor: isSubmitted ? Colors.greenMuted : Colors.warning.badgeBg },
                   ]}>
                   {/* Same glyph the collapsed chip uses, so the badge reads as
                       the same thing in both states rather than as two
@@ -369,20 +423,6 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
                     {isSubmitted ? 'Submitted' : 'Draft'}
                   </Text>
                 </View>
-                {/* A single report has no count to give, so it carries the
-                    state instead — same wording as the corner ribbon its card
-                    wears in the list, so the report reads the same in both
-                    places. */}
-                {urgency.level !== 'none' && (
-                  <View
-                    style={[styles.statusBadge, { backgroundColor: urgencyTone.badgeBg }]}
-                    accessibilityLabel={urgencySpokenLabel(urgency)}>
-                    <Ionicons name="alert-circle" size={11} color={urgencyTone.text} />
-                    <Text style={[styles.statusBadgeText, { color: urgencyTone.text }]}>
-                      {urgencyShortLabel(urgency)}
-                    </Text>
-                  </View>
-                )}
               </>
             )}
           </View>
@@ -392,8 +432,8 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
           <View style={styles.divider} />
 
           <View style={styles.metaRow}>
-            <View style={[styles.metaChip, styles.metaChipNarrow]}>
-              <Ionicons name="calendar-outline" size={11} color={Colors.textLight} />
+            <View style={[styles.metaChip, styles.metaChipNarrow, chipTone]}>
+              <Ionicons name="calendar-outline" size={11} color={chipIconColor} />
               <Text style={styles.metaText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.92}>
                 {formatDate(inspectionDate)}
               </Text>
@@ -402,14 +442,14 @@ export const InspectionReportHeader: React.FC<InspectionReportHeaderProps> = ({
                 chips' content ("Control No. 2026-08-09-000123") — giving this
                 one more of the row's width means it doesn't need to shrink
                 its text nearly as much to fit, unlike the other two. */}
-            <View style={[styles.metaChip, styles.metaChipWide]}>
-              <Ionicons name="pricetag-outline" size={11} color={Colors.textLight} />
+            <View style={[styles.metaChip, styles.metaChipWide, chipTone]}>
+              <Ionicons name="pricetag-outline" size={11} color={chipIconColor} />
               <Text style={styles.metaText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.92}>
                 {reportControlNo ? `Control No. ${reportControlNo}` : 'No control number yet'}
               </Text>
             </View>
-            <View style={[styles.metaChip, styles.metaChipNarrow]}>
-              <Ionicons name="person-circle-outline" size={12} color={Colors.textLight} />
+            <View style={[styles.metaChip, styles.metaChipNarrow, chipTone]}>
+              <Ionicons name="person-circle-outline" size={12} color={chipIconColor} />
               <Text style={styles.metaText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.92}>
                 {inspectorLabel}
               </Text>
@@ -465,6 +505,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderWidth: 1,
     borderColor: Colors.border,
+    // Always present; its colour is the card's identity (the report type)
+    // or its alarm (the urgency), set inline above.
+    borderLeftWidth: 5,
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -490,7 +533,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: Colors.greenMuted,
+    // backgroundColor comes from the type, set inline.
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -528,19 +571,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  pill: {
-    flexShrink: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 20,
-  },
-  pillText: {
-    fontSize: 10.5,
-    fontWeight: '700',
-  },
   locationRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -560,6 +590,23 @@ const styles = StyleSheet.create({
   },
   locationContainer: {
     flex: 1,
+  },
+  // A solid stamp at the head of the badge column: its fill is applied
+  // inline from urgencyTone since it differs by level, and the text is white
+  // on it. The column's own gap spaces it from the status pill below.
+  urgencyStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  urgencyStripText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Colors.textWhite,
+    letterSpacing: 0.2,
   },
   syncRow: {
     flexDirection: 'row',

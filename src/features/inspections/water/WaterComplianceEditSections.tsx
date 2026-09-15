@@ -9,7 +9,9 @@ import {
   FormSection,
   TextField,
   SelectField,
+  ComboInput,
   DateField,
+  TimeField,
   RadioGroup,
   DynamicRowTable,
   ChecklistTable,
@@ -27,11 +29,12 @@ import {
   ChecklistList,
   ConditionsList,
   DocumentsChips,
+  YnBadge,
   styles as sharedStyles,
 } from '../components/ComplianceReadPrimitives';
 import type { WaterComplianceView as WaterComplianceData } from '../hooks/useInspectionReport';
 import {
-  DAO_2005_10_CHECKLIST,
+  WATER_FINDINGS_CHECKLIST,
   DOCUMENTS_REVIEWED_OPTIONS,
   WATER_SOURCE_TYPES,
   WASTEWATER_USE_TYPES,
@@ -41,9 +44,17 @@ import {
   NON_WWTP_TREATMENT_OTHERS,
   NON_WWTP_TREATMENT_PROMPT,
   NON_WWTP_TREATMENT_OTHER_LABEL,
+  PRIMARY_TREATMENT_OPTIONS,
+  BIOLOGICAL_TREATMENT_OPTIONS,
+  CHEMICAL_TREATMENT_OPTIONS,
   WWTP_TYPE_OPTIONS,
+  WWTP_TYPE_OTHERS,
   WWTP_CONDITION_OPTIONS,
+  WWTP_CONDITION_OTHERS,
+  SAMPLING_CLASSIFICATION_OPTIONS,
+  WATER_QUALITY_PARAMETERS,
 } from './waterChecklistData';
+import { TreatmentCheckboxGroup } from './TreatmentCheckboxGroup';
 import {
   WwtpDetailCard,
   WwtpComponentCard,
@@ -58,9 +69,27 @@ import {
   emptyDpCondition,
   nonWwtpTreatmentFor,
   describeNonWwtpTreatment,
+  decodeReceivingBodyOfWater,
+  wwtpDetailForSave,
+  describeReceivingBodyOfWater,
+  decodeWwtpComponent,
+  wwtpComponentForSave,
+  describeTreatment,
+  wwtpTypeOtherForSave,
+  describeWwtpType,
+  wwtpConditionOtherForSave,
+  describeWwtpCondition,
+  wwtpConstructionForSave,
+  samplingForSave,
+  describeSampling,
+  findingsEntriesForSave,
+  findingsValuesFromEntries,
+  StoredFindingsEntry,
+  previousInspectionForSave,
 } from './waterTypes';
 import type { ComplianceWater } from '../../../db/models';
 import type { WaterMainTabDef } from './waterReportTabs';
+import { getWaterbodyGroups, WATERBODY_NOT_LISTED } from '../../../constants/waterbodies';
 
 const YES_NO = [
   { label: 'Yes', value: 'yes' },
@@ -366,13 +395,17 @@ export const TreatmentSystemTypeSection: React.FC<{
 export const WwtpTypeSection: React.FC<{
   complianceId: string;
   value: string | null;
+  otherValue: string | null;
   canEdit: boolean;
   onSaved: () => void;
-}> = ({ complianceId, value, canEdit, onSaved }) => {
-  const section = useEditableSection<string | null>({
-    value,
-    onSave: async wwtpType => {
-      await patchComplianceWater(complianceId, { wwtpType: wwtpType || null });
+}> = ({ complianceId, value, otherValue, canEdit, onSaved }) => {
+  const section = useEditableSection<{ wwtpType: string; wwtpTypeOther: string }>({
+    value: { wwtpType: value || '', wwtpTypeOther: otherValue || '' },
+    onSave: async draft => {
+      await patchComplianceWater(complianceId, {
+        wwtpType: draft.wwtpType || null,
+        wwtpTypeOther: wwtpTypeOtherForSave(draft.wwtpType, draft.wwtpTypeOther) || null,
+      });
       onSaved();
     },
   });
@@ -385,9 +418,29 @@ export const WwtpTypeSection: React.FC<{
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
       {section.editing ? (
-        <SelectField label="WWTP Type" value={section.draft || ''} options={WWTP_TYPE_OPTIONS} onSelect={v => section.setDraft(v)} />
+        <>
+          <SelectField
+            label="WWTP Type"
+            value={section.draft.wwtpType}
+            options={WWTP_TYPE_OPTIONS}
+            onSelect={v => section.setDraft({ ...section.draft, wwtpType: v })}
+          />
+          {section.draft.wwtpType === WWTP_TYPE_OTHERS && (
+            <TextField
+              label="Specify the type of WWTP"
+              value={section.draft.wwtpTypeOther}
+              onChangeText={t => section.setDraft({ ...section.draft, wwtpTypeOther: t })}
+              placeholder="e.g. Membrane bioreactor"
+              returnKeyType="done"
+            />
+          )}
+        </>
       ) : (
-        <TextField label="WWTP Type" value={section.draft || '—'} readOnly />
+        <TextField
+          label="WWTP Type"
+          value={describeWwtpType(section.draft.wwtpType, section.draft.wwtpTypeOther)}
+          readOnly
+        />
       )}
       {section.error && <Text style={styles.errorText}>{section.error}</Text>}
     </FormSection>
@@ -399,18 +452,40 @@ export const WwtpDetailsSection: React.FC<{
   value: WwtpDetailCard[];
   canEdit: boolean;
   onSaved: () => void;
-}> = ({ complianceId, value, canEdit, onSaved }) => {
+  province: string;
+}> = ({ complianceId, value, canEdit, onSaved, province }) => {
   const fieldRefs = useRef<Record<string, TextInput | null>>({});
   const focus = (key: string) => focusInput(fieldRefs.current[key]);
   const setRef = (key: string) => (el: TextInput | null) => { fieldRefs.current[key] = el; };
 
   const section = useEditableSection<WwtpDetailCard[]>({
-    value,
+    // A stored row holds one string; the form needs it split into the
+    // dropdown's selection and the specify box beside it.
+    value: value.map(d => {
+      const { selection, other } = decodeReceivingBodyOfWater(d.receivingBodyOfWater, province);
+      return { ...d, receivingBodyOfWater: selection, receivingBodyOfWaterOther: other };
+    }),
     onSave: async wwtpDetails => {
-      await patchComplianceWater(complianceId, { wwtpDetails });
+      await patchComplianceWater(complianceId, {
+        wwtpDetails: wwtpDetails.map(d => wwtpDetailForSave(d)),
+      });
       onSaved();
     },
   });
+
+  // The escape hatch is its own trailing group, never folded into an EMB
+  // classification heading, and filing it under one would read as though
+  // "Not listed (specify)" were itself a classified waterbody.
+  // getWaterbodyGroups returns the bundled dataset's own arrays, so we
+  // spread into a new outer array rather than pushing into any of its
+  // groups' option arrays.
+  const waterbodyGroups = React.useMemo(
+    () => [
+      ...getWaterbodyGroups(province),
+      { label: 'Not on the list', options: [WATERBODY_NOT_LISTED] },
+    ],
+    [province],
+  );
 
   const updateDetail = (i: number, patch: Partial<WwtpDetailCard>) => {
     const rows = section.draft.slice();
@@ -504,20 +579,16 @@ export const WwtpDetailsSection: React.FC<{
                 onChangeText={t => updateDetail(i, { outletLocation: t })}
                 returnKeyType="next"
                 blurOnSubmit={false}
-                onSubmitEditing={() => focus(k('receivingBodyOfWater'))}
+                onSubmitEditing={() => focus(k('flowMeterDevice'))}
 
               />
             </View>
             <View style={styles.row}>
-              <TextField
-                ref={setRef(k('receivingBodyOfWater'))}
-                label="Receiving Body of Water"
+              <SelectField
+                label="Receiving Body of Water (Water Classification)"
                 value={d.receivingBodyOfWater}
-                onChangeText={t => updateDetail(i, { receivingBodyOfWater: t })}
-                returnKeyType="next"
-                blurOnSubmit={false}
-                onSubmitEditing={() => focus(k('flowMeterDevice'))}
-
+                groups={waterbodyGroups}
+                onSelect={v => updateDetail(i, { receivingBodyOfWater: v })}
               />
               <TextField
                 ref={setRef(k('flowMeterDevice'))}
@@ -530,6 +601,20 @@ export const WwtpDetailsSection: React.FC<{
 
               />
             </View>
+            {d.receivingBodyOfWater === WATERBODY_NOT_LISTED && (
+              <View style={styles.row}>
+                <TextField
+                  ref={setRef(k('receivingBodyOfWaterOther'))}
+                  label="Specify"
+                  value={d.receivingBodyOfWaterOther}
+                  onChangeText={t => updateDetail(i, { receivingBodyOfWaterOther: t })}
+                  placeholder="e.g. Sapa Creek"
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => focus(k('flowRate'))}
+                />
+              </View>
+            )}
             <View style={styles.row}>
               <TextField
                 ref={setRef(k('flowRate'))}
@@ -551,7 +636,7 @@ export const WwtpDetailsSection: React.FC<{
               { label: 'Design Capacity', value: d.designCapacity },
               { label: 'Annual Maintenance Cost', value: d.annualMaintenanceCost },
               { label: 'Outlet Location', value: d.outletLocation },
-              { label: 'Receiving Body of Water', value: d.receivingBodyOfWater },
+              { label: 'Receiving Body of Water (Water Classification)', value: describeReceivingBodyOfWater(d) },
               { label: 'Flow Meter Device', value: d.flowMeterDevice },
               { label: 'Flow Rate', value: d.flowRate },
             ]}
@@ -564,9 +649,13 @@ export const WwtpDetailsSection: React.FC<{
   );
 };
 
+// `value` arrives as stored JSON rather than WwtpComponentCard[]: rows
+// written before section 5D became checkboxes hold a comma-separated string
+// where each treatment array now is, so the shape is only settled once
+// decodeWwtpComponent has read it.
 export const WwtpComponentsSection: React.FC<{
   complianceId: string;
-  value: WwtpComponentCard[];
+  value: Record<string, unknown>[];
   canEdit: boolean;
   onSaved: () => void;
 }> = ({ complianceId, value, canEdit, onSaved }) => {
@@ -575,9 +664,13 @@ export const WwtpComponentsSection: React.FC<{
   const setRef = (key: string) => (el: TextInput | null) => { fieldRefs.current[key] = el; };
 
   const section = useEditableSection<WwtpComponentCard[]>({
-    value,
+    // Rows written by an older build hold comma-separated strings where the
+    // arrays now are; decodeWwtpComponent reads both shapes.
+    value: value.map(c => decodeWwtpComponent(c)),
     onSave: async wwtpComponents => {
-      await patchComplianceWater(complianceId, { wwtpComponents });
+      await patchComplianceWater(complianceId, {
+        wwtpComponents: wwtpComponents.map(c => wwtpComponentForSave(c)),
+      });
       onSaved();
     },
   });
@@ -619,49 +712,49 @@ export const WwtpComponentsSection: React.FC<{
                 onChangeText={t => updateComponent(i, { outletNo: t })}
                 returnKeyType="next"
                 blurOnSubmit={false}
-                onSubmitEditing={() => focus(k('primaryTreatment'))}
+                onSubmitEditing={() => focus(k('wwtp'))}
 
               />
+              {/* Chain ends here: what follows is checkbox groups, not text,
+                  so there is nothing left for "next" to reach. */}
               <TextField
-                ref={setRef(k('primaryTreatment'))}
-                label="Primary Treatment"
-                value={c.primaryTreatment}
-                onChangeText={t => updateComponent(i, { primaryTreatment: t })}
-                hint="Comma-separated"
-                returnKeyType="next"
-                blurOnSubmit={false}
-                onSubmitEditing={() => focus(k('biologicalTreatment'))}
+                ref={setRef(k('wwtp'))}
+                label="WWTP"
+                value={c.wwtp}
+                onChangeText={t => updateComponent(i, { wwtp: t })}
+                placeholder="e.g. Septic Tank"
+                returnKeyType="done"
 
               />
             </View>
-            <View style={styles.row}>
-              <TextField
-                ref={setRef(k('biologicalTreatment'))}
-                label="Biological Treatment"
-                value={c.biologicalTreatment}
-                onChangeText={t => updateComponent(i, { biologicalTreatment: t })}
-                hint="Comma-separated"
-                returnKeyType="next"
-                blurOnSubmit={false}
-                onSubmitEditing={() => focus(k('chemicalTreatment'))}
-
-              />
-              <TextField
-                ref={setRef(k('chemicalTreatment'))}
-                label="Chemical Treatment"
-                value={c.chemicalTreatment}
-                onChangeText={t => updateComponent(i, { chemicalTreatment: t })}
-                hint="Comma-separated"
-                returnKeyType="next"
-                blurOnSubmit={false}
-                onSubmitEditing={() => focus(k('otherTreatment'))}
-
-              />
-            </View>
+            <TreatmentCheckboxGroup
+              label="Primary"
+              options={PRIMARY_TREATMENT_OPTIONS}
+              selected={c.primaryTreatment}
+              other={c.primaryTreatmentOther}
+              onChangeSelected={v => updateComponent(i, { primaryTreatment: v })}
+              onChangeOther={v => updateComponent(i, { primaryTreatmentOther: v })}
+            />
+            <TreatmentCheckboxGroup
+              label="Biological"
+              options={BIOLOGICAL_TREATMENT_OPTIONS}
+              selected={c.biologicalTreatment}
+              other={c.biologicalTreatmentOther}
+              onChangeSelected={v => updateComponent(i, { biologicalTreatment: v })}
+              onChangeOther={v => updateComponent(i, { biologicalTreatmentOther: v })}
+            />
+            <TreatmentCheckboxGroup
+              label="Chemical"
+              options={CHEMICAL_TREATMENT_OPTIONS}
+              selected={c.chemicalTreatment}
+              other={c.chemicalTreatmentOther}
+              onChangeSelected={v => updateComponent(i, { chemicalTreatment: v })}
+              onChangeOther={v => updateComponent(i, { chemicalTreatmentOther: v })}
+            />
             <View style={styles.row}>
               <TextField
                 ref={setRef(k('otherTreatment'))}
-                label="Other Treatment"
+                label="Others"
                 value={c.otherTreatment}
                 onChangeText={t => updateComponent(i, { otherTreatment: t })}
                 returnKeyType="done"
@@ -674,10 +767,11 @@ export const WwtpComponentsSection: React.FC<{
             key={i}
             title={`Outlet ${c.outletNo}`}
             fields={[
-              { label: 'Primary Treatment', value: c.primaryTreatment },
-              { label: 'Biological Treatment', value: c.biologicalTreatment },
-              { label: 'Chemical Treatment', value: c.chemicalTreatment },
-              { label: 'Other Treatment', value: c.otherTreatment },
+              { label: 'WWTP', value: c.wwtp },
+              { label: 'Primary', value: describeTreatment(c.primaryTreatment, c.primaryTreatmentOther) },
+              { label: 'Biological', value: describeTreatment(c.biologicalTreatment, c.biologicalTreatmentOther) },
+              { label: 'Chemical', value: describeTreatment(c.chemicalTreatment, c.chemicalTreatmentOther) },
+              { label: 'Others', value: c.otherTreatment },
             ]}
           />
         );
@@ -690,8 +784,28 @@ export const WwtpComponentsSection: React.FC<{
 
 interface WwtpConditionFields {
   wwtpCondition: string | null;
+  wwtpConditionOther: string | null;
   wwtpUnderConstruction: boolean | null;
+  wwtpConstructionReported: boolean | null;
+  wwtpConstructionUnits: string | null;
+  wwtpConstructionCompletionDate: string | null;
+  wwtpTreatmentUnitsUtilized: string | null;
 }
+
+// The draft holds the record's nulls as the form's empty strings so the
+// inputs below never see null; wwtpConstructionForSave turns them back.
+interface WwtpConditionDraft {
+  wwtpCondition: string;
+  wwtpConditionOther: string;
+  wwtpUnderConstruction: boolean | null;
+  wwtpConstructionReported: boolean | null;
+  wwtpConstructionUnits: string;
+  wwtpConstructionCompletionDate: string;
+  wwtpTreatmentUnitsUtilized: string;
+}
+
+const yesNo = (v: boolean | null): 'yes' | 'no' | null => (v == null ? null : v ? 'yes' : 'no');
+const yesNoLabel = (v: boolean | null): string => (v == null ? '—' : v ? 'Yes' : 'No');
 
 export const WwtpConditionSection: React.FC<{
   complianceId: string;
@@ -699,16 +813,35 @@ export const WwtpConditionSection: React.FC<{
   canEdit: boolean;
   onSaved: () => void;
 }> = ({ complianceId, value, canEdit, onSaved }) => {
-  const section = useEditableSection<WwtpConditionFields>({
-    value,
-    onSave: async fields => {
+  const section = useEditableSection<WwtpConditionDraft>({
+    value: {
+      wwtpCondition: value.wwtpCondition || '',
+      wwtpConditionOther: value.wwtpConditionOther || '',
+      wwtpUnderConstruction: value.wwtpUnderConstruction,
+      wwtpConstructionReported: value.wwtpConstructionReported,
+      wwtpConstructionUnits: value.wwtpConstructionUnits || '',
+      wwtpConstructionCompletionDate: value.wwtpConstructionCompletionDate || '',
+      wwtpTreatmentUnitsUtilized: value.wwtpTreatmentUnitsUtilized || '',
+    },
+    onSave: async draft => {
       await patchComplianceWater(complianceId, {
-        wwtpCondition: fields.wwtpCondition || null,
-        wwtpUnderConstruction: fields.wwtpUnderConstruction,
+        wwtpCondition: draft.wwtpCondition || null,
+        wwtpConditionOther: wwtpConditionOtherForSave(draft.wwtpCondition, draft.wwtpConditionOther) || null,
+        wwtpUnderConstruction: draft.wwtpUnderConstruction,
+        ...wwtpConstructionForSave(draft.wwtpUnderConstruction, {
+          ...draft,
+          wwtpConstructionReported: yesNo(draft.wwtpConstructionReported),
+        }),
       });
       onSaved();
     },
   });
+
+  const { draft } = section;
+  // Questions 3-6 on the printed form only apply to a plant under
+  // construction or rehabilitation, so they follow question 2 - on the
+  // read-only view too, where a stale answer would otherwise sit under a No.
+  const underConstruction = draft.wwtpUnderConstruction === true;
 
   return (
     <FormSection
@@ -717,27 +850,76 @@ export const WwtpConditionSection: React.FC<{
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
-      <View style={styles.row}>
-        {section.editing ? (
-          <SelectField label="WWTP Condition" value={section.draft.wwtpCondition || ''} options={WWTP_CONDITION_OPTIONS} onSelect={v => section.setDraft(d => ({ ...d, wwtpCondition: v }))} />
-        ) : (
-          <TextField label="WWTP Condition" value={section.draft.wwtpCondition || '—'} readOnly />
-        )}
-        {section.editing ? (
-          <RadioGroup
-            label="Under Construction / Rehabilitation?"
-            options={YES_NO}
-            value={section.draft.wwtpUnderConstruction == null ? null : section.draft.wwtpUnderConstruction ? 'yes' : 'no'}
-            onChange={v => section.setDraft(d => ({ ...d, wwtpUnderConstruction: v === 'yes' }))}
-          />
-        ) : (
-          <TextField
-            label="Under Construction?"
-            value={section.draft.wwtpUnderConstruction == null ? '—' : section.draft.wwtpUnderConstruction ? 'Yes' : 'No'}
-            readOnly
-          />
-        )}
-      </View>
+      {section.editing ? (
+        <>
+          <View style={styles.row}>
+            <SelectField label="WWTP Condition" value={draft.wwtpCondition} options={WWTP_CONDITION_OPTIONS} onSelect={v => section.setDraft(d => ({ ...d, wwtpCondition: v }))} />
+            <RadioGroup
+              label="Under Construction / Rehabilitation?"
+              options={YES_NO}
+              value={yesNo(draft.wwtpUnderConstruction)}
+              onChange={v => section.setDraft(d => ({ ...d, wwtpUnderConstruction: v === 'yes' }))}
+            />
+          </View>
+          {draft.wwtpCondition === WWTP_CONDITION_OTHERS && (
+            <TextField
+              label="Specify the condition"
+              value={draft.wwtpConditionOther}
+              onChangeText={t => section.setDraft(d => ({ ...d, wwtpConditionOther: t }))}
+              placeholder="e.g. Under repair"
+              returnKeyType="done"
+            />
+          )}
+          {underConstruction && (
+            <>
+              <RadioGroup
+                label="Reported to EMB/LLDA?"
+                options={YES_NO}
+                value={yesNo(draft.wwtpConstructionReported)}
+                onChange={v => section.setDraft(d => ({ ...d, wwtpConstructionReported: v === 'yes' }))}
+              />
+              <TextField
+                label="Units under construction or being modified"
+                value={draft.wwtpConstructionUnits}
+                onChangeText={t => section.setDraft(d => ({ ...d, wwtpConstructionUnits: t }))}
+                placeholder="e.g. Aeration tank, clarifier"
+                returnKeyType="next"
+              />
+              <View style={styles.row}>
+                <DateField
+                  label="Estimated date of completion"
+                  value={draft.wwtpConstructionCompletionDate}
+                  onChange={t => section.setDraft(d => ({ ...d, wwtpConstructionCompletionDate: t }))}
+                />
+                <TextField
+                  label="Treatment units utilized to treat wastewater"
+                  value={draft.wwtpTreatmentUnitsUtilized}
+                  onChangeText={t => section.setDraft(d => ({ ...d, wwtpTreatmentUnitsUtilized: t }))}
+                  placeholder="e.g. Septic tank"
+                  returnKeyType="done"
+                />
+              </View>
+            </>
+          )}
+        </>
+      ) : (
+        <>
+          <View style={styles.row}>
+            <TextField label="WWTP Condition" value={describeWwtpCondition(draft.wwtpCondition, draft.wwtpConditionOther)} readOnly />
+            <TextField label="Under Construction?" value={yesNoLabel(draft.wwtpUnderConstruction)} readOnly />
+          </View>
+          {underConstruction && (
+            <>
+              <View style={styles.row}>
+                <TextField label="Reported to EMB/LLDA?" value={yesNoLabel(draft.wwtpConstructionReported)} readOnly />
+                <TextField label="Estimated date of completion" value={draft.wwtpConstructionCompletionDate || '—'} readOnly />
+              </View>
+              <TextField label="Units under construction or being modified" value={draft.wwtpConstructionUnits || '—'} readOnly />
+              <TextField label="Treatment units utilized to treat wastewater" value={draft.wwtpTreatmentUnitsUtilized || '—'} readOnly />
+            </>
+          )}
+        </>
+      )}
       {section.error && <Text style={styles.errorText}>{section.error}</Text>}
     </FormSection>
   );
@@ -745,9 +927,23 @@ export const WwtpConditionSection: React.FC<{
 
 // ── Sampling Points ─────────────────────────────────────────────────────────
 
+interface SamplingFields {
+  samplingConducted: boolean | null;
+  samplingClassification: string | null;
+  samplingPoints: SamplingPointCard[];
+}
+
+interface SamplingDraft {
+  conducted: boolean | null;
+  classification: string;
+  points: SamplingPointCard[];
+}
+
+const SAMPLING_CLASSIFICATION = SAMPLING_CLASSIFICATION_OPTIONS.map(o => ({ label: o, value: o }));
+
 export const SamplingPointsSection: React.FC<{
   complianceId: string;
-  value: SamplingPointCard[];
+  value: SamplingFields;
   canEdit: boolean;
   onSaved: () => void;
 }> = ({
@@ -760,38 +956,43 @@ export const SamplingPointsSection: React.FC<{
   const focus = (key: string) => focusInput(fieldRefs.current[key]);
   const setRef = (key: string) => (el: TextInput | null) => { fieldRefs.current[key] = el; };
 
-  const section = useEditableSection<SamplingPointCard[]>({
-    value,
-    onSave: async samplingPoints => {
-      await patchComplianceWater(complianceId, { samplingPoints });
+  const section = useEditableSection<SamplingDraft>({
+    value: {
+      conducted: value.samplingConducted,
+      classification: value.samplingClassification || '',
+      points: value.samplingPoints,
+    },
+    onSave: async draft => {
+      await patchComplianceWater(complianceId, samplingForSave(draft.conducted, draft.classification, draft.points));
       onSaved();
     },
   });
 
+  const setPoints = (points: SamplingPointCard[]) => section.setDraft(d => ({ ...d, points }));
   const updatePoint = (i: number, patch: Partial<SamplingPointCard>) => {
-    const rows = section.draft.slice();
+    const rows = section.draft.points.slice();
     rows[i] = { ...rows[i], ...patch };
-    section.setDraft(rows);
+    setPoints(rows);
   };
-  const removePoint = (i: number) => section.setDraft(section.draft.filter((_, idx) => idx !== i));
-  const addPoint = () => section.setDraft([...section.draft, emptySamplingPoint(String(section.draft.length + 1))]);
+  const removePoint = (i: number) => setPoints(section.draft.points.filter((_, idx) => idx !== i));
+  const addPoint = () => setPoints([...section.draft.points, emptySamplingPoint(String(section.draft.points.length + 1))]);
 
   const addParameter = (pointIndex: number) => {
-    const rows = section.draft.slice();
+    const rows = section.draft.points.slice();
     rows[pointIndex] = { ...rows[pointIndex], parameters: [...rows[pointIndex].parameters, emptySamplingParameter()] };
-    section.setDraft(rows);
+    setPoints(rows);
   };
   const updateParameter = (pointIndex: number, paramIndex: number, patch: Partial<SamplingParameterRow>) => {
-    const rows = section.draft.slice();
+    const rows = section.draft.points.slice();
     const params = rows[pointIndex].parameters.slice();
     params[paramIndex] = { ...params[paramIndex], ...patch };
     rows[pointIndex] = { ...rows[pointIndex], parameters: params };
-    section.setDraft(rows);
+    setPoints(rows);
   };
   const removeParameter = (pointIndex: number, paramIndex: number) => {
-    const rows = section.draft.slice();
+    const rows = section.draft.points.slice();
     rows[pointIndex] = { ...rows[pointIndex], parameters: rows[pointIndex].parameters.filter((_, idx) => idx !== paramIndex) };
-    section.setDraft(rows);
+    setPoints(rows);
   };
 
   return (
@@ -801,10 +1002,40 @@ export const SamplingPointsSection: React.FC<{
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
-      {section.draft.length === 0 && !section.editing && (
+      {section.editing ? (
+        <>
+          <RadioGroup
+            label="Was water quality sampling conducted?"
+            options={YES_NO}
+            value={section.draft.conducted == null ? null : section.draft.conducted ? 'yes' : 'no'}
+            onChange={v => section.setDraft(d => ({ ...d, conducted: v === 'yes' }))}
+          />
+          {section.draft.conducted === true && (
+            <RadioGroup
+              label="Sampling classification"
+              options={SAMPLING_CLASSIFICATION}
+              value={section.draft.classification || null}
+              onChange={v => section.setDraft(d => ({ ...d, classification: v }))}
+            />
+          )}
+        </>
+      ) : (
+        <TextField
+          label="Sampling conducted?"
+          value={describeSampling(section.draft.conducted, section.draft.classification || null)}
+          readOnly
+        />
+      )}
+      {/* A No hides the points rather than clearing them; samplingForSave
+          drops them on save. A report never asked (null) still shows what
+          it recorded. */}
+      {section.draft.conducted === false && (
+        <Text style={sharedStyles.emptyText}>No sampling conducted — sampling points are not applicable.</Text>
+      )}
+      {section.draft.conducted !== false && section.draft.points.length === 0 && !section.editing && (
         <Text style={sharedStyles.emptyText}>No sampling points recorded.</Text>
       )}
-      {section.draft.map((pt, i) => {
+      {section.draft.conducted !== false && section.draft.points.map((pt, i) => {
         const k = (field: string) => `samplingPoint:${i}:${field}`;
         const pk = (pi: number, field: string) => `samplingParam:${i}:${pi}:${field}`;
         return section.editing ? (
@@ -839,16 +1070,14 @@ export const SamplingPointsSection: React.FC<{
               />
             </View>
             <View style={styles.row}>
-              <TextField
+              <TimeField
                 ref={setRef(k('samplingTime'))}
                 label="Sampling Time"
                 value={pt.samplingTime}
-                onChangeText={t => updatePoint(i, { samplingTime: t })}
-                placeholder="e.g. 9:00 AM"
+                onChange={t => updatePoint(i, { samplingTime: t })}
                 returnKeyType="next"
                 blurOnSubmit={false}
                 onSubmitEditing={() => focus(k('typeOfSample'))}
-
               />
               <TextField
                 ref={setRef(k('typeOfSample'))}
@@ -865,7 +1094,7 @@ export const SamplingPointsSection: React.FC<{
             <View style={styles.row}>
               <TextField
                 ref={setRef(k('remarks'))}
-                label="Remarks"
+                label="Result Analysis"
                 value={pt.remarks}
                 onChangeText={t => updatePoint(i, { remarks: t })}
                 returnKeyType={pt.parameters.length > 0 ? 'next' : 'done'}
@@ -881,17 +1110,17 @@ export const SamplingPointsSection: React.FC<{
               return (
                 <View key={pi} style={styles.paramEditRow}>
                   <View style={styles.paramTopLine}>
-                    <TextInput
+                    <ComboInput
                       ref={setRef(pk(pi, 'name'))}
                       style={styles.paramNameInput}
+                      title="Parameter"
+                      options={WATER_QUALITY_PARAMETERS}
                       value={param.parameterName}
                       onChangeText={t => updateParameter(i, pi, { parameterName: t })}
                       placeholder="Parameter name"
-                      placeholderTextColor={Colors.textLight}
                       returnKeyType="next"
                       blurOnSubmit={false}
                       onSubmitEditing={() => focus(pk(pi, 'value'))}
-
                     />
                     <YesNoNAToggle value={param.compliant} onChange={c => updateParameter(i, pi, { compliant: c })} />
                     <TouchableOpacity onPress={() => removeParameter(i, pi)}>
@@ -921,21 +1150,33 @@ export const SamplingPointsSection: React.FC<{
                       returnKeyType="next"
                       blurOnSubmit={false}
                       onSubmitEditing={() => focus(pk(pi, 'standard'))}
-
-                    />
-                    <TextInput
-                      ref={setRef(pk(pi, 'standard'))}
-                      style={styles.paramSmallInput}
-                      value={param.denrStandard}
-                      onChangeText={t => updateParameter(i, pi, { denrStandard: t })}
-                      placeholder="DENR Standard"
-                      placeholderTextColor={Colors.textLight}
-                      returnKeyType={isLastParam ? 'done' : 'next'}
-                      blurOnSubmit={isLastParam}
-                      onSubmitEditing={() => focus(pk(pi + 1, 'name'))}
-
                     />
                   </View>
+                  {/* Its own line, not a third of one - see the create
+                      form's note on the same field. */}
+                  <TextInput
+                    ref={setRef(pk(pi, 'standard'))}
+                    style={styles.paramStandardInput}
+                    value={param.denrStandard}
+                    onChangeText={t => updateParameter(i, pi, { denrStandard: t })}
+                    placeholder="DENR Standard"
+                    placeholderTextColor={Colors.textLight}
+                    multiline
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    onSubmitEditing={() => focus(pk(pi, 'remarks'))}
+                  />
+                  <TextInput
+                    ref={setRef(pk(pi, 'remarks'))}
+                    style={styles.paramRemarksInput}
+                    value={param.remarks}
+                    onChangeText={t => updateParameter(i, pi, { remarks: t })}
+                    placeholder="Remarks"
+                    placeholderTextColor={Colors.textLight}
+                    returnKeyType={isLastParam ? 'done' : 'next'}
+                    blurOnSubmit={isLastParam}
+                    onSubmitEditing={() => focus(pk(pi + 1, 'name'))}
+                  />
                 </View>
               );
             })}
@@ -950,15 +1191,21 @@ export const SamplingPointsSection: React.FC<{
               <View key={pi} style={sharedStyles.paramRow}>
                 <View style={sharedStyles.checklistTopLine}>
                   <Text style={sharedStyles.checklistRequirement}>{param.parameterName || '—'}</Text>
-                  <Text style={styles.paramValueText}>{param.value} {param.unit}</Text>
+                  <View style={styles.paramResult}>
+                    <Text style={styles.paramValueText}>{param.value} {param.unit}</Text>
+                    <YnBadge value={param.compliant} />
+                  </View>
                 </View>
                 <Text style={sharedStyles.checklistRef}>Standard: {param.denrStandard || '—'}</Text>
+                {!!param.remarks && <Text style={sharedStyles.checklistRemarks}>{param.remarks}</Text>}
               </View>
             ))}
           </View>
         );
       })}
-      {section.editing && <AddRowButton style={styles.addBtn} label="Add Sampling Point" onPress={addPoint} />}
+      {section.editing && section.draft.conducted === true && (
+        <AddRowButton style={styles.addBtn} label="Add Sampling Point" onPress={addPoint} />
+      )}
       {section.error && <Text style={styles.errorText}>{section.error}</Text>}
     </FormSection>
   );
@@ -980,7 +1227,7 @@ export const PreviousInspectionSection: React.FC<{
     value,
     onSave: async fields => {
       await patchComplianceWater(complianceId, {
-        previousInspectionSummary: fields.dateOfSampling ? fields : {},
+        previousInspectionSummary: previousInspectionForSave(fields),
       });
       onSaved();
     },
@@ -997,6 +1244,14 @@ export const PreviousInspectionSection: React.FC<{
     section.setDraft(d => ({ ...d, parameters: d.parameters.filter((_, idx) => idx !== i) }));
 
   const hasData = !!section.draft.dateOfSampling || section.draft.parameters.length > 0;
+  // The gate answers for the whole section. While editing, the fields
+  // appear on a Yes and not before - an unanswered report opens on the
+  // question alone. The read-only card is more lenient: a No shows only
+  // the not-applicable note, but a report never asked (null) still shows
+  // whatever it recorded rather than hiding data behind a question it
+  // was never asked.
+  const noRecords = section.draft.hasRecords === 'no';
+  const showFields = section.editing ? section.draft.hasRecords === 'yes' : !noRecords;
 
   return (
     <FormSection
@@ -1005,7 +1260,24 @@ export const PreviousInspectionSection: React.FC<{
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
-      {!hasData && !section.editing ? (
+      {section.editing ? (
+        <RadioGroup
+          label="Any previous sampling inspection records?"
+          options={YES_NO}
+          value={section.draft.hasRecords}
+          onChange={v => section.setDraft(d => ({ ...d, hasRecords: v as 'yes' | 'no' }))}
+        />
+      ) : (
+        <TextField
+          label="Previous sampling inspection records?"
+          value={section.draft.hasRecords == null ? '—' : section.draft.hasRecords === 'yes' ? 'Yes' : 'No'}
+          readOnly
+        />
+      )}
+      {noRecords && (
+        <Text style={sharedStyles.emptyText}>No previous sampling inspection records — this section is not applicable.</Text>
+      )}
+      {!showFields ? null : !hasData && !section.editing ? (
         <Text style={sharedStyles.emptyText}>No previous inspection summary recorded.</Text>
       ) : (
         <>
@@ -1035,12 +1307,12 @@ export const PreviousInspectionSection: React.FC<{
             />
           </View>
           <View style={styles.row}>
-            <TextField
+            <TimeField
               ref={setRef('samplingTime')}
               label="Sampling Time"
               value={section.draft.samplingTime}
               readOnly={!section.editing}
-              onChangeText={t => section.setDraft(d => ({ ...d, samplingTime: t }))}
+              onChange={t => section.setDraft(d => ({ ...d, samplingTime: t }))}
               returnKeyType="next"
               blurOnSubmit={false}
               onSubmitEditing={() => focus('typeOfSample')}
@@ -1064,17 +1336,17 @@ export const PreviousInspectionSection: React.FC<{
                 return (
                   <View key={pi} style={styles.paramEditRow}>
                     <View style={styles.paramTopLine}>
-                      <TextInput
+                      <ComboInput
                         ref={setRef(pk('name'))}
                         style={styles.paramNameInput}
+                        title="Parameter"
+                        options={WATER_QUALITY_PARAMETERS}
                         value={param.parameterName}
                         onChangeText={t => updateParameter(pi, { parameterName: t })}
                         placeholder="Parameter name"
-                        placeholderTextColor={Colors.textLight}
                         returnKeyType="next"
                         blurOnSubmit={false}
                         onSubmitEditing={() => focus(pk('value'))}
-
                       />
                       <YesNoNAToggle value={param.compliant} onChange={c => updateParameter(pi, { compliant: c })} />
                       <TouchableOpacity onPress={() => removeParameter(pi)}>
@@ -1104,21 +1376,32 @@ export const PreviousInspectionSection: React.FC<{
                         returnKeyType="next"
                         blurOnSubmit={false}
                         onSubmitEditing={() => focus(pk('standard'))}
-
-                      />
-                      <TextInput
-                        ref={setRef(pk('standard'))}
-                        style={styles.paramSmallInput}
-                        value={param.denrStandard}
-                        onChangeText={t => updateParameter(pi, { denrStandard: t })}
-                        placeholder="DENR Standard"
-                        placeholderTextColor={Colors.textLight}
-                        returnKeyType={isLastParam ? 'done' : 'next'}
-                        blurOnSubmit={isLastParam}
-                        onSubmitEditing={() => focus(`prevparam:${pi + 1}:name`)}
-
                       />
                     </View>
+                    {/* Same row as section I's - see the note there. */}
+                    <TextInput
+                      ref={setRef(pk('standard'))}
+                      style={styles.paramStandardInput}
+                      value={param.denrStandard}
+                      onChangeText={t => updateParameter(pi, { denrStandard: t })}
+                      placeholder="DENR Standard"
+                      placeholderTextColor={Colors.textLight}
+                      multiline
+                      returnKeyType="next"
+                      blurOnSubmit={false}
+                      onSubmitEditing={() => focus(pk('remarks'))}
+                    />
+                    <TextInput
+                      ref={setRef(pk('remarks'))}
+                      style={styles.paramRemarksInput}
+                      value={param.remarks}
+                      onChangeText={t => updateParameter(pi, { remarks: t })}
+                      placeholder="Remarks"
+                      placeholderTextColor={Colors.textLight}
+                      returnKeyType={isLastParam ? 'done' : 'next'}
+                      blurOnSubmit={isLastParam}
+                      onSubmitEditing={() => focus(`prevparam:${pi + 1}:name`)}
+                    />
                   </View>
                 );
               })}
@@ -1129,9 +1412,13 @@ export const PreviousInspectionSection: React.FC<{
               <View key={pi} style={sharedStyles.paramRow}>
                 <View style={sharedStyles.checklistTopLine}>
                   <Text style={sharedStyles.checklistRequirement}>{param.parameterName || '—'}</Text>
-                  <Text style={styles.paramValueText}>{param.value} {param.unit}</Text>
+                  <View style={styles.paramResult}>
+                    <Text style={styles.paramValueText}>{param.value} {param.unit}</Text>
+                    <YnBadge value={param.compliant} />
+                  </View>
                 </View>
                 <Text style={sharedStyles.checklistRef}>Standard: {param.denrStandard || '—'}</Text>
+                {!!param.remarks && <Text style={sharedStyles.checklistRemarks}>{param.remarks}</Text>}
               </View>
             ))
           )}
@@ -1146,7 +1433,9 @@ export const PreviousInspectionSection: React.FC<{
 
 export const SummaryOfFindingsSection: React.FC<{
   complianceId: string;
-  value: ChecklistValue[];
+  // The stored entries as they are; answers are matched to the current
+  // checklist by key - see findingsValuesFromEntries.
+  value: readonly StoredFindingsEntry[];
   canEdit: boolean;
   onSaved: () => void;
 }> = ({
@@ -1156,14 +1445,10 @@ export const SummaryOfFindingsSection: React.FC<{
   onSaved,
 }) => {
   const section = useEditableSection<ChecklistValue[]>({
-    value,
+    value: findingsValuesFromEntries(value),
     onSave: async fields => {
       await patchComplianceWater(complianceId, {
-        checklistDao200510: fields.map((v, i) => ({
-          legal_ref: `Section ${i + 3}`,
-          compliant: v.compliant,
-          remarks: v.remarks,
-        })),
+        checklistDao200510: findingsEntriesForSave(fields),
       });
       onSaved();
     },
@@ -1178,7 +1463,7 @@ export const SummaryOfFindingsSection: React.FC<{
       }>
       {section.editing ? (
         <ChecklistTable
-          items={DAO_2005_10_CHECKLIST}
+          items={WATER_FINDINGS_CHECKLIST}
           values={section.draft}
           onChange={(i, patch) => {
             const rows = section.draft.slice();
@@ -1188,7 +1473,8 @@ export const SummaryOfFindingsSection: React.FC<{
         />
       ) : (
         <ChecklistList
-          items={DAO_2005_10_CHECKLIST.map((def, i) => ({
+          items={WATER_FINDINGS_CHECKLIST.map((def, i) => ({
+            group: def.group,
             legal_ref: def.ref,
             requirement: def.requirement,
             compliant: section.draft[i]?.compliant ?? null,
@@ -1423,6 +1709,7 @@ interface WaterExtraSectionsViewProps {
   onSaved: () => void;
   mainTab: WaterMainTabDef;
   hasDp: boolean;
+  province: string;
 }
 
 export const WaterExtraSectionsView: React.FC<WaterExtraSectionsViewProps> = ({
@@ -1431,6 +1718,7 @@ export const WaterExtraSectionsView: React.FC<WaterExtraSectionsViewProps> = ({
   onSaved,
   mainTab,
   hasDp,
+  province,
 }) => {
   const complianceId = compliance.complianceId;
 
@@ -1456,13 +1744,19 @@ export const WaterExtraSectionsView: React.FC<WaterExtraSectionsViewProps> = ({
         return compliance.hasWwtp === false ? (
           <WwtpUnavailableSection title="B. Type of WWTP" />
         ) : (
-          <WwtpTypeSection complianceId={complianceId} value={compliance.wwtpType} canEdit={canEdit} onSaved={onSaved} />
+          <WwtpTypeSection
+            complianceId={complianceId}
+            value={compliance.wwtpType}
+            otherValue={compliance.wwtpTypeOther}
+            canEdit={canEdit}
+            onSaved={onSaved}
+          />
         );
       case 'wwtpDetails':
         return compliance.hasWwtp === false ? (
           <WwtpUnavailableSection title="C. WWTP Details" />
         ) : (
-          <WwtpDetailsSection complianceId={complianceId} value={compliance.wwtpDetails} canEdit={canEdit} onSaved={onSaved} />
+          <WwtpDetailsSection complianceId={complianceId} value={compliance.wwtpDetails} canEdit={canEdit} onSaved={onSaved} province={province} />
         );
       case 'wwtpComponents':
         return compliance.hasWwtp === false ? (
@@ -1476,22 +1770,36 @@ export const WaterExtraSectionsView: React.FC<WaterExtraSectionsViewProps> = ({
         ) : (
           <WwtpConditionSection
             complianceId={complianceId}
-            value={{ wwtpCondition: compliance.wwtpCondition, wwtpUnderConstruction: compliance.wwtpUnderConstruction }}
+            value={{
+              wwtpCondition: compliance.wwtpCondition,
+              wwtpConditionOther: compliance.wwtpConditionOther,
+              wwtpUnderConstruction: compliance.wwtpUnderConstruction,
+              wwtpConstructionReported: compliance.wwtpConstructionReported,
+              wwtpConstructionUnits: compliance.wwtpConstructionUnits,
+              wwtpConstructionCompletionDate: compliance.wwtpConstructionCompletionDate,
+              wwtpTreatmentUnitsUtilized: compliance.wwtpTreatmentUnitsUtilized,
+            }}
             canEdit={canEdit}
             onSaved={onSaved}
           />
         );
       case 'samplingPoints':
-        return <SamplingPointsSection complianceId={complianceId} value={compliance.samplingPoints} canEdit={canEdit} onSaved={onSaved} />;
+        return (
+          <SamplingPointsSection
+            complianceId={complianceId}
+            value={{
+              samplingConducted: compliance.samplingConducted,
+              samplingClassification: compliance.samplingClassification,
+              samplingPoints: compliance.samplingPoints,
+            }}
+            canEdit={canEdit}
+            onSaved={onSaved}
+          />
+        );
       case 'previousInspection':
         return <PreviousInspectionSection complianceId={complianceId} value={compliance.previousInspectionSummary} canEdit={canEdit} onSaved={onSaved} />;
-      case 'summaryOfFindings': {
-        const checklistValues: ChecklistValue[] = DAO_2005_10_CHECKLIST.map((_, i) => ({
-          compliant: compliance.checklistDao200510[i]?.compliant ?? null,
-          remarks: compliance.checklistDao200510[i]?.remarks ?? '',
-        }));
-        return <SummaryOfFindingsSection complianceId={complianceId} value={checklistValues} canEdit={canEdit} onSaved={onSaved} />;
-      }
+      case 'summaryOfFindings':
+        return <SummaryOfFindingsSection complianceId={complianceId} value={compliance.checklistDao200510} canEdit={canEdit} onSaved={onSaved} />;
       case 'dpConditions':
         return hasDp ? (
           <DpConditionsSection complianceId={complianceId} value={compliance.dpConditions} canEdit={canEdit} onSaved={onSaved} />
@@ -1596,19 +1904,36 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 6,
   },
+  // ComboInput brings its own border, padding and type; only the flex
+  // placement in the top line is this file's to set.
   paramNameInput: {
     flex: 1,
-    fontSize: 12,
+  },
+  paramFieldsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginBottom: 6,
+  },
+  paramStandardInput: {
+    fontSize: 11.5,
     color: Colors.textPrimary,
     borderWidth: 1,
     borderColor: Colors.border,
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 6,
+    minHeight: 48,
+    textAlignVertical: 'top',
+    marginBottom: 6,
   },
-  paramFieldsRow: {
-    flexDirection: 'row',
-    gap: 6,
+  paramRemarksInput: {
+    fontSize: 11.5,
+    color: Colors.textPrimary,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
   },
   paramSmallInput: {
     flex: 1,
@@ -1619,6 +1944,13 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 6,
+  },
+  // Value and its Compliant? badge sit together at the line's end, so the
+  // eye reads "what was measured -> did it pass" in one sweep.
+  paramResult: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   paramValueText: {
     fontSize: 11.5,

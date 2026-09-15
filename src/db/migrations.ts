@@ -51,6 +51,22 @@ import { schemaMigrations, addColumns, createTable, unsafeExecuteSql } from '@no
 // "Has WWTP?" is answered no. Existing rows get NULL, which the model's
 // asObject decoder reads as {} - correct, since no inspection before this
 // was ever asked the question.
+//
+// v12 -> v13: compliance_water gains wwtpTypeOther - what "Others" means
+// when that's the answer to "Type of WWTP" (section 5B). Existing rows get
+// NULL - correct, since no inspection before this was ever asked.
+//
+// v13 -> v14: compliance_water gains section 5E's remaining questions -
+// what "Others" means for the WWTP's condition, and questions 3-6 about a
+// WWTP under construction or rehabilitation (reported to EMB/LLDA, which
+// units, estimated completion, treatment units in use meanwhile). Existing
+// rows get NULL - correct, since no inspection before this was ever asked.
+//
+// v14 -> v15: compliance_water gains section 6I's gate - whether the
+// inspector conducted water quality sampling, and if so its classification
+// (ambient, effluent or both). Existing rows get NULL - correct, since no
+// inspection before this was ever asked; their sampling points stand as
+// they are.
 export const migrations = schemaMigrations({
   migrations: [
     {
@@ -151,6 +167,42 @@ export const migrations = schemaMigrations({
         addColumns({
           table: 'compliance_water',
           columns: [{ name: 'nonWwtpTreatment', type: 'string', isOptional: true }],
+        }),
+      ],
+    },
+    {
+      toVersion: 13,
+      steps: [
+        addColumns({
+          table: 'compliance_water',
+          columns: [{ name: 'wwtpTypeOther', type: 'string', isOptional: true }],
+        }),
+      ],
+    },
+    {
+      toVersion: 14,
+      steps: [
+        addColumns({
+          table: 'compliance_water',
+          columns: [
+            { name: 'wwtpConditionOther', type: 'string', isOptional: true },
+            { name: 'wwtpConstructionReported', type: 'boolean', isOptional: true },
+            { name: 'wwtpConstructionUnits', type: 'string', isOptional: true },
+            { name: 'wwtpConstructionCompletionDate', type: 'string', isOptional: true },
+            { name: 'wwtpTreatmentUnitsUtilized', type: 'string', isOptional: true },
+          ],
+        }),
+      ],
+    },
+    {
+      toVersion: 15,
+      steps: [
+        addColumns({
+          table: 'compliance_water',
+          columns: [
+            { name: 'samplingConducted', type: 'boolean', isOptional: true },
+            { name: 'samplingClassification', type: 'string', isOptional: true },
+          ],
         }),
       ],
     },

@@ -25,7 +25,7 @@ import { appSchema, tableSchema } from '@nozbe/watermelondb';
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const schema = appSchema({
-  version: 12,
+  version: 15,
   tables: [
 
     // ── ESTABLISHMENTS ───────────────────────────────────────────────────────
@@ -206,10 +206,25 @@ export const schema = appSchema({
         // while hasWwtp is false; see nonWwtpTreatmentForSave.
         { name: 'nonWwtpTreatment',           type: 'string', isOptional: true },
         { name: 'wwtpType',                   type: 'string', isOptional: true },
+        { name: 'wwtpTypeOther',              type: 'string', isOptional: true },
         { name: 'wwtpDetails',                type: 'string', isOptional: true },
         { name: 'wwtpComponents',             type: 'string', isOptional: true },
         { name: 'wwtpCondition',              type: 'string', isOptional: true },
         { name: 'wwtpUnderConstruction',      type: 'boolean', isOptional: true },
+        // Section 5E, questions 1 (specify) and 3-6. All nullable: NULL on
+        // rows written before they existed, and the construction ones are
+        // only ever populated while wwtpUnderConstruction is true - see
+        // wwtpConstructionForSave.
+        { name: 'wwtpConditionOther',         type: 'string', isOptional: true },
+        { name: 'wwtpConstructionReported',   type: 'boolean', isOptional: true },
+        { name: 'wwtpConstructionUnits',      type: 'string', isOptional: true },
+        { name: 'wwtpConstructionCompletionDate', type: 'string', isOptional: true },
+        { name: 'wwtpTreatmentUnitsUtilized', type: 'string', isOptional: true },
+        // Section 6I's gate: whether the inspector sampled at all, and if
+        // so whether ambient, effluent or both. samplingPoints is only ever
+        // populated while samplingConducted is true - see samplingForSave.
+        { name: 'samplingConducted',          type: 'boolean', isOptional: true },
+        { name: 'samplingClassification',     type: 'string', isOptional: true },
         { name: 'samplingPoints',             type: 'string', isOptional: true },
         { name: 'previousInspectionSummary',  type: 'string', isOptional: true },
         { name: 'checklistDao200510',         type: 'string', isOptional: true },

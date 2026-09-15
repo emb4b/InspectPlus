@@ -16,10 +16,20 @@ import { Spacing } from '../../design/spacing';
 import { Type } from '../../design/typography';
 import { AppText } from '../AppText';
 
+export interface SelectGroup {
+  label: string;
+  options: string[];
+}
+
 interface SelectFieldProps {
   label: string;
   value: string;
-  options: string[];
+  options?: string[];
+  // An alternative to `options` for lists whose ordering carries meaning
+  // the reader can't infer - a waterbody list runs principal rivers, then
+  // minor, then other, which looks merely unsorted without headers. Headers
+  // are labels, not choices, and are never selectable.
+  groups?: SelectGroup[];
   onSelect: (value: string) => void;
   placeholder?: string;
   required?: boolean;
@@ -32,7 +42,8 @@ interface SelectFieldProps {
 export const SelectField: React.FC<SelectFieldProps> = ({
   label,
   value,
-  options,
+  options = [],
+  groups,
   onSelect,
   placeholder = 'Select…',
   required,
@@ -42,10 +53,30 @@ export const SelectField: React.FC<SelectFieldProps> = ({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
 
-  const filtered = useMemo(() => {
+  type Row = { kind: 'header'; text: string } | { kind: 'option'; text: string };
+
+  const rows = useMemo<Row[]>(() => {
     const q = search.trim().toLowerCase();
-    return q ? options.filter(o => o.toLowerCase().includes(q)) : options;
-  }, [options, search]);
+    const keep = (o: string) => !q || o.toLowerCase().includes(q);
+    if (!groups) {
+      return options.filter(keep).map(text => ({ kind: 'option' as const, text }));
+    }
+    return groups.flatMap(group => {
+      const kept = group.options.filter(keep);
+      // A header with nothing under it would sit above a gap.
+      if (kept.length === 0) return [];
+      return [
+        { kind: 'header' as const, text: group.label },
+        ...kept.map(text => ({ kind: 'option' as const, text })),
+      ];
+    });
+  }, [groups, options, search]);
+
+  // Headers aren't choices, so they don't count toward the threshold that
+  // decides whether this list is long enough to need a search box.
+  const optionCount = groups
+    ? groups.reduce((n, g) => n + g.options.length, 0)
+    : options.length;
 
   return (
     <View style={[styles.group, style]}>
@@ -85,7 +116,7 @@ export const SelectField: React.FC<SelectFieldProps> = ({
                 <Ionicons name="close" size={20} color={Colors.textMuted} />
               </TouchableOpacity>
             </View>
-            {options.length > 6 && (
+            {optionCount > 6 && (
               <TextInput
                 style={styles.search}
                 placeholder="Search…"
@@ -96,25 +127,31 @@ export const SelectField: React.FC<SelectFieldProps> = ({
               />
             )}
             <FlatList
-              data={filtered}
-              keyExtractor={item => item}
+              data={rows}
+              keyExtractor={row => `${row.kind}:${row.text}`}
               style={{ maxHeight: 320 }}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.option}
-                  onPress={() => {
-                    onSelect(item);
-                    setSearch('');
-                    setOpen(false);
-                  }}>
-                  <Text style={item === value ? styles.optionTextActive : styles.optionText}>
-                    {item}
-                  </Text>
-                  {item === value && (
-                    <Ionicons name="checkmark" size={16} color={Colors.green} />
-                  )}
-                </TouchableOpacity>
-              )}
+              renderItem={({ item }) =>
+                item.kind === 'header' ? (
+                  <View style={styles.groupHeader}>
+                    <Text style={styles.groupHeaderText}>{item.text}</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.option}
+                    onPress={() => {
+                      onSelect(item.text);
+                      setSearch('');
+                      setOpen(false);
+                    }}>
+                    <Text style={item.text === value ? styles.optionTextActive : styles.optionText}>
+                      {item.text}
+                    </Text>
+                    {item.text === value && (
+                      <Ionicons name="checkmark" size={16} color={Colors.green} />
+                    )}
+                  </TouchableOpacity>
+                )
+              }
               ListEmptyComponent={
                 <Text style={styles.empty}>No matches.</Text>
               }
@@ -241,5 +278,17 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     textAlign: 'center',
     paddingVertical: Spacing.lg,
+  },
+  groupHeader: {
+    paddingHorizontal: Spacing.md,
+    paddingTop: Spacing.md,
+    paddingBottom: Spacing.xs,
+    backgroundColor: Colors.bgMuted,
+  },
+  groupHeaderText: {
+    ...Type.caption,
+    color: Colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });

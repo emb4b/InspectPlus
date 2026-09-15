@@ -18,15 +18,29 @@ import { PurposeOfInspectionTab } from '../components/PurposeOfInspectionTab';
 import { DenrPermitsFormSection } from '../components/DenrPermitsFormSection';
 import { SaveBar } from '../components/SaveBar';
 import { useReportFormState } from '../hooks/useReportFormState';
+import { useMainTabChange } from '../hooks/useMainTabChange';
 import { createEstablishmentRecord } from '../establishmentPersistence';
 import { buildGeneralInfoFromEstablishment, GeneralInfoFormState, PurposeFormState } from '../types';
 import { WaterExtraFormSectionsView } from './WaterExtraFormSections';
-import { emptyWaterComplianceForm, nonWwtpTreatmentForSave, WaterComplianceFormState } from './waterTypes';
+import {
+  emptyWaterComplianceForm,
+  nonWwtpTreatmentForSave,
+  wwtpDetailForSave,
+  wwtpComponentForSave,
+  wwtpTypeOtherForSave,
+  wwtpConditionOtherForSave,
+  wwtpConstructionForSave,
+  samplingForSave,
+  findingsEntriesForSave,
+  previousInspectionForSave,
+  WaterComplianceFormState,
+} from './waterTypes';
 import { buildWaterReportTabs, establishmentHasDischargePermit } from './waterReportTabs';
 import type { EstablishmentDTO } from '../../establishments/types';
 import { useHeaderScroll } from '../../home/context/HeaderScrollContext';
 import { useScreenFooter } from '../../home/context/ScreenFooterContext';
 import { AttachmentsSection } from '../../attachments/components/AttachmentsSection';
+import { ReportThemeProvider } from '../../../core/providers/ReportThemeProvider';
 
 const REPORT_TYPE = 'water_monitoring';
 
@@ -45,6 +59,7 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
   );
   const scrollRef = useRef<ScrollView>(null);
   const { onScroll } = useHeaderScroll();
+  const handleMainChange = useMainTabChange(activeMain, setActiveMain, scrollRef);
   // Set on the first save() (silent or explicit) and reused on every save()
   // after that — save() itself updates rather than recreates once it sees
   // a complianceIdRef, matching the create-or-update pattern of save()'s own
@@ -71,19 +86,21 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
         hasWwtp: waterCompliance.hasWwtp === 'yes',
         nonWwtpTreatment: nonWwtpTreatmentForSave(waterCompliance),
         wwtpType: waterCompliance.wwtpType || null,
-        wwtpDetails: waterCompliance.wwtpDetails,
-        wwtpComponents: waterCompliance.wwtpComponents,
+        wwtpTypeOther: wwtpTypeOtherForSave(waterCompliance.wwtpType, waterCompliance.wwtpTypeOther) || null,
+        wwtpDetails: waterCompliance.wwtpDetails.map(d => wwtpDetailForSave(d)),
+        wwtpComponents: waterCompliance.wwtpComponents.map(c => wwtpComponentForSave(c)),
         wwtpCondition: waterCompliance.wwtpCondition || null,
+        wwtpConditionOther:
+          wwtpConditionOtherForSave(waterCompliance.wwtpCondition, waterCompliance.wwtpConditionOther) || null,
         wwtpUnderConstruction: waterCompliance.wwtpUnderConstruction === 'yes',
-        samplingPoints: waterCompliance.samplingPoints,
-        previousInspectionSummary: waterCompliance.previousInspection.dateOfSampling
-          ? waterCompliance.previousInspection
-          : {},
-        checklistDao200510: waterCompliance.checklistDao200510.map((v, i) => ({
-          legal_ref: `Section ${i + 3}`,
-          compliant: v.compliant,
-          remarks: v.remarks,
-        })),
+        ...wwtpConstructionForSave(waterCompliance.wwtpUnderConstruction, waterCompliance),
+        ...samplingForSave(
+          waterCompliance.samplingConducted,
+          waterCompliance.samplingClassification,
+          waterCompliance.samplingPoints,
+        ),
+        previousInspectionSummary: previousInspectionForSave(waterCompliance.previousInspection),
+        checklistDao200510: findingsEntriesForSave(waterCompliance.checklistDao200510),
         dpConditions: waterCompliance.dpConditions.filter(c => c.description?.trim()),
         otherObservations: waterCompliance.otherObservations || null,
         remarksRecommendations: waterCompliance.remarksRecommendations || null,
@@ -175,49 +192,57 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
   const activeMainTab = tabs.find(t => t.key === activeMain) ?? tabs[0];
 
   return (
-    <View style={styles.flex}>
-      <ReportFormHeader
-        establishmentName={generalInfo.name || 'New Establishment'}
-        establishmentLocation={formatEstablishmentLocation(generalInfo)}
-        reportType={REPORT_TYPE}
-        tabs={tabs}
-        activeMain={activeMainTab.key}
-        onMainChange={setActiveMain}
-      />
+    <ReportThemeProvider reportType={REPORT_TYPE}>
+      <View style={styles.flex}>
+        <ReportFormHeader
+          establishmentName={generalInfo.name || 'New Establishment'}
+          establishmentLocation={formatEstablishmentLocation(generalInfo)}
+          reportType={REPORT_TYPE}
+          tabs={tabs}
+          activeMain={activeMainTab.key}
+          onMainChange={handleMainChange}
+        />
 
-      <KeyboardAwareScrollView
-        ref={scrollRef as unknown as React.Ref<KeyboardAwareScrollViewRef>}
-        style={styles.body}
-        contentContainerStyle={styles.bodyContent}
-        bottomOffset={150}
-        keyboardShouldPersistTaps="handled"
-        onScroll={onScroll}
-        scrollEventThrottle={16}>
-        {activeMainTab.key === 'geninfo' && (
-          <GeneralInformationTab value={generalInfo} onChange={setGeneralInfo} />
-        )}
-        {activeMainTab.key === 'purpose' && (
-          <PurposeOfInspectionTab value={purpose} onChange={setPurpose} />
-        )}
-        {activeMainTab.key === 'compliance' && (
-          <DenrPermitsFormSection
-            value={generalInfo.denrPermits}
-            onChange={denrPermits => setGeneralInfo({ ...generalInfo, denrPermits })}
-          />
-        )}
-        {(activeMainTab.key === 'watersupply' || activeMainTab.key === 'wastewaterpollution' || activeMainTab.key === 'samplingfindings') && (
-          <WaterExtraFormSectionsView value={waterCompliance} onChange={setWaterCompliance} mainTab={activeMainTab} hasDp={hasDp} />
-        )}
-        {activeMainTab.key === 'attachments' && (
-          <AttachmentsSection
-            parentType="inspection"
-            parentId={draftReportId ?? undefined}
-            ensureParentId={ensureDraftReport}
-            canEdit
-          />
-        )}
-      </KeyboardAwareScrollView>
-    </View>
+        <KeyboardAwareScrollView
+          ref={scrollRef as unknown as React.Ref<KeyboardAwareScrollViewRef>}
+          style={styles.body}
+          contentContainerStyle={styles.bodyContent}
+          bottomOffset={150}
+          keyboardShouldPersistTaps="handled"
+          onScroll={onScroll}
+          scrollEventThrottle={16}>
+          {activeMainTab.key === 'geninfo' && (
+            <GeneralInformationTab value={generalInfo} onChange={setGeneralInfo} />
+          )}
+          {activeMainTab.key === 'purpose' && (
+            <PurposeOfInspectionTab value={purpose} onChange={setPurpose} />
+          )}
+          {activeMainTab.key === 'compliance' && (
+            <DenrPermitsFormSection
+              value={generalInfo.denrPermits}
+              onChange={denrPermits => setGeneralInfo({ ...generalInfo, denrPermits })}
+            />
+          )}
+          {(activeMainTab.key === 'watersupply' || activeMainTab.key === 'wastewaterpollution' || activeMainTab.key === 'samplingfindings') && (
+            <WaterExtraFormSectionsView
+              value={waterCompliance}
+              onChange={setWaterCompliance}
+              mainTab={activeMainTab}
+              hasDp={hasDp}
+              province={generalInfo.province}
+            />
+          )}
+          {activeMainTab.key === 'attachments' && (
+            <AttachmentsSection
+              parentType="inspection"
+              parentId={draftReportId ?? undefined}
+              ensureParentId={ensureDraftReport}
+              canEdit
+            />
+          )}
+        </KeyboardAwareScrollView>
+      </View>
+    </ReportThemeProvider>
   );
 }
 

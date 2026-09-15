@@ -474,13 +474,44 @@ report-creation time. Deliberately excludes `product`, `year_established`,
   establishment's wastewater when `has_wwtp` is false. `{}` on any report that
   records a WWTP.
 - `wwtp_type`
+- `wwtp_type_other` — text, nullable; what "Others" means when that is the
+  `wwtp_type`. Empty or `NULL` on any other type, and `NULL` on rows written
+  before the column existed. Additive.
 - `wwtp_details`
-- `wwtp_components`
+- `wwtp_components` — jsonb array of camelCase items. Rows written by older
+  builds hold comma-separated strings where `primaryTreatment`,
+  `biologicalTreatment` and `chemicalTreatment` now hold arrays; the client
+  decodes both on read (`decodeWwtpComponent`) and never rewrites a row it
+  does not re-save, so two item shapes are in flight in this column.
 - `wwtp_condition`
+- `wwtp_condition_other` — text, nullable; what "Others" means when that is
+  the `wwtp_condition`. Empty or `NULL` otherwise, and `NULL` on rows written
+  before the column existed. Additive.
 - `wwtp_under_construction`
-- `sampling_points`
-- `previous_inspection_summary`
-- `checklist_dao_2005_10`
+- `wwtp_construction_reported`, `wwtp_construction_units`,
+  `wwtp_construction_completion_date`, `wwtp_treatment_units_utilized` —
+  section 5E questions 3-6, asked only of a WWTP under construction or
+  rehabilitation. All `NULL` unless `wwtp_under_construction` is true, and
+  `NULL` on rows written before the columns existed. Additive.
+- `sampling_conducted` — boolean, nullable; whether the inspector conducted
+  water quality sampling (section 6I). `NULL` on rows written before the
+  column existed, whose `sampling_points` stand as they are. Additive.
+- `sampling_classification` — text, nullable; `Ambient`, `Effluent` or
+  `Both` when `sampling_conducted` is true, `NULL` otherwise. Additive.
+- `sampling_points` — `[]` whenever `sampling_conducted` is false.
+- `previous_inspection_summary` — jsonb object. `hasRecords` (boolean,
+  optional) is section 6II's gate: `false` means the inspector recorded that
+  no previous sampling inspection records exist, and the object then holds
+  nothing else; `true` means the summary fields follow. Rows written before
+  the gate existed have no `hasRecords` and hold the summary if a date was
+  entered, otherwise `{}`.
+- `checklist_dao_2005_10` — jsonb array holding the whole "Summary of
+  Findings" checklist (DAO 2005-10, DAO 1990-35, DAO 1990-25 and Other
+  Requirements — the column name predates the wider list). Each item is
+  `{ key, legal_ref, requirement, compliant, remarks }`; `key` identifies the
+  question and is what the client matches on when reading. Rows written by
+  older builds hold six `{ legal_ref: "Section N", … }` items with no `key`;
+  the client ignores those on read and overwrites them on the next save.
 - `dp_conditions`
 - `other_observations`
 - `remarks_recommendations`

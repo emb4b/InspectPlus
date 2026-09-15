@@ -92,12 +92,21 @@ describe('REPORT_TYPE_DISPLAY', () => {
 
   // The card renders each type as a coloured glyph on a tint of its own hue.
   // That only works as a scanning aid if every type is a saturated hue —
-  // air_monitoring shipped resolving to Colors.textMuted, the same neutral
-  // grey the date text uses, so it read as "no type" rather than "air".
+  // a neutral text grey reads as "no type" rather than as a type.
+  //
+  // Air is the one deliberate exception. It was gray, went orange to satisfy
+  // this rule, and went back to gray by decision (see the comment on
+  // Colors.air) — so the rule still guards the other four, and air is
+  // pinned to its chosen gray separately rather than silently exempted.
   const NEUTRALS = [Colors.textPrimary, Colors.textSecondary, Colors.textMuted, Colors.textLight];
+  const SATURATED_KEYS = ALL_DATA_KEYS.filter((key) => key !== 'air_monitoring');
 
-  it.each(ALL_DATA_KEYS)('%s uses a saturated glyph colour, not a neutral text token', (key) => {
+  it.each(SATURATED_KEYS)('%s uses a saturated glyph colour, not a neutral text token', (key) => {
     expect(NEUTRALS).not.toContain(REPORT_TYPE_DISPLAY[key].textColor);
+  });
+
+  it('air_monitoring is gray by decision, matching the speed dial', () => {
+    expect(REPORT_TYPE_DISPLAY.air_monitoring.textColor).toBe(Colors.textMuted);
   });
 
   // Two types sharing a glyph colour would make the tile useless for telling

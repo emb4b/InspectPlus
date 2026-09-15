@@ -34,12 +34,20 @@ function baseCompliance(hasWwtp: boolean | null): WaterComplianceView {
     nonWwtpTreatment: {},
     hasWwtp,
     wwtpType: null,
+    wwtpTypeOther: null,
     wwtpDetails: [],
     wwtpComponents: [],
     wwtpCondition: null,
+    wwtpConditionOther: null,
     wwtpUnderConstruction: null,
+    wwtpConstructionReported: null,
+    wwtpConstructionUnits: null,
+    wwtpConstructionCompletionDate: null,
+    wwtpTreatmentUnitsUtilized: null,
+    samplingConducted: null,
+    samplingClassification: null,
     samplingPoints: [],
-    previousInspectionSummary: { dateOfSampling: '', samplingStation: '', samplingTime: '', typeOfSample: '', parameters: [] },
+    previousInspectionSummary: { hasRecords: null, dateOfSampling: '', samplingStation: '', samplingTime: '', typeOfSample: '', parameters: [] },
     checklistDao200510: [],
     dpConditions: [],
     otherObservations: null,
@@ -56,7 +64,7 @@ describe('WWTP subsection visibility (view screen)', () => {
     let tree: renderer.ReactTestRenderer;
     act(() => {
       tree = renderer.create(
-        <WaterExtraSectionsView compliance={baseCompliance(true)} canEdit onSaved={() => {}} mainTab={wastewaterPollutionTab} hasDp={false} />,
+        <WaterExtraSectionsView compliance={baseCompliance(true)} canEdit onSaved={() => {}} mainTab={wastewaterPollutionTab} hasDp={false} province="Marinduque" />,
       );
     });
     const json = tree!.toJSON();
@@ -70,7 +78,7 @@ describe('WWTP subsection visibility (view screen)', () => {
     let tree: renderer.ReactTestRenderer;
     act(() => {
       tree = renderer.create(
-        <WaterExtraSectionsView compliance={baseCompliance(false)} canEdit onSaved={() => {}} mainTab={wastewaterPollutionTab} hasDp={false} />,
+        <WaterExtraSectionsView compliance={baseCompliance(false)} canEdit onSaved={() => {}} mainTab={wastewaterPollutionTab} hasDp={false} province="Marinduque" />,
       );
     });
     const json = tree!.toJSON();
@@ -83,7 +91,7 @@ describe('WWTP subsection visibility (view screen)', () => {
     let tree: renderer.ReactTestRenderer;
     act(() => {
       tree = renderer.create(
-        <WaterExtraSectionsView compliance={baseCompliance(null)} canEdit onSaved={() => {}} mainTab={wastewaterPollutionTab} hasDp={false} />,
+        <WaterExtraSectionsView compliance={baseCompliance(null)} canEdit onSaved={() => {}} mainTab={wastewaterPollutionTab} hasDp={false} province="Marinduque" />,
       );
     });
     const json = tree!.toJSON();
@@ -102,6 +110,7 @@ describe('WWTP subsection field visibility (create form)', () => {
           onChange={() => {}}
           mainTab={wastewaterPollutionTab}
           hasDp={false}
+          province="Marinduque"
         />,
       );
     });
@@ -118,6 +127,7 @@ describe('WWTP subsection field visibility (create form)', () => {
           onChange={() => {}}
           mainTab={wastewaterPollutionTab}
           hasDp={false}
+          province="Marinduque"
         />,
       );
     });

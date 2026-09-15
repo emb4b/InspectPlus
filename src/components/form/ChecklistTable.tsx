@@ -8,6 +8,12 @@ import { YesNoNAToggle, YnValue } from './YesNoNAToggle';
 import { focusInput } from './focusInput';
 
 export interface ChecklistItemDef {
+  // Stable identity for the stored answer - refs can repeat (three of the
+  // water checklist's questions sit under one Rule) and lists get revised.
+  key: string;
+  // Legal-reference heading the item sits under; consecutive items with the
+  // same group share one heading. Empty ref = a question with no citation.
+  group?: string;
   ref: string;
   requirement: string;
 }
@@ -31,8 +37,11 @@ export const ChecklistTable: React.FC<ChecklistTableProps> = ({ items, values, o
       {items.map((item, i) => {
         const v = values[i] ?? { compliant: null, remarks: '' };
         const isLast = i === items.length - 1;
+        const opensGroup = !!item.group && item.group !== items[i - 1]?.group;
         return (
-          <View key={item.ref} style={styles.row}>
+          <View key={item.key}>
+            {opensGroup && <Text style={styles.groupHeading}>{item.group}</Text>}
+            <View style={styles.row}>
             <View style={styles.topLine}>
               <Text style={styles.ref}>{item.ref}</Text>
               <YesNoNAToggle
@@ -52,6 +61,7 @@ export const ChecklistTable: React.FC<ChecklistTableProps> = ({ items, values, o
               blurOnSubmit={isLast}
               onSubmitEditing={() => focusInput(remarksRefs.current[i + 1])}
             />
+            </View>
           </View>
         );
       })}
@@ -67,6 +77,16 @@ const styles = StyleSheet.create({
     // play at Spacing.md — resolved here the same way rather than to the
     // tighter sm, which is reserved below for padding inside a row.
     marginBottom: Spacing.md,
+  },
+  groupHeading: {
+    fontSize: Type.caption.fontSize,
+    lineHeight: Type.caption.lineHeight,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+    color: Colors.textMuted,
+    marginTop: Spacing.md,
+    marginBottom: Spacing.xs,
   },
   row: {
     // Same bare-10 case as `wrap`, but this is internal row padding, not a

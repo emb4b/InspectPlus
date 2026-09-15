@@ -7,8 +7,10 @@ import { Type } from '../../../design/typography';
 import {
   FormSection,
   TextField,
+  ComboInput,
   SelectField,
   DateField,
+  TimeField,
   RadioGroup,
   YesNoNAToggle,
   DynamicRowTable,
@@ -18,7 +20,7 @@ import {
 } from '../../../components/form';
 import { AddRowButton } from '../../../components/AddRowButton';
 import {
-  DAO_2005_10_CHECKLIST,
+  WATER_FINDINGS_CHECKLIST,
   DOCUMENTS_REVIEWED_OPTIONS,
   WATER_SOURCE_TYPES,
   WASTEWATER_USE_TYPES,
@@ -28,9 +30,17 @@ import {
   NON_WWTP_TREATMENT_OTHERS,
   NON_WWTP_TREATMENT_PROMPT,
   NON_WWTP_TREATMENT_OTHER_LABEL,
+  PRIMARY_TREATMENT_OPTIONS,
+  BIOLOGICAL_TREATMENT_OPTIONS,
+  CHEMICAL_TREATMENT_OPTIONS,
   WWTP_TYPE_OPTIONS,
+  WWTP_TYPE_OTHERS,
   WWTP_CONDITION_OPTIONS,
+  WWTP_CONDITION_OTHERS,
+  SAMPLING_CLASSIFICATION_OPTIONS,
+  WATER_QUALITY_PARAMETERS,
 } from './waterChecklistData';
+import { TreatmentCheckboxGroup } from './TreatmentCheckboxGroup';
 import {
   WaterComplianceFormState,
   emptySamplingPoint,
@@ -41,17 +51,21 @@ import {
   SamplingParameterRow,
 } from './waterTypes';
 import type { WaterMainTabDef } from './waterReportTabs';
+import { getWaterbodyGroups, WATERBODY_NOT_LISTED } from '../../../constants/waterbodies';
 
 const YES_NO = [
   { label: 'Yes', value: 'yes' },
   { label: 'No', value: 'no' },
 ];
 
+const SAMPLING_CLASSIFICATION = SAMPLING_CLASSIFICATION_OPTIONS.map(o => ({ label: o, value: o }));
+
 interface WaterExtraFormSectionsViewProps {
   value: WaterComplianceFormState;
   onChange: (value: WaterComplianceFormState) => void;
   mainTab: WaterMainTabDef;
   hasDp: boolean;
+  province: string;
 }
 
 // Renders every subsection of the active main tab in template order, top to
@@ -65,10 +79,28 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
   onChange,
   mainTab,
   hasDp,
+  province,
 }) => {
   const fieldRefs = useRef<Record<string, TextInput | null>>({});
   const focus = (key: string) => focusInput(fieldRefs.current[key]);
   const setRef = (key: string) => (el: TextInput | null) => { fieldRefs.current[key] = el; };
+
+  // The dropdown offers this establishment's own province plus a way to say
+  // "none of these" - see getWaterbodyGroups for the out-of-region fallback.
+  // The not-listed option is its own trailing, ungrouped-feeling group
+  // rather than folded into "Other Waterbodies": that group is a real EMB
+  // classification heading, and filing the escape hatch under it would read
+  // as though "Not listed (specify)" were itself a classified waterbody.
+  // getWaterbodyGroups returns the bundled dataset's own arrays, so we
+  // spread into a new outer array rather than pushing into any of its
+  // groups' option arrays.
+  const waterbodyGroups = React.useMemo(
+    () => [
+      ...getWaterbodyGroups(province),
+      { label: 'Not on the list', options: [WATERBODY_NOT_LISTED] },
+    ],
+    [province],
+  );
 
   const set = <K extends keyof WaterComplianceFormState>(key: K, v: WaterComplianceFormState[K]) =>
     onChange({ ...value, [key]: v });
@@ -290,7 +322,22 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
         }
         return (
           <FormSection icon="business-outline" title="B. Type of WWTP">
-            <SelectField label="WWTP Type" value={value.wwtpType} options={WWTP_TYPE_OPTIONS} onSelect={v => set('wwtpType', v)} />
+            <SelectField
+              label="WWTP Type"
+              value={value.wwtpType}
+              options={WWTP_TYPE_OPTIONS}
+              onSelect={v => set('wwtpType', v)}
+            />
+            {value.wwtpType === WWTP_TYPE_OTHERS && (
+              <TextField
+                ref={setRef('wwtpTypeOther')}
+                label="Specify the type of WWTP"
+                value={value.wwtpTypeOther}
+                onChangeText={t => set('wwtpTypeOther', t)}
+                placeholder="e.g. Membrane bioreactor"
+                returnKeyType="done"
+              />
+            )}
           </FormSection>
         );
 
@@ -373,18 +420,15 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                       onChangeText={t => updateWwtpDetail(i, { outletLocation: t })}
                       returnKeyType="next"
                       blurOnSubmit={false}
-                      onSubmitEditing={() => focus(k('receivingBodyOfWater'))}
+                      onSubmitEditing={() => focus(k('flowMeterDevice'))}
                     />
                   </View>
                   <View style={styles.row}>
-                    <TextField
-                      ref={setRef(k('receivingBodyOfWater'))}
-                      label="Receiving Body of Water"
+                    <SelectField
+                      label="Receiving Body of Water (Water Classification)"
                       value={d.receivingBodyOfWater}
-                      onChangeText={t => updateWwtpDetail(i, { receivingBodyOfWater: t })}
-                      returnKeyType="next"
-                      blurOnSubmit={false}
-                      onSubmitEditing={() => focus(k('flowMeterDevice'))}
+                      groups={waterbodyGroups}
+                      onSelect={v => updateWwtpDetail(i, { receivingBodyOfWater: v })}
                     />
                     <TextField
                       ref={setRef(k('flowMeterDevice'))}
@@ -396,6 +440,20 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                       onSubmitEditing={() => focus(k('flowRate'))}
                     />
                   </View>
+                  {d.receivingBodyOfWater === WATERBODY_NOT_LISTED && (
+                    <View style={styles.row}>
+                      <TextField
+                        ref={setRef(k('receivingBodyOfWaterOther'))}
+                        label="Specify"
+                        value={d.receivingBodyOfWaterOther}
+                        onChangeText={t => updateWwtpDetail(i, { receivingBodyOfWaterOther: t })}
+                        placeholder="e.g. Sapa Creek"
+                        returnKeyType="next"
+                        blurOnSubmit={false}
+                        onSubmitEditing={() => focus(k('flowRate'))}
+                      />
+                    </View>
+                  )}
                   <View style={styles.row}>
                     <TextField
                       ref={setRef(k('flowRate'))}
@@ -441,45 +499,47 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                       onChangeText={t => updateWwtpComponent(i, { outletNo: t })}
                       returnKeyType="next"
                       blurOnSubmit={false}
-                      onSubmitEditing={() => focus(k('primaryTreatment'))}
+                      onSubmitEditing={() => focus(k('wwtp'))}
                     />
+                    {/* Chain ends here: what follows is checkbox groups, not
+                        text, so there is nothing left for "next" to reach. */}
                     <TextField
-                      ref={setRef(k('primaryTreatment'))}
-                      label="Primary Treatment"
-                      value={c.primaryTreatment}
-                      onChangeText={t => updateWwtpComponent(i, { primaryTreatment: t })}
-                      hint="Comma-separated"
-                      returnKeyType="next"
-                      blurOnSubmit={false}
-                      onSubmitEditing={() => focus(k('biologicalTreatment'))}
+                      ref={setRef(k('wwtp'))}
+                      label="WWTP"
+                      value={c.wwtp}
+                      onChangeText={t => updateWwtpComponent(i, { wwtp: t })}
+                      placeholder="e.g. Septic Tank"
+                      returnKeyType="done"
                     />
                   </View>
-                  <View style={styles.row}>
-                    <TextField
-                      ref={setRef(k('biologicalTreatment'))}
-                      label="Biological Treatment"
-                      value={c.biologicalTreatment}
-                      onChangeText={t => updateWwtpComponent(i, { biologicalTreatment: t })}
-                      hint="Comma-separated"
-                      returnKeyType="next"
-                      blurOnSubmit={false}
-                      onSubmitEditing={() => focus(k('chemicalTreatment'))}
-                    />
-                    <TextField
-                      ref={setRef(k('chemicalTreatment'))}
-                      label="Chemical Treatment"
-                      value={c.chemicalTreatment}
-                      onChangeText={t => updateWwtpComponent(i, { chemicalTreatment: t })}
-                      hint="Comma-separated"
-                      returnKeyType="next"
-                      blurOnSubmit={false}
-                      onSubmitEditing={() => focus(k('otherTreatment'))}
-                    />
-                  </View>
+                  <TreatmentCheckboxGroup
+                    label="Primary"
+                    options={PRIMARY_TREATMENT_OPTIONS}
+                    selected={c.primaryTreatment}
+                    other={c.primaryTreatmentOther}
+                    onChangeSelected={v => updateWwtpComponent(i, { primaryTreatment: v })}
+                    onChangeOther={v => updateWwtpComponent(i, { primaryTreatmentOther: v })}
+                  />
+                  <TreatmentCheckboxGroup
+                    label="Biological"
+                    options={BIOLOGICAL_TREATMENT_OPTIONS}
+                    selected={c.biologicalTreatment}
+                    other={c.biologicalTreatmentOther}
+                    onChangeSelected={v => updateWwtpComponent(i, { biologicalTreatment: v })}
+                    onChangeOther={v => updateWwtpComponent(i, { biologicalTreatmentOther: v })}
+                  />
+                  <TreatmentCheckboxGroup
+                    label="Chemical"
+                    options={CHEMICAL_TREATMENT_OPTIONS}
+                    selected={c.chemicalTreatment}
+                    other={c.chemicalTreatmentOther}
+                    onChangeSelected={v => updateWwtpComponent(i, { chemicalTreatment: v })}
+                    onChangeOther={v => updateWwtpComponent(i, { chemicalTreatmentOther: v })}
+                  />
                   <View style={styles.row}>
                     <TextField
                       ref={setRef(k('otherTreatment'))}
-                      label="Other Treatment"
+                      label="Others"
                       value={c.otherTreatment}
                       onChangeText={t => updateWwtpComponent(i, { otherTreatment: t })}
                       returnKeyType="done"
@@ -511,13 +571,85 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                 onChange={v => set('wwtpUnderConstruction', v as 'yes' | 'no')}
               />
             </View>
+            {value.wwtpCondition === WWTP_CONDITION_OTHERS && (
+              <TextField
+                ref={setRef('wwtpConditionOther')}
+                label="Specify the condition"
+                value={value.wwtpConditionOther}
+                onChangeText={t => set('wwtpConditionOther', t)}
+                placeholder="e.g. Under repair"
+                returnKeyType="done"
+              />
+            )}
+            {/* Questions 3-6 on the printed form only apply to a plant under
+                construction or rehabilitation, so they follow question 2. */}
+            {value.wwtpUnderConstruction === 'yes' && (
+              <>
+                <RadioGroup
+                  label="Reported to EMB/LLDA?"
+                  options={YES_NO}
+                  value={value.wwtpConstructionReported}
+                  onChange={v => set('wwtpConstructionReported', v as 'yes' | 'no')}
+                />
+                <TextField
+                  ref={setRef('wwtpConstructionUnits')}
+                  label="Units under construction or being modified"
+                  value={value.wwtpConstructionUnits}
+                  onChangeText={t => set('wwtpConstructionUnits', t)}
+                  placeholder="e.g. Aeration tank, clarifier"
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => focus('wwtpConstructionCompletionDate')}
+                />
+                <View style={styles.row}>
+                  <DateField
+                    ref={setRef('wwtpConstructionCompletionDate')}
+                    label="Estimated date of completion"
+                    value={value.wwtpConstructionCompletionDate}
+                    onChange={t => set('wwtpConstructionCompletionDate', t)}
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    onSubmitEditing={() => focus('wwtpTreatmentUnitsUtilized')}
+                  />
+                  <TextField
+                    ref={setRef('wwtpTreatmentUnitsUtilized')}
+                    label="Treatment units utilized to treat wastewater"
+                    value={value.wwtpTreatmentUnitsUtilized}
+                    onChangeText={t => set('wwtpTreatmentUnitsUtilized', t)}
+                    placeholder="e.g. Septic tank"
+                    returnKeyType="done"
+                  />
+                </View>
+              </>
+            )}
           </FormSection>
         );
 
       case 'samplingPoints':
         return (
           <FormSection icon="flask-outline" title="I. Water Quality Sampling">
-            {value.samplingPoints.map((pt, i) => {
+            <RadioGroup
+              label="Was water quality sampling conducted?"
+              options={YES_NO}
+              value={value.samplingConducted}
+              onChange={v => set('samplingConducted', v as 'yes' | 'no')}
+            />
+            {value.samplingConducted === 'yes' && (
+              <RadioGroup
+                label="Sampling classification"
+                options={SAMPLING_CLASSIFICATION}
+                value={value.samplingClassification || null}
+                onChange={v => set('samplingClassification', v)}
+              />
+            )}
+            {/* Points are hidden rather than cleared when the answer flips
+                to No; samplingForSave is what keeps the stored report
+                consistent. Unanswered still shows nothing to add - the
+                question comes first. */}
+            {value.samplingConducted === 'no' && (
+              <Text style={styles.emptyText}>No sampling conducted — sampling points are not applicable.</Text>
+            )}
+            {value.samplingConducted === 'yes' && value.samplingPoints.map((pt, i) => {
               const k = (field: string) => `samplingPoint:${i}:${field}`;
               const pk = (pi: number, field: string) => `samplingParam:${i}:${pi}:${field}`;
               return (
@@ -550,12 +682,11 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                     />
                   </View>
                   <View style={styles.row}>
-                    <TextField
+                    <TimeField
                       ref={setRef(k('samplingTime'))}
                       label="Sampling Time"
                       value={pt.samplingTime}
-                      onChangeText={t => updateSamplingPoint(i, { samplingTime: t })}
-                      placeholder="e.g. 9:00 AM"
+                      onChange={t => updateSamplingPoint(i, { samplingTime: t })}
                       returnKeyType="next"
                       blurOnSubmit={false}
                       onSubmitEditing={() => focus(k('typeOfSample'))}
@@ -574,7 +705,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                   <View style={styles.row}>
                     <TextField
                       ref={setRef(k('remarks'))}
-                      label="Remarks"
+                      label="Result Analysis"
                       value={pt.remarks}
                       onChangeText={t => updateSamplingPoint(i, { remarks: t })}
                       returnKeyType={pt.parameters.length > 0 ? 'next' : 'done'}
@@ -589,13 +720,14 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                     return (
                       <View key={pi} style={styles.paramRow}>
                         <View style={styles.paramTopLine}>
-                          <TextInput
+                          <ComboInput
                             ref={setRef(pk(pi, 'name'))}
                             style={styles.paramNameInput}
+                            title="Parameter"
+                            options={WATER_QUALITY_PARAMETERS}
                             value={param.parameterName}
                             onChangeText={t => updateParameter(i, pi, { parameterName: t })}
                             placeholder="Parameter name"
-                            placeholderTextColor={Colors.textLight}
                             returnKeyType="next"
                             blurOnSubmit={false}
                             onSubmitEditing={() => focus(pk(pi, 'value'))}
@@ -628,18 +760,23 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                             blurOnSubmit={false}
                             onSubmitEditing={() => focus(pk(pi, 'standard'))}
                           />
-                          <TextInput
-                            ref={setRef(pk(pi, 'standard'))}
-                            style={styles.paramSmallInput}
-                            value={param.denrStandard}
-                            onChangeText={t => updateParameter(i, pi, { denrStandard: t })}
-                            placeholder="DENR Standard"
-                            placeholderTextColor={Colors.textLight}
-                            returnKeyType={isLastParam ? 'done' : 'next'}
-                            blurOnSubmit={isLastParam}
-                            onSubmitEditing={() => focus(pk(pi + 1, 'name'))}
-                          />
                         </View>
+                        {/* Its own line, not a third of one: a standard is
+                            rarely a bare number ("50 mg/L (Class C, DAO
+                            2016-08)"), so it gets the width and the height
+                            to hold that. */}
+                        <TextInput
+                          ref={setRef(pk(pi, 'standard'))}
+                          style={styles.paramStandardInput}
+                          value={param.denrStandard}
+                          onChangeText={t => updateParameter(i, pi, { denrStandard: t })}
+                          placeholder="DENR Standard"
+                          placeholderTextColor={Colors.textLight}
+                          multiline
+                          returnKeyType="next"
+                          blurOnSubmit={false}
+                          onSubmitEditing={() => focus(pk(pi, 'remarks'))}
+                        />
                         <TextInput
                           ref={setRef(pk(pi, 'remarks'))}
                           style={styles.paramRemarksInput}
@@ -658,13 +795,31 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                 </View>
               );
             })}
-            <AddRowButton style={styles.addBtn} label="Add Sampling Point" onPress={addSamplingPoint} />
+            {value.samplingConducted === 'yes' && (
+              <AddRowButton style={styles.addBtn} label="Add Sampling Point" onPress={addSamplingPoint} />
+            )}
           </FormSection>
         );
 
-      case 'previousInspection':
+      case 'previousInspection': {
+        const prev = value.previousInspection;
         return (
           <FormSection icon="time-outline" title="II. Previous Inspection">
+            <RadioGroup
+              label="Any previous sampling inspection records?"
+              options={YES_NO}
+              value={prev.hasRecords}
+              onChange={v => set('previousInspection', { ...prev, hasRecords: v as 'yes' | 'no' })}
+            />
+            {/* Fields are hidden rather than cleared when the answer flips
+                to No; previousInspectionForSave is what keeps the stored
+                report consistent. Unanswered shows nothing yet - the
+                question comes first. */}
+            {prev.hasRecords === 'no' && (
+              <Text style={styles.emptyText}>No previous sampling inspection records — this section is not applicable.</Text>
+            )}
+            {prev.hasRecords === 'yes' && (
+              <>
             <View style={styles.row}>
               <DateField
                 label="Date of Sampling"
@@ -685,11 +840,11 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
               />
             </View>
             <View style={styles.row}>
-              <TextField
+              <TimeField
                 ref={setRef('prev:samplingTime')}
                 label="Sampling Time"
                 value={value.previousInspection.samplingTime}
-                onChangeText={t => set('previousInspection', { ...value.previousInspection, samplingTime: t })}
+                onChange={t => set('previousInspection', { ...value.previousInspection, samplingTime: t })}
                 returnKeyType="next"
                 blurOnSubmit={false}
                 onSubmitEditing={() => focus('prev:typeOfSample')}
@@ -711,13 +866,14 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
               return (
                 <View key={pi} style={styles.paramRow}>
                   <View style={styles.paramTopLine}>
-                    <TextInput
+                    <ComboInput
                       ref={setRef(pk('name'))}
                       style={styles.paramNameInput}
+                      title="Parameter"
+                      options={WATER_QUALITY_PARAMETERS}
                       value={param.parameterName}
                       onChangeText={t => updatePrevParameter(pi, { parameterName: t })}
                       placeholder="Parameter name"
-                      placeholderTextColor={Colors.textLight}
                       returnKeyType="next"
                       blurOnSubmit={false}
                       onSubmitEditing={() => focus(pk('value'))}
@@ -750,30 +906,46 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                       blurOnSubmit={false}
                       onSubmitEditing={() => focus(pk('standard'))}
                     />
-                    <TextInput
-                      ref={setRef(pk('standard'))}
-                      style={styles.paramSmallInput}
-                      value={param.denrStandard}
-                      onChangeText={t => updatePrevParameter(pi, { denrStandard: t })}
-                      placeholder="DENR Standard"
-                      placeholderTextColor={Colors.textLight}
-                      returnKeyType={isLastParam ? 'done' : 'next'}
-                      blurOnSubmit={isLastParam}
-                      onSubmitEditing={() => focus(`prevparam:${pi + 1}:name`)}
-                    />
                   </View>
+                  {/* Same row as section I's - see the note there. */}
+                  <TextInput
+                    ref={setRef(pk('standard'))}
+                    style={styles.paramStandardInput}
+                    value={param.denrStandard}
+                    onChangeText={t => updatePrevParameter(pi, { denrStandard: t })}
+                    placeholder="DENR Standard"
+                    placeholderTextColor={Colors.textLight}
+                    multiline
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    onSubmitEditing={() => focus(pk('remarks'))}
+                  />
+                  <TextInput
+                    ref={setRef(pk('remarks'))}
+                    style={styles.paramRemarksInput}
+                    value={param.remarks}
+                    onChangeText={t => updatePrevParameter(pi, { remarks: t })}
+                    placeholder="Remarks"
+                    placeholderTextColor={Colors.textLight}
+                    returnKeyType={isLastParam ? 'done' : 'next'}
+                    blurOnSubmit={isLastParam}
+                    onSubmitEditing={() => focus(`prevparam:${pi + 1}:name`)}
+                  />
                 </View>
               );
             })}
             <AddRowButton style={styles.addBtn} label="Add Parameter" onPress={addPrevParameter} small />
+              </>
+            )}
           </FormSection>
         );
+      }
 
       case 'summaryOfFindings':
         return (
           <FormSection icon="clipboard-outline" title="III. Summary of Findings">
             <ChecklistTable
-              items={DAO_2005_10_CHECKLIST}
+              items={WATER_FINDINGS_CHECKLIST}
               values={value.checklistDao200510}
               onChange={(i, patch) => {
                 const rows = value.checklistDao200510.slice();
@@ -978,15 +1150,10 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 6,
   },
+  // ComboInput brings its own border, padding and type; only the flex
+  // placement in the top line is this file's to set.
   paramNameInput: {
     flex: 1,
-    fontSize: 12,
-    color: Colors.textPrimary,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
   },
   paramFieldsRow: {
     flexDirection: 'row',
@@ -1002,6 +1169,18 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 6,
+  },
+  paramStandardInput: {
+    fontSize: 11.5,
+    color: Colors.textPrimary,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    minHeight: 48,
+    textAlignVertical: 'top',
+    marginBottom: 6,
   },
   paramRemarksInput: {
     fontSize: 11.5,

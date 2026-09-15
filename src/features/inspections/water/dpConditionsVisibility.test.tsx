@@ -46,12 +46,20 @@ function baseCompliance(): WaterComplianceView {
     nonWwtpTreatment: {},
     hasWwtp: null,
     wwtpType: null,
+    wwtpTypeOther: null,
     wwtpDetails: [],
     wwtpComponents: [],
     wwtpCondition: null,
+    wwtpConditionOther: null,
     wwtpUnderConstruction: null,
+    wwtpConstructionReported: null,
+    wwtpConstructionUnits: null,
+    wwtpConstructionCompletionDate: null,
+    wwtpTreatmentUnitsUtilized: null,
+    samplingConducted: null,
+    samplingClassification: null,
     samplingPoints: [],
-    previousInspectionSummary: { dateOfSampling: '', samplingStation: '', samplingTime: '', typeOfSample: '', parameters: [] },
+    previousInspectionSummary: { hasRecords: null, dateOfSampling: '', samplingStation: '', samplingTime: '', typeOfSample: '', parameters: [] },
     checklistDao200510: [],
     dpConditions: [{ conditionNo: '1', description: 'Effluent within limits', compliant: null, remarks: '' }],
     otherObservations: null,
@@ -90,6 +98,7 @@ describe('DP conditions Edit-button visibility (view screen)', () => {
           onSaved={() => {}}
           mainTab={samplingFindingsTab}
           hasDp
+          province="Marinduque"
         />,
       );
     });
@@ -110,6 +119,7 @@ describe('DP conditions Edit-button visibility (view screen)', () => {
           onSaved={() => {}}
           mainTab={samplingFindingsTab}
           hasDp={false}
+          province="Marinduque"
         />,
       );
     });
@@ -129,6 +139,7 @@ describe('DP conditions field visibility (create form)', () => {
           onChange={() => {}}
           mainTab={samplingFindingsTab}
           hasDp
+          province="Marinduque"
         />,
       );
     });
@@ -144,6 +155,7 @@ describe('DP conditions field visibility (create form)', () => {
           onChange={() => {}}
           mainTab={samplingFindingsTab}
           hasDp={false}
+          province="Marinduque"
         />,
       );
     });

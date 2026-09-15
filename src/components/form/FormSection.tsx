@@ -5,6 +5,7 @@ import { Colors } from '../../design/colors';
 import { Spacing } from '../../design/spacing';
 import { Type } from '../../design/typography';
 import { AppText } from '../AppText';
+import { useReportAccent } from '../../core/providers/ReportThemeProvider';
 
 interface FormSectionProps {
   icon?: keyof typeof Ionicons.glyphMap;
@@ -20,18 +21,23 @@ interface FormSectionProps {
 // regulation the section is about. A marquee showed them in full but read as
 // restless next to a static button, and only one section ever had it, so the
 // same kind of heading truncated two different ways.
-export const FormSection: React.FC<FormSectionProps> = ({ icon, title, headerRight, children }) => (
+export const FormSection: React.FC<FormSectionProps> = ({ icon, title, headerRight, children }) => {
+  // The icon is the one part of the heading that is identity rather than
+  // structure, so it alone takes the report's accent; title and rule stay.
+  const accent = useReportAccent(Colors.navy);
+  return (
   <View style={styles.section}>
     <View style={styles.titleRow}>
       <View style={styles.titleLeft}>
-        {icon && <Ionicons name={icon} size={16} color={Colors.navy} />}
+        {icon && <Ionicons name={icon} size={16} color={accent} />}
         <AppText variant="multiline" text={title} style={styles.title} containerStyle={styles.titleContainer} />
       </View>
       {headerRight}
     </View>
     {children}
   </View>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   section: {

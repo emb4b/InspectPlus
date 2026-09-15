@@ -86,16 +86,23 @@ export const ChecklistList: React.FC<{ items: ChecklistEntry[] }> = ({ items }) 
   if (items.length === 0) return <Text style={styles.emptyText}>No checklist entries recorded.</Text>;
   return (
     <View>
-      {items.map((item, i) => (
-        <View key={i} style={styles.checklistRow}>
-          <View style={styles.checklistTopLine}>
-            {item.legal_ref ? <Text style={styles.checklistRef}>{item.legal_ref}</Text> : <View />}
-            <YnBadge value={item.compliant} />
+      {items.map((item, i) => {
+        const group = typeof item.group === 'string' ? item.group : '';
+        const opensGroup = !!group && group !== items[i - 1]?.group;
+        return (
+          <View key={i}>
+            {opensGroup && <Text style={[styles.subTitle, i > 0 && styles.subTitleSpaced]}>{group}</Text>}
+            <View style={styles.checklistRow}>
+              <View style={styles.checklistTopLine}>
+                {item.legal_ref ? <Text style={styles.checklistRef}>{item.legal_ref}</Text> : <View />}
+                <YnBadge value={item.compliant} />
+              </View>
+              {item.requirement && <Text style={styles.checklistRequirement}>{item.requirement}</Text>}
+              {!!item.remarks && <Text style={styles.checklistRemarks}>{item.remarks}</Text>}
+            </View>
           </View>
-          {item.requirement && <Text style={styles.checklistRequirement}>{item.requirement}</Text>}
-          {!!item.remarks && <Text style={styles.checklistRemarks}>{item.remarks}</Text>}
-        </View>
-      ))}
+        );
+      })}
     </View>
   );
 };
