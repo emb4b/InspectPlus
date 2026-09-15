@@ -17,6 +17,11 @@ interface SyncOptionsModalProps {
   syncing: boolean;
   onCancel: () => void;
   onSync: (direction: SyncDirection) => void;
+  // The recovery action. Its own handler, not a fourth direction: it
+  // confirms first and does something the three directions never do
+  // (delete the synced cache), so it must not be reachable by picking a
+  // radio out of habit and tapping Start Sync.
+  onReset: () => void;
 }
 
 export const SyncOptionsModal: React.FC<SyncOptionsModalProps> = ({
@@ -24,6 +29,7 @@ export const SyncOptionsModal: React.FC<SyncOptionsModalProps> = ({
   syncing,
   onCancel,
   onSync,
+  onReset,
 }) => {
   const [direction, setDirection] = useState<SyncDirection>('both');
 
@@ -77,6 +83,24 @@ export const SyncOptionsModal: React.FC<SyncOptionsModalProps> = ({
                   {direction === 'push' && 'Uploads changes made on this device without downloading anything from the server.'}
                   {direction === 'both' && 'Uploads changes from this device, then downloads the latest changes from the server.'}
                 </Text>
+
+                {/* Set apart from the directions above by a rule and its
+                    own heading: a recovery tool for a local copy that is
+                    empty or wrong, not an everyday choice. */}
+                <View style={styles.recovery}>
+                  <Text style={styles.recoveryLabel}>If your lists look empty or wrong</Text>
+                  <TouchableOpacity
+                    style={styles.resetBtn}
+                    onPress={onReset}
+                    disabled={syncing}
+                    activeOpacity={0.7}>
+                    <Ionicons name="refresh-outline" size={14} color={Colors.navy} />
+                    <Text style={styles.resetText}>Reset and re-download…</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.hint}>
+                    Sends your unsynced entries up first, then replaces everything else on this phone with a fresh copy from the server. Takes longer than a normal sync.
+                  </Text>
+                </View>
               </View>
 
               <View style={styles.footer}>
@@ -164,6 +188,37 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     lineHeight: 15,
     marginTop: -4,
+  },
+  recovery: {
+    marginTop: 16,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    gap: 8,
+  },
+  recoveryLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    color: Colors.textMuted,
+  },
+  resetBtn: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    backgroundColor: Colors.white,
+  },
+  resetText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.navy,
   },
   footer: {
     flexDirection: 'row',
