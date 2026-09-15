@@ -54,6 +54,7 @@
     { "op": "cell", "table": 4, "row": 15, "cell": 2, "tag": "purpose_cb_pab" },
     { "op": "cell", "table": 4, "row": 16, "cell": 2, "tag": "purpose_cb_commitment_others" },
     { "op": "cell", "table": 4, "row": 16, "cell": 3, "tag": "purpose_commitment_others" },
+    { "op": "replaceText", "find": ": _", "with": ": ", "nth": 1 },
     { "op": "replaceText", "find": "________________________", "with": "{purpose_others}", "nth": 1 },
 
     { "op": "cell", "table": 5, "row": 2, "cell": 3, "tag": "permit_ecc1_serial" },

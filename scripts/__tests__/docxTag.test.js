@@ -21,6 +21,20 @@ describe('applyRecipe', () => {
     expect(out).toContain('<w:r><w:rPr><w:sz w:val="20"/></w:rPr><w:t xml:space="preserve">{t}</w:t></w:r>');
   });
 
+  it('normalises a self-closing <w:p/> before inserting a cell tag, without corrupting its attributes', () => {
+    // Word writes a wholly-empty paragraph as a self-closing <w:p .../>. The
+    // cell/loop ops locate a paragraph's end by subtracting '</w:p>'.length
+    // from its span end, which only holds for the open/close form — on a
+    // self-closing paragraph that used to land mid-attribute and corrupt the
+    // XML (see normalise()'s self-closing-<w:p/> expansion).
+    const selfClosingP = '<w:p w:rsidR="00AB12CD" w14:textId="77777777" />';
+    const xml = doc(`<w:tbl>${TR(TC(selfClosingP))}</w:tbl>`);
+    const out = applyRecipe(xml, { checkboxes: [], ops: [{ op: 'cell', table: 1, row: 1, cell: 1, tag: 'x' }] });
+    expect(out).toContain('w:rsidR="00AB12CD" w14:textId="77777777"');
+    expect(out).toContain('<w:t xml:space="preserve">{x}</w:t>');
+    expect(out).toMatch(/<w:p w:rsidR="00AB12CD" w14:textId="77777777" ?><w:r><w:t xml:space="preserve">\{x\}<\/w:t><\/w:r><\/w:p>/);
+  });
+
   it('replaces the nth exact text', () => {
     const xml = doc(P(' __') + P(' __') + P('Date: ____'));
     const out = applyRecipe(xml, { checkboxes: [], ops: [{ op: 'replaceText', find: ' __', with: ' {b}', nth: 2 }] });
