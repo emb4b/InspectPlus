@@ -42,7 +42,14 @@ function normalise(xml) {
   let out = xml.replace(/<w:sdt>(?:(?!<w:sdt>)[\s\S])*?<w14:checkbox>[\s\S]*?<\/w:sdtPr><w:sdtContent>([\s\S]*?)<\/w:sdtContent><\/w:sdt>/g, '$1');
   // Remove legacy FORMCHECKBOX fields (begin … end runs, plus bookmarks around them).
   out = out.replace(/<w:r>(?:(?!<\/w:r>)[\s\S])*?<w:fldChar w:fldCharType="begin">(?:(?!<w:fldChar w:fldCharType="end")[\s\S])*?FORMCHECKBOX[\s\S]*?<w:fldChar w:fldCharType="end"\s*\/><\/w:r>/g, '');
-  out = out.replace(/<w:bookmarkStart w:name="Check\d+" w:id="\d+"\s*\/>|<w:bookmarkEnd w:id="\d+"\s*\/>/g, '');
+  // Only strip the bookmarks that wrap the checkbox fields — other bookmarks (e.g. Word's
+  // own `_GoBack`) share the same <w:bookmarkEnd w:id="N"/> shape and must survive intact.
+  const checkIds = [...out.matchAll(/<w:bookmarkStart w:name="Check\d+" w:id="(\d+)"\s*\/>/g)].map(m => m[1]);
+  out = out.replace(/<w:bookmarkStart w:name="Check\d+" w:id="\d+"\s*\/>/g, '');
+  if (checkIds.length) {
+    const endRe = new RegExp(`<w:bookmarkEnd w:id="(?:${checkIds.join('|')})"\\s*/>`, 'g');
+    out = out.replace(endRe, '');
+  }
   return out;
 }
 

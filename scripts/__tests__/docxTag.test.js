@@ -86,6 +86,16 @@ describe('applyRecipe', () => {
     expect(out).toContain('<w:t>__</w:t>');
   });
 
+  it('only strips bookmarks paired with a Check* field, leaving unrelated bookmarks like _GoBack intact', () => {
+    const field = '<w:r><w:fldChar w:fldCharType="begin"><w:ffData><w:checkBox/></w:ffData></w:fldChar></w:r><w:r><w:instrText xml:space="preserve"> FORMCHECKBOX </w:instrText></w:r><w:r></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>';
+    const xml = doc(`<w:p><w:bookmarkStart w:name="Check1" w:id="1"/>${field}<w:bookmarkEnd w:id="1"/><w:bookmarkStart w:name="_GoBack" w:id="7"/><w:bookmarkEnd w:id="7"/></w:p>`);
+    const out = applyRecipe(xml, { checkboxes: [], ops: [] });
+    expect(out).not.toContain('Check1');
+    expect(out).not.toContain('FORMCHECKBOX');
+    expect(out).toContain('<w:bookmarkStart w:name="_GoBack" w:id="7"/>');
+    expect(out).toContain('<w:bookmarkEnd w:id="7"/>');
+  });
+
   it('fails loudly on a checkbox count mismatch or a missing target', () => {
     const xml = doc(`<w:tbl>${TR(TC(`<w:p>${SDT(CB)}</w:p>`))}</w:tbl>`);
     expect(() => applyRecipe(xml, { checkboxes: ['a', 'b'], ops: [] })).toThrow(/2 names .* 1 checkbox/);
