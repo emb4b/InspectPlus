@@ -1,6 +1,6 @@
 import type { DynamicRow, ChecklistValue, YnValue } from '../../../components/form';
 import {
-  DAO_2005_10_CHECKLIST,
+  WATER_FINDINGS_CHECKLIST,
   NON_WWTP_TREATMENT_OTHERS,
   TREATMENT_OTHERS,
   WWTP_TYPE_OTHERS,
@@ -187,7 +187,7 @@ export function emptyWaterComplianceForm(): WaterComplianceFormState {
       typeOfSample: '',
       parameters: [],
     },
-    checklistDao200510: DAO_2005_10_CHECKLIST.map(() => ({ compliant: null, remarks: '' })),
+    checklistDao200510: WATER_FINDINGS_CHECKLIST.map(() => ({ compliant: null, remarks: '' })),
     dpConditions: [emptyDpCondition('1')],
     documentsReviewed: [],
     otherObservations: '',
@@ -424,6 +424,52 @@ export interface WwtpConstructionRecord {
   wwtpConstructionUnits: string | null;
   wwtpConstructionCompletionDate: string | null;
   wwtpTreatmentUnitsUtilized: string | null;
+}
+
+// ── Summary of Findings ──────────────────────────────────────────────────────
+// The form holds one {compliant, remarks} per question, in checklist order.
+// The record holds the same answers keyed and self-describing - each entry
+// carries the question's key, citation and wording as they stood when it
+// was answered - so a stored report reads on its own and survives the list
+// being reordered or revised. (Still under the checklist_dao_2005_10
+// column; renaming it isn't worth a push_changes re-issue.)
+
+export interface FindingsEntry {
+  key: string;
+  legal_ref: string;
+  requirement: string;
+  compliant: YnValue;
+  remarks: string;
+}
+
+export function findingsEntriesForSave(values: ChecklistValue[]): FindingsEntry[] {
+  return WATER_FINDINGS_CHECKLIST.map((def, i) => ({
+    key: def.key,
+    legal_ref: def.ref ? `${def.group} ${def.ref}` : def.group ?? '',
+    requirement: def.requirement,
+    compliant: values[i]?.compliant ?? null,
+    remarks: values[i]?.remarks ?? '',
+  }));
+}
+
+// Answers are matched by key, never by position. Entries the current list
+// doesn't know - the retired "Section N" placeholders - are dropped, so an
+// old report opens blank here rather than with answers under the wrong
+// questions.
+// Takes the record's entries as stored - our own FindingsEntry shape, the
+// hook's looser ChecklistEntry, or anything an older build wrote.
+export type StoredFindingsEntry = Partial<FindingsEntry> | Record<string, unknown>;
+
+export function findingsValuesFromEntries(entries: readonly StoredFindingsEntry[]): ChecklistValue[] {
+  const byKey = new Map<string, StoredFindingsEntry>();
+  for (const e of entries) if (typeof e.key === 'string') byKey.set(e.key, e);
+  return WATER_FINDINGS_CHECKLIST.map(def => {
+    const e = byKey.get(def.key);
+    return {
+      compliant: (e?.compliant as YnValue) ?? null,
+      remarks: typeof e?.remarks === 'string' ? e.remarks : '',
+    };
+  });
 }
 
 // ── Water Quality Sampling ───────────────────────────────────────────────────

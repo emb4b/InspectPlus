@@ -17,8 +17,8 @@ const flattenStyle = (style: unknown): Record<string, unknown> =>
   Object.assign({}, ...([style].flat(Infinity).filter(Boolean) as Record<string, unknown>[]));
 
 const items: ChecklistItemDef[] = [
-  { ref: '1.1', requirement: 'Maintains a valid Discharge Permit at all times.' },
-  { ref: '1.2', requirement: 'Submits self-monitoring reports on schedule.' },
+  { key: '1-1', ref: '1.1', requirement: 'Maintains a valid Discharge Permit at all times.' },
+  { key: '1-2', ref: '1.2', requirement: 'Submits self-monitoring reports on schedule.' },
 ];
 
 const values: ChecklistValue[] = [

@@ -20,7 +20,7 @@ import {
 } from '../../../components/form';
 import { AddRowButton } from '../../../components/AddRowButton';
 import {
-  DAO_2005_10_CHECKLIST,
+  WATER_FINDINGS_CHECKLIST,
   DOCUMENTS_REVIEWED_OPTIONS,
   WATER_SOURCE_TYPES,
   WASTEWATER_USE_TYPES,
@@ -926,7 +926,7 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
         return (
           <FormSection icon="clipboard-outline" title="III. Summary of Findings">
             <ChecklistTable
-              items={DAO_2005_10_CHECKLIST}
+              items={WATER_FINDINGS_CHECKLIST}
               values={value.checklistDao200510}
               onChange={(i, patch) => {
                 const rows = value.checklistDao200510.slice();

@@ -500,7 +500,13 @@ report-creation time. Deliberately excludes `product`, `year_established`,
   `Both` when `sampling_conducted` is true, `NULL` otherwise. Additive.
 - `sampling_points` — `[]` whenever `sampling_conducted` is false.
 - `previous_inspection_summary`
-- `checklist_dao_2005_10`
+- `checklist_dao_2005_10` — jsonb array holding the whole "Summary of
+  Findings" checklist (DAO 2005-10, DAO 1990-35, DAO 1990-25 and Other
+  Requirements — the column name predates the wider list). Each item is
+  `{ key, legal_ref, requirement, compliant, remarks }`; `key` identifies the
+  question and is what the client matches on when reading. Rows written by
+  older builds hold six `{ legal_ref: "Section N", … }` items with no `key`;
+  the client ignores those on read and overwrites them on the next save.
 - `dp_conditions`
 - `other_observations`
 - `remarks_recommendations`

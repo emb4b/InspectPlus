@@ -1,12 +1,33 @@
 import type { ChecklistItemDef } from '../../../components/form';
 
-export const DAO_2005_10_CHECKLIST: ChecklistItemDef[] = [
-  { ref: 'Section 3', requirement: 'Discharge Permit (DP) is valid and posted at facility' },
-  { ref: 'Section 4', requirement: 'Treated effluent meets DP effluent standards' },
-  { ref: 'Section 5', requirement: 'Wastewater self-monitoring reports (SMR) submitted on schedule' },
-  { ref: 'Section 6', requirement: 'Flow meter installed at each outlet and properly maintained' },
-  { ref: 'Section 7', requirement: 'WWTP properly operated and maintained' },
-  { ref: 'Section 8', requirement: 'Wastewater treatment records available and up to date' },
+// Section 6III, "Summary of Findings" - the printed form's compliance
+// checklist, question for question and in its order, grouped under the
+// legal reference each block cites. Wording follows the template with its
+// evident typos corrected ("wastewater change", "started in DAO 1990-35");
+// the citations are as printed, including DAO 1990-25 Sec. 8.
+//
+// Keys, not positions, identify a stored answer (see findingsEntriesForSave
+// in waterTypes.ts): three questions share Rule 14.11, and the list will be
+// revised again.
+export const WATER_FINDINGS_CHECKLIST: ChecklistItemDef[] = [
+  { key: 'dao2005-10-r13-1-wastewater-charge', group: 'DAO 2005-10', ref: 'Rule 13.1', requirement: 'Does the establishment pay the required wastewater charge?' },
+  { key: 'dao2005-10-r14-1-has-dp', group: 'DAO 2005-10', ref: 'Rule 14.1', requirement: 'Does the establishment have a discharge permit?' },
+  { key: 'dao2005-10-r14-5-dp-fee', group: 'DAO 2005-10', ref: 'Rule 14.5', requirement: 'Does the establishment pay the required discharge permit fee?' },
+  { key: 'dao2005-10-r14-9-dp-valid', group: 'DAO 2005-10', ref: 'Rule 14.9', requirement: 'Is the permit available and valid?' },
+  { key: 'dao2005-10-r14-11-discharge-points', group: 'DAO 2005-10', ref: 'Rule 14.11', requirement: 'Do the discharge points correspond to those declared in the discharge permit?' },
+  { key: 'dao2005-10-r14-11-discharge-volume', group: 'DAO 2005-10', ref: 'Rule 14.11', requirement: 'Is the volume discharged within the allowable volume declared in the discharge permit?' },
+  { key: 'dao2005-10-r14-11-dp-posted', group: 'DAO 2005-10', ref: 'Rule 14.11', requirement: 'Is the permit posted in the proper area?' },
+  { key: 'dao2005-10-r14-16-smr', group: 'DAO 2005-10', ref: 'Rule 14.16', requirement: 'Are the SMRs submitted quarterly and on time?' },
+  { key: 'dao1990-35-s4-6-effluent-standards', group: 'DAO 1990-35', ref: 'Sec. 4-6', requirement: 'Are the effluent parameters compliant with the standards in the existing DENR effluent standards?' },
+  { key: 'dao1990-35-s9-pcf-operated', group: 'DAO 1990-35', ref: 'Sec. 9', requirement: 'Are the pollution control facilities properly and continuously operated?' },
+  { key: 'dao1990-35-s10-methods-of-analysis', group: 'DAO 1990-35', ref: 'Sec. 10', requirement: 'Are the methods of analysis used for effluent samples in accordance with the prescribed methods of the Department?' },
+  { key: 'dao1990-25-s8-additional-requirements', group: 'DAO 1990-25', ref: 'Sec. 8', requirement: 'Does the establishment comply with the additional requirements stated in DAO 1990-35?' },
+  { key: 'other-analysis-reports', group: 'Other Requirements', ref: '', requirement: 'Are the copies of water analysis reports available?' },
+  { key: 'other-emb-correspondence', group: 'Other Requirements', ref: '', requirement: 'Are the correspondences between the establishment and EMB documented?' },
+  { key: 'other-violations-documented', group: 'Other Requirements', ref: '', requirement: 'Are the establishment\u2019s compliance violations and exceedances documented?' },
+  { key: 'other-pending-litigation', group: 'Other Requirements', ref: '', requirement: 'Are there any pending litigation/PAB cases?' },
+  { key: 'other-spill-prevention-plan', group: 'Other Requirements', ref: '', requirement: 'Is there a spill prevention contingency plan?' },
+  { key: 'other-spill-containment', group: 'Other Requirements', ref: '', requirement: 'Are there spill containment facilities available?' },
 ];
 
 export const DOCUMENTS_REVIEWED_OPTIONS = [

@@ -34,7 +34,7 @@ import {
 } from '../components/ComplianceReadPrimitives';
 import type { WaterComplianceView as WaterComplianceData } from '../hooks/useInspectionReport';
 import {
-  DAO_2005_10_CHECKLIST,
+  WATER_FINDINGS_CHECKLIST,
   DOCUMENTS_REVIEWED_OPTIONS,
   WATER_SOURCE_TYPES,
   WASTEWATER_USE_TYPES,
@@ -82,6 +82,9 @@ import {
   wwtpConstructionForSave,
   samplingForSave,
   describeSampling,
+  findingsEntriesForSave,
+  findingsValuesFromEntries,
+  StoredFindingsEntry,
 } from './waterTypes';
 import type { ComplianceWater } from '../../../db/models';
 import type { WaterMainTabDef } from './waterReportTabs';
@@ -1404,7 +1407,9 @@ export const PreviousInspectionSection: React.FC<{
 
 export const SummaryOfFindingsSection: React.FC<{
   complianceId: string;
-  value: ChecklistValue[];
+  // The stored entries as they are; answers are matched to the current
+  // checklist by key - see findingsValuesFromEntries.
+  value: readonly StoredFindingsEntry[];
   canEdit: boolean;
   onSaved: () => void;
 }> = ({
@@ -1414,14 +1419,10 @@ export const SummaryOfFindingsSection: React.FC<{
   onSaved,
 }) => {
   const section = useEditableSection<ChecklistValue[]>({
-    value,
+    value: findingsValuesFromEntries(value),
     onSave: async fields => {
       await patchComplianceWater(complianceId, {
-        checklistDao200510: fields.map((v, i) => ({
-          legal_ref: `Section ${i + 3}`,
-          compliant: v.compliant,
-          remarks: v.remarks,
-        })),
+        checklistDao200510: findingsEntriesForSave(fields),
       });
       onSaved();
     },
@@ -1436,7 +1437,7 @@ export const SummaryOfFindingsSection: React.FC<{
       }>
       {section.editing ? (
         <ChecklistTable
-          items={DAO_2005_10_CHECKLIST}
+          items={WATER_FINDINGS_CHECKLIST}
           values={section.draft}
           onChange={(i, patch) => {
             const rows = section.draft.slice();
@@ -1446,7 +1447,8 @@ export const SummaryOfFindingsSection: React.FC<{
         />
       ) : (
         <ChecklistList
-          items={DAO_2005_10_CHECKLIST.map((def, i) => ({
+          items={WATER_FINDINGS_CHECKLIST.map((def, i) => ({
+            group: def.group,
             legal_ref: def.ref,
             requirement: def.requirement,
             compliant: section.draft[i]?.compliant ?? null,
@@ -1770,13 +1772,8 @@ export const WaterExtraSectionsView: React.FC<WaterExtraSectionsViewProps> = ({
         );
       case 'previousInspection':
         return <PreviousInspectionSection complianceId={complianceId} value={compliance.previousInspectionSummary} canEdit={canEdit} onSaved={onSaved} />;
-      case 'summaryOfFindings': {
-        const checklistValues: ChecklistValue[] = DAO_2005_10_CHECKLIST.map((_, i) => ({
-          compliant: compliance.checklistDao200510[i]?.compliant ?? null,
-          remarks: compliance.checklistDao200510[i]?.remarks ?? '',
-        }));
-        return <SummaryOfFindingsSection complianceId={complianceId} value={checklistValues} canEdit={canEdit} onSaved={onSaved} />;
-      }
+      case 'summaryOfFindings':
+        return <SummaryOfFindingsSection complianceId={complianceId} value={compliance.checklistDao200510} canEdit={canEdit} onSaved={onSaved} />;
       case 'dpConditions':
         return hasDp ? (
           <DpConditionsSection complianceId={complianceId} value={compliance.dpConditions} canEdit={canEdit} onSaved={onSaved} />
