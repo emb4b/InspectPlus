@@ -40,6 +40,7 @@ jest.mock('react-native-keyboard-controller', () => ({
 const samplingTab = buildWaterReportTabs().find(t => t.key === 'samplingfindings')!;
 
 const previous = (remarks = '', compliant: YnValue = null): PreviousInspectionState => ({
+  hasRecords: 'yes',
   dateOfSampling: '2025-03-04',
   samplingStation: 'Outfall',
   samplingTime: '9:00 AM',

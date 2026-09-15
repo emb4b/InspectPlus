@@ -499,7 +499,12 @@ report-creation time. Deliberately excludes `product`, `year_established`,
 - `sampling_classification` — text, nullable; `Ambient`, `Effluent` or
   `Both` when `sampling_conducted` is true, `NULL` otherwise. Additive.
 - `sampling_points` — `[]` whenever `sampling_conducted` is false.
-- `previous_inspection_summary`
+- `previous_inspection_summary` — jsonb object. `hasRecords` (boolean,
+  optional) is section 6II's gate: `false` means the inspector recorded that
+  no previous sampling inspection records exist, and the object then holds
+  nothing else; `true` means the summary fields follow. Rows written before
+  the gate existed have no `hasRecords` and hold the summary if a date was
+  entered, otherwise `{}`.
 - `checklist_dao_2005_10` — jsonb array holding the whole "Summary of
   Findings" checklist (DAO 2005-10, DAO 1990-35, DAO 1990-25 and Other
   Requirements — the column name predates the wider list). Each item is

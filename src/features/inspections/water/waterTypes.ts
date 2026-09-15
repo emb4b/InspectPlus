@@ -55,6 +55,9 @@ export interface SamplingPointCard {
 }
 
 export interface PreviousInspectionState {
+  // Whether any previous sampling inspection records exist at all - the
+  // section's gate. null on reports written before it was asked.
+  hasRecords: 'yes' | 'no' | null;
   dateOfSampling: string;
   samplingStation: string;
   samplingTime: string;
@@ -181,6 +184,7 @@ export function emptyWaterComplianceForm(): WaterComplianceFormState {
     samplingClassification: '',
     samplingPoints: [],
     previousInspection: {
+      hasRecords: null,
       dateOfSampling: '',
       samplingStation: '',
       samplingTime: '',
@@ -424,6 +428,21 @@ export interface WwtpConstructionRecord {
   wwtpConstructionUnits: string | null;
   wwtpConstructionCompletionDate: string | null;
   wwtpTreatmentUnitsUtilized: string | null;
+}
+
+// ── Previous Inspection ──────────────────────────────────────────────────────
+// The whole section is one jsonb object, so its gate lives inside it as
+// `hasRecords` rather than in a column of its own. A No stores only the
+// gate - fields stranded by flipping to No would describe a previous
+// sampling the record also says never happened, the same rule
+// samplingForSave applies. A report never asked (null) keeps the rule it
+// was written under: the summary if a date was entered, otherwise nothing.
+
+export function previousInspectionForSave(state: PreviousInspectionState): Record<string, unknown> {
+  const { hasRecords, ...fields } = state;
+  if (hasRecords === 'no') return { hasRecords: false };
+  if (hasRecords === 'yes') return { hasRecords: true, ...fields };
+  return fields.dateOfSampling ? fields : {};
 }
 
 // ── Summary of Findings ──────────────────────────────────────────────────────

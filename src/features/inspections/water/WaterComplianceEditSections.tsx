@@ -85,6 +85,7 @@ import {
   findingsEntriesForSave,
   findingsValuesFromEntries,
   StoredFindingsEntry,
+  previousInspectionForSave,
 } from './waterTypes';
 import type { ComplianceWater } from '../../../db/models';
 import type { WaterMainTabDef } from './waterReportTabs';
@@ -1226,7 +1227,7 @@ export const PreviousInspectionSection: React.FC<{
     value,
     onSave: async fields => {
       await patchComplianceWater(complianceId, {
-        previousInspectionSummary: fields.dateOfSampling ? fields : {},
+        previousInspectionSummary: previousInspectionForSave(fields),
       });
       onSaved();
     },
@@ -1243,6 +1244,10 @@ export const PreviousInspectionSection: React.FC<{
     section.setDraft(d => ({ ...d, parameters: d.parameters.filter((_, idx) => idx !== i) }));
 
   const hasData = !!section.draft.dateOfSampling || section.draft.parameters.length > 0;
+  // The gate answers for the whole section: a No shows only the not-
+  // applicable note, on the read-only card too. A report never asked
+  // (null) still shows what it recorded.
+  const noRecords = section.draft.hasRecords === 'no';
 
   return (
     <FormSection
@@ -1251,7 +1256,24 @@ export const PreviousInspectionSection: React.FC<{
       headerRight={
         <SectionEditActions editing={section.editing} saving={section.saving} onStartEdit={section.startEdit} onCancel={section.cancel} onSave={section.save} canEdit={canEdit} />
       }>
-      {!hasData && !section.editing ? (
+      {section.editing ? (
+        <RadioGroup
+          label="Any previous sampling inspection records?"
+          options={YES_NO}
+          value={section.draft.hasRecords}
+          onChange={v => section.setDraft(d => ({ ...d, hasRecords: v as 'yes' | 'no' }))}
+        />
+      ) : (
+        <TextField
+          label="Previous sampling inspection records?"
+          value={section.draft.hasRecords == null ? '—' : section.draft.hasRecords === 'yes' ? 'Yes' : 'No'}
+          readOnly
+        />
+      )}
+      {noRecords && (
+        <Text style={sharedStyles.emptyText}>No previous sampling inspection records — this section is not applicable.</Text>
+      )}
+      {noRecords ? null : !hasData && !section.editing ? (
         <Text style={sharedStyles.emptyText}>No previous inspection summary recorded.</Text>
       ) : (
         <>

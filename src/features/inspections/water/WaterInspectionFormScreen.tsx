@@ -32,6 +32,7 @@ import {
   wwtpConstructionForSave,
   samplingForSave,
   findingsEntriesForSave,
+  previousInspectionForSave,
   WaterComplianceFormState,
 } from './waterTypes';
 import { buildWaterReportTabs, establishmentHasDischargePermit } from './waterReportTabs';
@@ -98,9 +99,7 @@ export function WaterFormShell({ start }: { start: ShellStart }) {
           waterCompliance.samplingClassification,
           waterCompliance.samplingPoints,
         ),
-        previousInspectionSummary: waterCompliance.previousInspection.dateOfSampling
-          ? waterCompliance.previousInspection
-          : {},
+        previousInspectionSummary: previousInspectionForSave(waterCompliance.previousInspection),
         checklistDao200510: findingsEntriesForSave(waterCompliance.checklistDao200510),
         dpConditions: waterCompliance.dpConditions.filter(c => c.description?.trim()),
         otherObservations: waterCompliance.otherObservations || null,

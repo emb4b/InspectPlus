@@ -278,6 +278,12 @@ export function useInspectionReport(reportId: string | undefined): UseInspection
               samplingClassification: c.samplingClassification,
               samplingPoints: c.samplingPoints ?? [],
               previousInspectionSummary: {
+                hasRecords:
+                  c.previousInspectionSummary?.hasRecords === true
+                    ? 'yes'
+                    : c.previousInspectionSummary?.hasRecords === false
+                      ? 'no'
+                      : null,
                 dateOfSampling: c.previousInspectionSummary?.dateOfSampling ?? '',
                 samplingStation: c.previousInspectionSummary?.samplingStation ?? '',
                 samplingTime: c.previousInspectionSummary?.samplingTime ?? '',

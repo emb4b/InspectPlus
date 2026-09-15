@@ -59,7 +59,7 @@ function baseCompliance(): WaterComplianceView {
     samplingConducted: null,
     samplingClassification: null,
     samplingPoints: [],
-    previousInspectionSummary: { dateOfSampling: '', samplingStation: '', samplingTime: '', typeOfSample: '', parameters: [] },
+    previousInspectionSummary: { hasRecords: null, dateOfSampling: '', samplingStation: '', samplingTime: '', typeOfSample: '', parameters: [] },
     checklistDao200510: [],
     dpConditions: [{ conditionNo: '1', description: 'Effluent within limits', compliant: null, remarks: '' }],
     otherObservations: null,

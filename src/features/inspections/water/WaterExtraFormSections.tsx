@@ -801,9 +801,25 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
           </FormSection>
         );
 
-      case 'previousInspection':
+      case 'previousInspection': {
+        const prev = value.previousInspection;
         return (
           <FormSection icon="time-outline" title="II. Previous Inspection">
+            <RadioGroup
+              label="Any previous sampling inspection records?"
+              options={YES_NO}
+              value={prev.hasRecords}
+              onChange={v => set('previousInspection', { ...prev, hasRecords: v as 'yes' | 'no' })}
+            />
+            {/* Fields are hidden rather than cleared when the answer flips
+                to No; previousInspectionForSave is what keeps the stored
+                report consistent. Unanswered shows nothing yet - the
+                question comes first. */}
+            {prev.hasRecords === 'no' && (
+              <Text style={styles.emptyText}>No previous sampling inspection records — this section is not applicable.</Text>
+            )}
+            {prev.hasRecords === 'yes' && (
+              <>
             <View style={styles.row}>
               <DateField
                 label="Date of Sampling"
@@ -919,8 +935,11 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
               );
             })}
             <AddRowButton style={styles.addBtn} label="Add Parameter" onPress={addPrevParameter} small />
+              </>
+            )}
           </FormSection>
         );
+      }
 
       case 'summaryOfFindings':
         return (

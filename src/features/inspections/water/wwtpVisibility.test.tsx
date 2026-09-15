@@ -47,7 +47,7 @@ function baseCompliance(hasWwtp: boolean | null): WaterComplianceView {
     samplingConducted: null,
     samplingClassification: null,
     samplingPoints: [],
-    previousInspectionSummary: { dateOfSampling: '', samplingStation: '', samplingTime: '', typeOfSample: '', parameters: [] },
+    previousInspectionSummary: { hasRecords: null, dateOfSampling: '', samplingStation: '', samplingTime: '', typeOfSample: '', parameters: [] },
     checklistDao200510: [],
     dpConditions: [],
     otherObservations: null,
