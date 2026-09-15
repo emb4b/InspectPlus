@@ -3,6 +3,7 @@ import { Text, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors } from '../../../constants/colors';
 import { describeAppVersion } from '../../../utils/version';
+import { schema } from '../../../db/schema';
 
 interface HomeFooterProps {
   // Full credits line is only for non-authenticated pages (e.g. login).
@@ -13,8 +14,10 @@ interface HomeFooterProps {
 export const HomeFooter: React.FC<HomeFooterProps> = ({ showCredits = false }) => {
   // The one place the running version is visible - the recovery guide and
   // support both ask for it, and the footer is on every screen including
-  // login, where an inspector who can't get in still needs to read it.
-  const version = describeAppVersion();
+  // login, where an inspector who can't get in still needs to read it. The
+  // schema version rides along: it decides whether an update migrates the
+  // local store or resets it, so a screenshot answers that question too.
+  const version = `${describeAppVersion()} · db ${schema.version}`;
   return (
     <LinearGradient
       colors={[Colors.navy, '#0a7a3e']}
@@ -32,8 +35,7 @@ export const HomeFooter: React.FC<HomeFooterProps> = ({ showCredits = false }) =
           <Text style={styles.line}>
             Developed by Jonathan Remonte and Stephanie Kim Pineda
           </Text>
-          <Text style={styles.line}>All Rights Reserved</Text>
-          <Text style={[styles.line, styles.versionLine]}>InspectPlus {version}</Text>
+          <Text style={[styles.line, styles.versionLine]}>All Rights Reserved · {version}</Text>
         </>
       )}
       {!showCredits && (
@@ -61,9 +63,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   versionLine: {
-    marginTop: 2,
     fontVariant: ['tabular-nums'],
-    color: 'rgba(255,255,255,0.85)',
   },
   versionStamp: {
     position: 'absolute',
