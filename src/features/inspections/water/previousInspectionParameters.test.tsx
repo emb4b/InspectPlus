@@ -1,7 +1,7 @@
 import React from 'react';
 import { TextInput } from 'react-native';
 import renderer, { act } from 'react-test-renderer';
-import { ComboInput, FormSection } from '../../../components/form';
+import { ComboInput, FormSection, TimeField } from '../../../components/form';
 import type { YnValue } from '../../../components/form';
 import { YnBadge } from '../components/ComplianceReadPrimitives';
 import { WaterExtraFormSectionsView } from './WaterExtraFormSections';
@@ -101,6 +101,10 @@ describe.each([
     const standards = byPlaceholder(render(), 'DENR Standard');
     expect(standards).toHaveLength(1);
     expect(standards[0].props.multiline).toBe(true);
+  });
+
+  it('picks the sampling time from a time picker', () => {
+    expect(scope(render()).findAll(n => n.type === TimeField && n.props.label === 'Sampling Time')).toHaveLength(1);
   });
 
   it('offers a Remarks input per parameter', () => {

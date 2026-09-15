@@ -11,6 +11,7 @@ import {
   SelectField,
   ComboInput,
   DateField,
+  TimeField,
   RadioGroup,
   DynamicRowTable,
   ChecklistTable,
@@ -1065,16 +1066,14 @@ export const SamplingPointsSection: React.FC<{
               />
             </View>
             <View style={styles.row}>
-              <TextField
+              <TimeField
                 ref={setRef(k('samplingTime'))}
                 label="Sampling Time"
                 value={pt.samplingTime}
-                onChangeText={t => updatePoint(i, { samplingTime: t })}
-                placeholder="e.g. 9:00 AM"
+                onChange={t => updatePoint(i, { samplingTime: t })}
                 returnKeyType="next"
                 blurOnSubmit={false}
                 onSubmitEditing={() => focus(k('typeOfSample'))}
-
               />
               <TextField
                 ref={setRef(k('typeOfSample'))}
@@ -1279,12 +1278,12 @@ export const PreviousInspectionSection: React.FC<{
             />
           </View>
           <View style={styles.row}>
-            <TextField
+            <TimeField
               ref={setRef('samplingTime')}
               label="Sampling Time"
               value={section.draft.samplingTime}
               readOnly={!section.editing}
-              onChangeText={t => section.setDraft(d => ({ ...d, samplingTime: t }))}
+              onChange={t => section.setDraft(d => ({ ...d, samplingTime: t }))}
               returnKeyType="next"
               blurOnSubmit={false}
               onSubmitEditing={() => focus('typeOfSample')}

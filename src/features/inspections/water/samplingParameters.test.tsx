@@ -1,7 +1,7 @@
 import React from 'react';
 import { TextInput } from 'react-native';
 import renderer, { act } from 'react-test-renderer';
-import { ComboInput, TextField } from '../../../components/form';
+import { ComboInput, FormSection, TextField, TimeField } from '../../../components/form';
 import type { YnValue } from '../../../components/form';
 import { YnBadge } from '../components/ComplianceReadPrimitives';
 import { WaterExtraFormSectionsView } from './WaterExtraFormSections';
@@ -101,6 +101,14 @@ describe.each([
     const standard = byPlaceholder(render(), 'DENR Standard');
     expect(standard).toHaveLength(1);
     expect(standard[0].props.multiline).toBe(true);
+  });
+
+  it('picks the sampling time from a time picker', () => {
+    // Scoped to section I: on the create form section II sits on the same
+    // tab with a Sampling Time of its own.
+    const tree = render();
+    const sectionI = tree.root.find(n => n.type === FormSection && n.props.title === 'I. Water Quality Sampling');
+    expect(sectionI.findAll(n => n.type === TimeField && n.props.label === 'Sampling Time')).toHaveLength(1);
   });
 
   it('calls the point-level note Result Analysis, as the template does', () => {

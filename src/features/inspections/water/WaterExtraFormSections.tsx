@@ -10,6 +10,7 @@ import {
   ComboInput,
   SelectField,
   DateField,
+  TimeField,
   RadioGroup,
   YesNoNAToggle,
   DynamicRowTable,
@@ -681,12 +682,11 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
                     />
                   </View>
                   <View style={styles.row}>
-                    <TextField
+                    <TimeField
                       ref={setRef(k('samplingTime'))}
                       label="Sampling Time"
                       value={pt.samplingTime}
-                      onChangeText={t => updateSamplingPoint(i, { samplingTime: t })}
-                      placeholder="e.g. 9:00 AM"
+                      onChange={t => updateSamplingPoint(i, { samplingTime: t })}
                       returnKeyType="next"
                       blurOnSubmit={false}
                       onSubmitEditing={() => focus(k('typeOfSample'))}
@@ -824,11 +824,11 @@ export const WaterExtraFormSectionsView: React.FC<WaterExtraFormSectionsViewProp
               />
             </View>
             <View style={styles.row}>
-              <TextField
+              <TimeField
                 ref={setRef('prev:samplingTime')}
                 label="Sampling Time"
                 value={value.previousInspection.samplingTime}
-                onChangeText={t => set('previousInspection', { ...value.previousInspection, samplingTime: t })}
+                onChange={t => set('previousInspection', { ...value.previousInspection, samplingTime: t })}
                 returnKeyType="next"
                 blurOnSubmit={false}
                 onSubmitEditing={() => focus('prev:typeOfSample')}
