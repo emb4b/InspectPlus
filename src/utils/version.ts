@@ -23,3 +23,17 @@ export function compareVersions(a: string, b: string): number {
 export function getCurrentAppVersion(): string {
   return Constants.expoConfig?.version ?? '0.0.0';
 }
+
+// What the app prints about itself - "v1.0.3 (12)" when a native build
+// number is known, "v1.0.3" otherwise (Expo Go, or a build without one).
+// This is the string an inspector reads off the footer when asked which
+// version they are on, so it should match what a support ticket needs:
+// the marketing version and the build that actually shipped.
+//
+// Constants.nativeBuildVersion is deprecated in favour of expo-application,
+// which this project doesn't depend on; it still reports the value and
+// pulling in a package for one string isn't worth it.
+export function describeAppVersion(): string {
+  const build = Constants.nativeBuildVersion;
+  return build ? `v${getCurrentAppVersion()} (${build})` : `v${getCurrentAppVersion()}`;
+}

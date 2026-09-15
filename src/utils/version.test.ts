@@ -1,9 +1,9 @@
 import Constants from 'expo-constants';
-import { compareVersions, getCurrentAppVersion } from './version';
+import { compareVersions, describeAppVersion, getCurrentAppVersion } from './version';
 
 jest.mock('expo-constants', () => ({
   __esModule: true,
-  default: { expoConfig: { version: '2.5.0' } },
+  default: { expoConfig: { version: '2.5.0' }, nativeBuildVersion: null },
 }));
 
 describe('compareVersions', () => {
@@ -41,5 +41,11 @@ describe('getCurrentAppVersion', () => {
     } finally {
       Constants.expoConfig = original;
     }
+  });
+});
+
+describe('describeAppVersion', () => {
+  it('omits the build number when the platform has none to report', () => {
+    expect(describeAppVersion()).toBe('v2.5.0');
   });
 });

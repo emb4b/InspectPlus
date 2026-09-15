@@ -2,6 +2,7 @@ import { Database } from '@nozbe/watermelondb';
 import SQLiteAdapter from '@nozbe/watermelondb/adapters/sqlite';
 import { schema } from './schema';
 import { migrations } from './migrations';
+import { assertMigrationsCoverSchema } from './migrationGuard';
 import {
   Establishment,
   InspectionReport,
@@ -13,6 +14,11 @@ import {
   ComplianceEia,
   Attachment,
 } from './models';
+
+// A schema version the migrations can't reach makes the adapter reset the
+// store instead of migrating it - see migrationGuard.ts. Crash here rather
+// than let that happen to an inspector's unsynced work.
+assertMigrationsCoverSchema(schema, migrations);
 
 // ── SQLite adapter ────────────────────────────────────────────────────────────
 const adapter = new SQLiteAdapter({
