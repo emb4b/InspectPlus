@@ -99,6 +99,34 @@ describe('applyRecipe', () => {
     expect(() => applyRecipe(xml, { checkboxes: [], ops: [{ op: 'insertBeforeParagraph', find: 'NOPE', xml: '<w:tbl>T</w:tbl>' }] })).toThrow(/no paragraph reads exactly "NOPE"/);
   });
 
+  it('deletes both empty paragraphs immediately before the target when count is 2', () => {
+    const xml = doc(P('before') + P(null) + P(null) + P('NAME OF INSPECTOR'));
+    const out = applyRecipe(xml, { checkboxes: [], ops: [{ op: 'deleteEmptyParagraphsBefore', find: 'NAME OF INSPECTOR', count: 2 }] });
+    expect(out).toContain('before');
+    expect(out).toContain('NAME OF INSPECTOR');
+    expect(out.match(/<w:p>/g)).toHaveLength(2);
+  });
+
+  it('deletes only the 1 empty paragraph present when count asks for more than exist', () => {
+    const xml = doc(P('before') + P(null) + P('NAME OF INSPECTOR'));
+    const out = applyRecipe(xml, { checkboxes: [], ops: [{ op: 'deleteEmptyParagraphsBefore', find: 'NAME OF INSPECTOR', count: 2 }] });
+    expect(out).toContain('before');
+    expect(out).toContain('NAME OF INSPECTOR');
+    expect(out.match(/<w:p>/g)).toHaveLength(2);
+  });
+
+  it('does not touch a non-empty paragraph, stopping the walk there', () => {
+    const xml = doc(P('keep') + P(null) + P('NAME OF INSPECTOR'));
+    const out = applyRecipe(xml, { checkboxes: [], ops: [{ op: 'deleteEmptyParagraphsBefore', find: 'NAME OF INSPECTOR', count: 5 }] });
+    expect(out).toContain('keep');
+    expect(out.match(/<w:p>/g)).toHaveLength(2);
+  });
+
+  it('throws when no paragraph reads exactly the deleteEmptyParagraphsBefore target text', () => {
+    const xml = doc(P('NAME OF INSPECTOR'));
+    expect(() => applyRecipe(xml, { checkboxes: [], ops: [{ op: 'deleteEmptyParagraphsBefore', find: 'NOPE', count: 2 }] })).toThrow(/no paragraph reads exactly "NOPE"/);
+  });
+
   it('sets pageBreakBefore on an existing pPr, ahead of its other children', () => {
     const xml = doc(P('ATTACHMENTS'));
     const out = applyRecipe(xml, { checkboxes: [], ops: [{ op: 'pageBreakBefore', find: 'ATTACHMENTS' }] });

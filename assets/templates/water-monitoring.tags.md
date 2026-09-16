@@ -31,7 +31,7 @@ Loop minimums (rows padded by the mapper): product_lines 1 · permits_extra 0 ·
 | `other_observations`, `remarks_recommendations` | `compliance.*` (any kind but `none`) |
 | `sig_inspector_name`, `sig_inspector_position`, `sig_supervisor_name`, `sig_supervisor_position` | `ctx.signatories` |
 | `sig_recommending_name`, `sig_recommending_position`, `sig_approver_name`, `sig_approver_position` | `ctx.signatories`; default to `DEFAULT_APPROVERS` (what the forms printed before this was editable) |
-| `sig_inspectors[]` → `sig_inspector_name`, `sig_inspector_position` | primary inspector + `additionalInspectors[]` with a non-blank name, min 1 |
+| `sig_inspectors[]` → `sig_inspector_name`, `sig_inspector_position` | primary inspector + `additionalInspectors[]` with a non-blank name, min 1; the loop repeats the printed form's two blank signature-space paragraphs above each name, not just the name/position |
 | `photo_rows[]` → `left[]` / `right[]` → `photo_id`, `caption`, `photo_missing_text` | `bundle.photos`, two per row; `right` is `[]` for an odd last photo; `caption` is `Figure N` (1-based across the report), plus `: <text>` when the inspector gave one |
 
 ## Water block

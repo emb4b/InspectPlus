@@ -186,7 +186,12 @@
     {
       "op": "insertBeforeParagraph",
       "find": "NAME OF INSPECTOR",
-      "xml": "<w:p><w:r><w:t>{#sig_inspectors}</w:t></w:r></w:p>"
+      "xml": "<w:p><w:r><w:t>{#sig_inspectors}</w:t></w:r></w:p><w:p><w:pPr><w:ind w:firstLine=\"0\"/><w:jc w:val=\"left\"/><w:rPr><w:rFonts w:ascii=\"Calibri\" w:hAnsi=\"Calibri\" w:eastAsia=\"Calibri\" w:cs=\"Times New Roman\"/><w:b/><w:bCs/><w:sz w:val=\"20\"/><w:szCs w:val=\"20\"/></w:rPr></w:pPr></w:p><w:p><w:pPr><w:ind w:firstLine=\"0\"/><w:jc w:val=\"left\"/><w:rPr><w:rFonts w:ascii=\"Calibri\" w:hAnsi=\"Calibri\" w:eastAsia=\"Calibri\" w:cs=\"Times New Roman\"/><w:b/><w:bCs/><w:sz w:val=\"20\"/><w:szCs w:val=\"20\"/></w:rPr></w:pPr></w:p>"
+    },
+    {
+      "op": "deleteEmptyParagraphsBefore",
+      "find": "NAME OF INSPECTOR",
+      "count": 2
     },
     {
       "op": "replaceText",
@@ -203,7 +208,7 @@
     {
       "op": "insertAfterParagraph",
       "find": "Position/Designation of Inspector",
-      "xml": "<w:p><w:pPr><w:spacing w:after=\"0\"/></w:pPr></w:p><w:p><w:r><w:t>{/sig_inspectors}</w:t></w:r></w:p>"
+      "xml": "<w:p><w:r><w:t>{/sig_inspectors}</w:t></w:r></w:p>"
     },
     {
       "op": "replaceText",

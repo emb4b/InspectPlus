@@ -191,6 +191,33 @@ function applyRecipe(originalXml, recipe) {
         }
         break;
       }
+      case 'deleteEmptyParagraphsBefore': {
+        // Deletes up to `count` wholly-empty paragraphs (no <w:t> anywhere in
+        // them) that sit immediately before the paragraph matching `find` —
+        // used to pull the printed form's blank signature lines out from
+        // ahead of a loop so they can be re-inserted inside it (see the
+        // insertBeforeParagraph case just below). "Immediately before" is
+        // checked structurally: only whitespace/nothing between one
+        // paragraph's close tag and the next one's open tag, so a paragraph
+        // separated by other content (e.g. it's actually in a different
+        // table cell) is never mistaken for a sibling.
+        const ps = spans(xml, 'w:p');
+        const idx = ps.findIndex(s => paragraphText(xml, s) === op.find);
+        if (idx < 0) throw new Error(`deleteEmptyParagraphsBefore: no paragraph reads exactly "${op.find}"`);
+        let boundary = ps[idx].start;
+        let deleted = 0;
+        let i = idx - 1;
+        while (i >= 0 && deleted < op.count) {
+          const p = ps[i];
+          if (xml.slice(p.end, boundary).trim() !== '') break; // not an immediate sibling
+          if (textRuns(xml.slice(p.start, p.end)).length > 0) break; // not empty
+          edits.push({ at: p.start, end: p.end, text: '' });
+          boundary = p.start;
+          deleted += 1;
+          i -= 1;
+        }
+        break;
+      }
       case 'insertBeforeParagraph': {
         const ps = spans(xml, 'w:p');
         const p = ps.find(s => paragraphText(xml, s) === op.find);

@@ -84,10 +84,11 @@
     { "op": "cell", "table": 8, "row": 4, "cell": 1, "tag": "remarks_recommendations" },
     { "op": "cell", "table": 8, "row": 6, "cell": 2, "tag": "doc_others" },
 
-    { "op": "insertBeforeParagraph", "find": "NAME OF INSPECTOR", "xml": "<w:p><w:r><w:t>{#sig_inspectors}</w:t></w:r></w:p>" },
+    { "op": "insertBeforeParagraph", "find": "NAME OF INSPECTOR", "xml": "<w:p><w:r><w:t>{#sig_inspectors}</w:t></w:r></w:p><w:p><w:pPr><w:rPr><w:b/><w:bCs/><w:sz w:val=\"20\"/><w:szCs w:val=\"20\"/></w:rPr></w:pPr></w:p><w:p><w:pPr><w:rPr><w:b/><w:bCs/><w:sz w:val=\"20\"/><w:szCs w:val=\"20\"/></w:rPr></w:pPr></w:p>" },
+    { "op": "deleteEmptyParagraphsBefore", "find": "NAME OF INSPECTOR", "count": 2 },
     { "op": "replaceText", "find": "NAME OF INSPECTOR", "with": "{sig_inspector_name}", "nth": 1 },
     { "op": "replaceText", "find": "Position/Designation of Inspector", "with": "{sig_inspector_position}", "nth": 1 },
-    { "op": "insertAfterParagraph", "find": "Position/Designation of Inspector", "xml": "<w:p><w:pPr><w:spacing w:after=\"0\"/></w:pPr></w:p><w:p><w:r><w:t>{/sig_inspectors}</w:t></w:r></w:p>" },
+    { "op": "insertAfterParagraph", "find": "Position/Designation of Inspector", "xml": "<w:p><w:r><w:t>{/sig_inspectors}</w:t></w:r></w:p>" },
     { "op": "replaceText", "find": "NAME OF IMMEDIATE SUPERVISOR", "with": "{sig_supervisor_name}", "nth": 1 },
     { "op": "replaceText", "find": "Position/Designation of Immediate Supervisor", "with": "{sig_supervisor_position}", "nth": 1 },
     { "op": "replaceText", "find": "ERWIN R. LIZARDO", "with": "{sig_recommending_name}", "nth": 1 },

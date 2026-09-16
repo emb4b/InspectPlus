@@ -18,22 +18,23 @@ const docXml = (bytes: Uint8Array) => new PizZip(bytes).file('word/document.xml'
 const png1x1 = Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64'));
 
 // Finds the <w:tc>…</w:tc> that contains `primaryInspectorName` (unique to
-// the "Submitted by" cell) and returns the plain text of each of its
-// paragraphs from the primary inspector's name onward — the cell's own two
-// blank spacing paragraphs above the printed name are skipped, leaving just
-// the sig_inspectors loop's output. Used to assert name and position land in
+// the "Submitted by" cell) and returns the plain text of every paragraph in
+// it. The {#sig_inspectors}/{/sig_inspectors} delimiter paragraphs render to
+// nothing (docxtemplater drops a paragraph that holds only a loop tag), so
+// this is just the loop's repeated output — including the two blank
+// signature-space paragraphs that print above every inspector's name, since
+// those now live inside the loop. Used to assert name and position land in
 // separate paragraphs per inspector rather than being glued together inside
-// one (see the inline-loop bug this guards against).
+// one (see the inline-loop bug this guards against), and that the printed
+// form's blank signature lines repeat for every inspector, not just the
+// first.
 function submittedByParagraphs(xml: string, primaryInspectorName: string): string[] {
   const i = xml.indexOf(primaryInspectorName);
   expect(i).toBeGreaterThanOrEqual(0);
   const tcStart = xml.lastIndexOf('<w:tc>', i);
   const tcEnd = xml.indexOf('</w:tc>', i) + '</w:tc>'.length;
   const tc = xml.slice(tcStart, tcEnd);
-  const paragraphs = [...tc.matchAll(/<w:p[\s>][\s\S]*?<\/w:p>/g)].map(m => m[0].replace(/<[^>]+>/g, ''));
-  const start = paragraphs.indexOf(primaryInspectorName);
-  expect(start).toBeGreaterThanOrEqual(0);
-  return paragraphs.slice(start);
+  return [...tc.matchAll(/<w:p[\s>][\s\S]*?<\/w:p>/g)].map(m => m[0].replace(/<[^>]+>/g, ''));
 }
 
 // A checked-in template with a malformed document.xml (e.g. the EIA
@@ -105,8 +106,12 @@ describe('water-monitoring.docx renders', () => {
     expect(drawingParagraphs.length).toBeGreaterThan(0);
     for (const p of drawingParagraphs) expect(p).toContain('<w:jc w:val="center"/>');
     // The plain case (no additional inspectors) prints the primary
-    // inspector's name and position once each, as separate paragraphs.
-    expect(submittedByParagraphs(xml, signatories.inspectorName)).toEqual([signatories.inspectorName, signatories.inspectorPosition, '']);
+    // inspector's name and position once each, as separate paragraphs, with
+    // the form's two blank signature-space lines above the name.
+    expect(submittedByParagraphs(xml, signatories.inspectorName)).toEqual(['', '', signatories.inspectorName, signatories.inspectorPosition]);
+    // The "Reviewed by" (supervisor) cell isn't part of the sig_inspectors
+    // loop and stays exactly as printed: two blanks, then name, position.
+    expect(submittedByParagraphs(xml, signatories.supervisorName)).toEqual(['', '', signatories.supervisorName, signatories.supervisorPosition]);
   });
 
   it('an empty draft, still showing the printed row counts', () => {
@@ -136,13 +141,14 @@ describe('water-monitoring.docx renders', () => {
     // duplicate it alongside the top-level sig_inspector_name tag.
     expect(xml.split(signatories.inspectorName).length - 1).toBe(1);
     expect(() => assertWellFormed(xml)).not.toThrow();
-    // Whole paragraphs repeat per inspector: name and position are separate
-    // paragraphs, each followed by a blank spacer paragraph, for every
-    // inspector — never a name glued onto the next inspector's position.
+    // Whole paragraphs repeat per inspector: the form's two blank
+    // signature-space lines, then name, then position, for every inspector —
+    // never a name glued onto the next inspector's position, and never just
+    // the first inspector getting the blank lines above their name.
     expect(submittedByParagraphs(xml, signatories.inspectorName)).toEqual([
-      signatories.inspectorName, signatories.inspectorPosition, '',
-      'Second Inspector', 'Engineer I', '',
-      'Third Inspector', 'Engineer III', '',
+      '', '', signatories.inspectorName, signatories.inspectorPosition,
+      '', '', 'Second Inspector', 'Engineer I',
+      '', '', 'Third Inspector', 'Engineer III',
     ]);
   });
 });
