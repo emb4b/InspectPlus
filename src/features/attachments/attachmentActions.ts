@@ -27,6 +27,14 @@ export async function resolveLocalFileUri(attachment: Pick<Attachment, 'attachme
     throw new Error('This photo has not finished uploading yet — nothing to download.');
   }
 
+  // Attachments are immutable once uploaded, so a cached copy downloaded for
+  // this id (by an earlier export or gallery save) is always the same bytes.
+  // Reuse it: downloadFileAsync refuses to overwrite an existing destination
+  // (ERR_DESTINATION_ALREADY_EXISTS), and this also lets a repeat export
+  // work offline.
+  const destination = new File(Paths.cache, `download-${attachment.attachmentId}.jpg`);
+  if (destination.exists) return destination.uri;
+
   const { data, error } = await withTimeout(
     supabase.storage.from(STORAGE_BUCKET).createSignedUrl(attachment.storagePath, 300),
     NETWORK_TIMEOUT_MS,
@@ -36,7 +44,6 @@ export async function resolveLocalFileUri(attachment: Pick<Attachment, 'attachme
     throw new Error('Could not reach the photo — check your connection and try again.');
   }
 
-  const destination = new File(Paths.cache, `download-${attachment.attachmentId}.jpg`);
   const downloaded = await withTimeout(
     File.downloadFileAsync(data.signedUrl, destination),
     NETWORK_TIMEOUT_MS,
