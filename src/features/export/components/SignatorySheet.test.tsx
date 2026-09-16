@@ -12,7 +12,12 @@ jest.mock('react-native-reanimated', () => ({ ...jest.requireActual('react-nativ
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- factory can't close over top-level imports (babel-plugin-jest-hoist)
 jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 
-const initial = { inspectorName: 'Juan', inspectorPosition: '', supervisorName: '', supervisorPosition: '' };
+const initial = {
+  inspectorName: 'Juan', inspectorPosition: '', supervisorName: '', supervisorPosition: '',
+  recommendingName: 'Rec Name', recommendingPosition: 'Rec Position',
+  approverName: 'App Name', approverPosition: 'App Position',
+  additionalInspectors: [],
+};
 
 describe('SignatorySheet', () => {
   it('prefills from initial and confirms the edited values', () => {
@@ -20,13 +25,26 @@ describe('SignatorySheet', () => {
     let r!: TestRenderer.ReactTestRenderer;
     act(() => { r = TestRenderer.create(<SignatorySheet visible initial={initial} onCancel={() => {}} onConfirm={onConfirm} />); });
     const fields = r.root.findAllByType(TextField);
-    expect(fields.map(f => f.props.label)).toEqual(['Inspector name', 'Inspector position/designation', 'Immediate supervisor name', 'Supervisor position/designation']);
+    expect(fields.map(f => f.props.label)).toEqual([
+      'Inspector name', 'Inspector position/designation', 'Immediate supervisor name', 'Supervisor position/designation',
+      'Recommending approval — name', 'Recommending approval — position', 'Approved by — name', 'Approved by — position',
+    ]);
     expect(fields[0].props.value).toBe('Juan');
+    expect(fields[4].props.value).toBe('Rec Name');
+    expect(fields[5].props.value).toBe('Rec Position');
+    expect(fields[6].props.value).toBe('App Name');
+    expect(fields[7].props.value).toBe('App Position');
     act(() => fields[1].props.onChangeText('Engineer II'));
     act(() => fields[2].props.onChangeText('Maria'));
+    act(() => fields[6].props.onChangeText('New Approver'));
     const generate = r.root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
     act(() => generate.props.onPress());
-    expect(onConfirm).toHaveBeenCalledWith({ inspectorName: 'Juan', inspectorPosition: 'Engineer II', supervisorName: 'Maria', supervisorPosition: '' });
+    expect(onConfirm).toHaveBeenCalledWith({
+      inspectorName: 'Juan', inspectorPosition: 'Engineer II', supervisorName: 'Maria', supervisorPosition: '',
+      recommendingName: 'Rec Name', recommendingPosition: 'Rec Position',
+      approverName: 'New Approver', approverPosition: 'App Position',
+      additionalInspectors: [],
+    });
   });
 
   it('disables Generate until the inspector name is filled', () => {
@@ -53,7 +71,7 @@ describe('SignatorySheet', () => {
 
     // Close, then reopen with a genuinely different `initial` — now it resets.
     act(() => { r.update(<SignatorySheet visible={false} initial={sameValuesNewIdentity} onCancel={() => {}} onConfirm={() => {}} />); });
-    const initialB = { inspectorName: 'Maria', inspectorPosition: '', supervisorName: '', supervisorPosition: '' };
+    const initialB = { ...initial, inspectorName: 'Maria' };
     act(() => { r.update(<SignatorySheet visible initial={initialB} onCancel={() => {}} onConfirm={() => {}} />); });
     expect(r.root.findAllByType(TextField)[0].props.value).toBe('Maria');
   });

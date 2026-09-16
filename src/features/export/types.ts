@@ -63,6 +63,16 @@ export interface Signatories {
   inspectorPosition: string;
   supervisorName: string;
   supervisorPosition: string;
+  // The recommending and approving signatories used to be printed as
+  // fixed text on every form (see DEFAULT_APPROVERS in signatories.ts);
+  // they're now editable, defaulting to what the forms printed before.
+  recommendingName: string;
+  recommendingPosition: string;
+  approverName: string;
+  approverPosition: string;
+  // Extra inspectors under "Submitted by", beyond the primary one above —
+  // see mapSignatures' sig_inspectors loop.
+  additionalInspectors: { name: string; position: string }[];
 }
 
 export interface MapContext {

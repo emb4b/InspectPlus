@@ -12,7 +12,11 @@ jest.mock('../../../core/providers/AuthProvider', () => ({
   useAuthContext: () => ({ session: { user: { id: 'u1' } }, province: 'P', role: 'Inspector' }),
 }));
 
-const signatories = { inspectorName: 'A', inspectorPosition: 'B', supervisorName: 'C', supervisorPosition: 'D' };
+const signatories = {
+  inspectorName: 'A', inspectorPosition: 'B', supervisorName: 'C', supervisorPosition: 'D',
+  recommendingName: 'R', recommendingPosition: 'RP', approverName: 'AP', approverPosition: 'APP',
+  additionalInspectors: [],
+};
 const item: ExportItem = { key: 'k', kind: 'inspection', reportId: 'r1', reportType: 'water_monitoring', title: 'Water', estabName: 'Alpha', date: '2026-09-05' };
 
 function Harness({ onReady }: { onReady: (h: ReturnType<typeof useExportReports>) => void }) {

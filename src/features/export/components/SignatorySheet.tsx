@@ -60,6 +60,11 @@ export const SignatorySheet: React.FC<SignatorySheetProps> = ({ visible, initial
             <TextField label="Inspector position/designation" value={value.inspectorPosition} onChangeText={set('inspectorPosition')} style={styles.field} />
             <TextField label="Immediate supervisor name" value={value.supervisorName} onChangeText={set('supervisorName')} style={styles.field} />
             <TextField label="Supervisor position/designation" value={value.supervisorPosition} onChangeText={set('supervisorPosition')} style={styles.field} />
+            <Text style={styles.sectionHeading}>Approvers</Text>
+            <TextField label="Recommending approval — name" value={value.recommendingName} onChangeText={set('recommendingName')} style={styles.field} />
+            <TextField label="Recommending approval — position" value={value.recommendingPosition} onChangeText={set('recommendingPosition')} style={styles.field} />
+            <TextField label="Approved by — name" value={value.approverName} onChangeText={set('approverName')} style={styles.field} />
+            <TextField label="Approved by — position" value={value.approverPosition} onChangeText={set('approverPosition')} style={styles.field} />
             <Text style={styles.hint}>Names and positions are remembered on this phone.</Text>
           </ScrollView>
           <View style={[styles.footer, { paddingBottom: Spacing.lg + insets.bottom }]}>
@@ -68,6 +73,11 @@ export const SignatorySheet: React.FC<SignatorySheetProps> = ({ visible, initial
               inspectorPosition: value.inspectorPosition.trim(),
               supervisorName: value.supervisorName.trim(),
               supervisorPosition: value.supervisorPosition.trim(),
+              recommendingName: value.recommendingName.trim(),
+              recommendingPosition: value.recommendingPosition.trim(),
+              approverName: value.approverName.trim(),
+              approverPosition: value.approverPosition.trim(),
+              additionalInspectors: value.additionalInspectors,
             })} variant="primary" size="md" fullWidth disabled={!canGenerate} />
           </View>
         </TouchableOpacity>
@@ -84,6 +94,13 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md },
   field: { flex: undefined },
+  sectionHeading: {
+    fontSize: Type.label.fontSize,
+    lineHeight: Type.label.lineHeight,
+    fontWeight: '700',
+    color: Colors.navy,
+    marginBottom: Spacing.sm,
+  },
   hint: { fontSize: Type.caption.fontSize, lineHeight: Type.caption.lineHeight, color: Colors.textMuted, marginBottom: Spacing.md },
   footer: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm },
 });

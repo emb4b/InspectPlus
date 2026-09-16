@@ -120,6 +120,10 @@ export function mapSignatures(ctx: MapContext): TemplateData {
     sig_inspector_position: text(ctx.signatories.inspectorPosition),
     sig_supervisor_name: text(ctx.signatories.supervisorName),
     sig_supervisor_position: text(ctx.signatories.supervisorPosition),
+    sig_recommending_name: text(ctx.signatories.recommendingName),
+    sig_recommending_position: text(ctx.signatories.recommendingPosition),
+    sig_approver_name: text(ctx.signatories.approverName),
+    sig_approver_position: text(ctx.signatories.approverPosition),
   };
 }
 

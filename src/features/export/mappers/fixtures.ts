@@ -6,6 +6,13 @@ export const signatories: Signatories = {
   inspectorPosition: 'Engineer II',
   supervisorName: 'Maria Santos',
   supervisorPosition: 'Chief, Water Quality Section',
+  // Deliberately not DEFAULT_APPROVERS — proves the mapper prints whatever
+  // the inspector edited, not just what the form used to say.
+  recommendingName: 'Pedro Reyes',
+  recommendingPosition: 'OIC, Regional Division',
+  approverName: 'Ana Villanueva',
+  approverPosition: 'Regional Director',
+  additionalInspectors: [],
 };
 
 export const photos: ExportPhoto[] = [

@@ -88,6 +88,10 @@ describe('mapCommon', () => {
     expect(empty.other_observations).toBe('');
     expect(full.sig_inspector_name).toBe('Juan Dela Cruz');
     expect(full.sig_supervisor_position).toBe('Chief, Water Quality Section');
+    expect(full.sig_recommending_name).toBe('Pedro Reyes');
+    expect(full.sig_recommending_position).toBe('OIC, Regional Division');
+    expect(full.sig_approver_name).toBe('Ana Villanueva');
+    expect(full.sig_approver_position).toBe('Regional Director');
   });
 
   it('lays photos out two per row with a caption that falls back to the file name and adds the geotag', () => {

@@ -33,7 +33,12 @@ const mockSignatoryLoad = jest.fn();
 const mockSignatorySave = jest.fn();
 jest.mock('../../export/signatories', () => ({
   asyncStorageSignatoryProvider: { load: () => mockSignatoryLoad(), save: (s: unknown) => mockSignatorySave(s) },
-  emptySignatories: (name: string | null) => ({ inspectorName: name ?? '', inspectorPosition: '', supervisorName: '', supervisorPosition: '' }),
+  emptySignatories: (name: string | null) => ({
+    inspectorName: name ?? '', inspectorPosition: '', supervisorName: '', supervisorPosition: '',
+    recommendingName: 'Default Rec', recommendingPosition: 'Default Rec Position',
+    approverName: 'Default App', approverPosition: 'Default App Position',
+    additionalInspectors: [],
+  }),
 }));
 
 // ExportReportsTab renders the real ReportListCard, which pulls in
@@ -459,7 +464,7 @@ describe('the Generate flow', () => {
   });
 
   it('prefills the sheet from the saved signatories', async () => {
-    mockSignatoryLoad.mockResolvedValue({ inspectorName: 'Saved', inspectorPosition: 'Eng', supervisorName: 'Sup', supervisorPosition: 'Chief' });
+    mockSignatoryLoad.mockResolvedValue({ inspectorName: 'Saved', inspectorPosition: 'Eng', supervisorName: 'Sup', supervisorPosition: 'Chief', recommendingName: 'Rec', recommendingPosition: 'RecPos', approverName: 'App', approverPosition: 'AppPos', additionalInspectors: [] });
     const r = render();
     selectRow(r, 0);
     // renderFooter() (below) already wraps its own TestRenderer.create() in
@@ -482,7 +487,7 @@ describe('the Generate flow', () => {
     // from inside another act() callback.
     const generate = renderFooter().root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
     await act(async () => { generate.props.onPress(); });
-    const s = { inspectorName: 'J', inspectorPosition: 'E', supervisorName: 'M', supervisorPosition: 'C' };
+    const s = { inspectorName: 'J', inspectorPosition: 'E', supervisorName: 'M', supervisorPosition: 'C', recommendingName: 'R', recommendingPosition: 'RP', approverName: 'AP', approverPosition: 'APP', additionalInspectors: [] };
     await act(async () => { r.root.findByType(SignatorySheet).props.onConfirm(s); });
     expect(mockSignatorySave).toHaveBeenCalledWith(s);
     expect(mockStart).toHaveBeenCalledWith(
@@ -499,7 +504,7 @@ describe('the Generate flow', () => {
     selectRow(r, 0);
     const generate = renderFooter().root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
     await act(async () => { generate.props.onPress(); });
-    const s = { inspectorName: 'J', inspectorPosition: 'E', supervisorName: 'M', supervisorPosition: 'C' };
+    const s = { inspectorName: 'J', inspectorPosition: 'E', supervisorName: 'M', supervisorPosition: 'C', recommendingName: 'R', recommendingPosition: 'RP', approverName: 'AP', approverPosition: 'APP', additionalInspectors: [] };
     // The rejection must not escape as an unhandled promise rejection — this
     // await/act only resolves cleanly if runExport's own try/catch actually
     // caught it.
