@@ -609,6 +609,42 @@ describe('the Generate flow', () => {
     expect(mockStart).toHaveBeenCalledWith([expect.objectContaining({ key: 'inspection-r2' })], expect.anything());
   });
 
+  // Regression coverage: a mixed Water+Air selection, confirmed while r1
+  // (water) is the first selected item, so sheetType (and the save) are
+  // keyed on water_monitoring. Only r2 (air_monitoring) fails and gets
+  // retried — a bug fixed here once saved the confirmed approvers under
+  // items[0] of whatever runExport was called with, which for THIS retry
+  // is r2 alone, misattributing the Water-prefilled approvers to
+  // air_monitoring. sheetType (captured once, in openSheet) is what
+  // save() must key off regardless — and a retry must not re-save at all,
+  // since it's re-sending signatories already saved at the original
+  // confirm, not a fresh one.
+  it('keeps saving under the type the sheet was confirmed for when a retry only re-sends a different-typed report, and never re-saves on retry', async () => {
+    const r = render();
+    selectRow(r, 0); // r1: water_monitoring
+    selectRow(r, 1); // r2: air_monitoring
+    const generate = renderFooter().root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
+    await act(async () => { generate.props.onPress(); });
+    const s = { inspectorName: 'J', inspectorPosition: 'E', supervisorName: 'M', supervisorPosition: 'C', recommendingName: 'R', recommendingPosition: 'RP', approverName: 'AP', approverPosition: 'APP', additionalInspectors: [] };
+    await act(async () => { r.root.findByType(SignatorySheet).props.onConfirm(s); });
+    expect(mockSignatorySave).toHaveBeenCalledTimes(1);
+    expect(mockSignatorySave).toHaveBeenCalledWith(s, 'inspection', 'water_monitoring');
+
+    // Only r2 (air_monitoring) failed. mockPhase is a plain mock variable,
+    // not React state, so the component needs an explicit re-render (same
+    // props) to pick up the change before the retry button reflects it.
+    mockPhase = { status: 'done', result: { shareUri: null, succeeded: 1, failures: [{ key: 'inspection-r2', title: 'x', reason: 'y' }], skippedPhotos: 0, cancelled: false } };
+    await act(async () => { r.update(<ExportReportsTab />); });
+    const footer = renderFooter();
+    await act(async () => { footer.root.findByType(ExportProgressBar).props.onRetry(); });
+
+    expect(mockStart).toHaveBeenLastCalledWith([expect.objectContaining({ key: 'inspection-r2' })], s);
+    // Still exactly once, still water_monitoring — the retry neither
+    // re-saved nor misattributed the save to air_monitoring.
+    expect(mockSignatorySave).toHaveBeenCalledTimes(1);
+    expect(mockSignatorySave).toHaveBeenCalledWith(s, 'inspection', 'water_monitoring');
+  });
+
   it('Retry failed re-runs the whole selection when the failure is the synthetic save/share entry', async () => {
     // exportReports.ts pushes { key: 'export', ... } when saving/sharing the
     // whole export fails, after every per-item report already rendered — it

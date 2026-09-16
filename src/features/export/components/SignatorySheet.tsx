@@ -27,32 +27,61 @@ interface SignatorySheetProps {
   mixedTypes?: boolean;
 }
 
+// An additional inspector row, as this sheet holds it internally: the same
+// {name, position} Signatories.additionalInspectors carries, plus an `id`
+// that exists only in this component's own state — assigned once when a row
+// is added or the sheet loads `initial`, and stripped again in onConfirm.
+// Keying each row's View on this `id` (rather than its array index) keeps a
+// row's own identity — and so its focused TextField/keyboard — attached to
+// the SAME row across an add or remove anywhere else in the list, instead
+// of every row after the edited one silently shifting index and swapping
+// content under an unmoved key.
+interface InspectorRow {
+  id: number;
+  name: string;
+  position: string;
+}
+type SheetValue = Omit<Signatories, 'additionalInspectors'> & { additionalInspectors: InspectorRow[] };
+
 // Asked before every export and remembered, so the second time it's a
 // glance and a tap. Positions and the supervisor are free text until the
 // admin-defined chain of command exists — see signatories.ts.
 export const SignatorySheet: React.FC<SignatorySheetProps> = ({ visible, initial, onCancel, onConfirm, mixedTypes = false }) => {
-  const [value, setValue] = useState<Signatories>(initial);
+  // Monotonically increasing, never reused within one mounted instance of
+  // this component — safe as a React key even after rows are added and
+  // removed repeatedly across several opens of the sheet.
+  const nextRowId = useRef(0);
+  const withRowIds = (rows: { name: string; position: string }[]): InspectorRow[] =>
+    rows.map(row => ({ id: nextRowId.current++, ...row }));
+
+  const [value, setValue] = useState<SheetValue>(() => ({ ...initial, additionalInspectors: withRowIds(initial.additionalInspectors) }));
   // `initial` can change identity while the sheet stays open (e.g. an
   // AsyncStorage load resolving after mount) — that shouldn't stomp on
   // edits the user already made. Only reset when the sheet actually opens.
   const initialRef = useRef(initial);
   initialRef.current = initial;
-  useEffect(() => { if (visible) setValue(initialRef.current); }, [visible]);
+  useEffect(() => {
+    if (visible) setValue({ ...initialRef.current, additionalInspectors: withRowIds(initialRef.current.additionalInspectors) });
+    // withRowIds is a fresh closure every render (it reads the nextRowId
+    // ref) but is otherwise stable in every way that matters here — adding
+    // it to the deps would re-run this on every render, defeating the
+    // "only reset when the sheet opens" comment above.
+  }, [visible]);
   const { height: keyboardHeight } = useReanimatedKeyboardAnimation();
   const overlayStyle = useAnimatedStyle(() => ({ paddingBottom: -keyboardHeight.value }));
-  const set = (key: keyof Signatories) => (text: string) => setValue(v => ({ ...v, [key]: text }));
+  const set = (key: keyof Omit<Signatories, 'additionalInspectors'>) => (text: string) => setValue(v => ({ ...v, [key]: text }));
   const canGenerate = value.inspectorName.trim().length > 0;
   const insets = useSafeAreaInsets();
 
-  const updateInspector = (index: number, key: 'name' | 'position', text: string) =>
+  const updateInspector = (id: number, key: 'name' | 'position', text: string) =>
     setValue(v => ({
       ...v,
-      additionalInspectors: v.additionalInspectors.map((insp, i) => (i === index ? { ...insp, [key]: text } : insp)),
+      additionalInspectors: v.additionalInspectors.map(insp => (insp.id === id ? { ...insp, [key]: text } : insp)),
     }));
-  const removeInspector = (index: number) =>
-    setValue(v => ({ ...v, additionalInspectors: v.additionalInspectors.filter((_, i) => i !== index) }));
+  const removeInspector = (id: number) =>
+    setValue(v => ({ ...v, additionalInspectors: v.additionalInspectors.filter(insp => insp.id !== id) }));
   const addInspector = () =>
-    setValue(v => ({ ...v, additionalInspectors: [...v.additionalInspectors, { name: '', position: '' }] }));
+    setValue(v => ({ ...v, additionalInspectors: [...v.additionalInspectors, { id: nextRowId.current++, name: '', position: '' }] }));
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
@@ -75,24 +104,23 @@ export const SignatorySheet: React.FC<SignatorySheetProps> = ({ visible, initial
             <TextField label="Inspector name" value={value.inspectorName} onChangeText={set('inspectorName')} required style={styles.field} />
             <TextField label="Inspector position/designation" value={value.inspectorPosition} onChangeText={set('inspectorPosition')} style={styles.field} />
             {value.additionalInspectors.map((inspector, index) => (
-              // eslint-disable-next-line react/no-array-index-key -- rows have no stable id; index is fine since only appends/removes at the end matter and React doesn't need to preserve keyboard focus across a reorder here
-              <View key={index} style={styles.inspectorRow}>
+              <View key={inspector.id} style={styles.inspectorRow}>
                 <View style={styles.inspectorFields}>
                   <TextField
                     label={`Additional inspector ${index + 1} — name`}
                     value={inspector.name}
-                    onChangeText={text => updateInspector(index, 'name', text)}
+                    onChangeText={text => updateInspector(inspector.id, 'name', text)}
                     style={styles.field}
                   />
                   <TextField
                     label={`Additional inspector ${index + 1} — position`}
                     value={inspector.position}
-                    onChangeText={text => updateInspector(index, 'position', text)}
+                    onChangeText={text => updateInspector(inspector.id, 'position', text)}
                     style={styles.field}
                   />
                 </View>
                 <TouchableOpacity
-                  onPress={() => removeInspector(index)}
+                  onPress={() => removeInspector(inspector.id)}
                   accessibilityRole="button"
                   accessibilityLabel={`Remove inspector ${index + 1}`}
                   style={styles.removeInspectorBtn}>

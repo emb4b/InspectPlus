@@ -34,6 +34,12 @@ export interface ExportReportsTabHandle {
 
 const NO_TEMPLATE_REASON = 'No template yet';
 const canExport = (item: AllReportItem) => hasTemplate(item.kind, item.reportType);
+// The report type the currently-open (or most recently confirmed)
+// signatory sheet is for — set once in openSheet from the first selected
+// item, and what runExport's save() keys off, regardless of which items a
+// later retry actually passes it. See runExport below for why this can't
+// just be `items[0]` of whatever's being (re)exported.
+type SheetType = { kind: AllReportItem['kind']; reportType: string };
 const toExportItem = (item: AllReportItem): ExportItem => ({
   key: item.key,
   kind: item.kind,
@@ -60,6 +66,12 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
   // false, and openSheet always overwrites it (resolved for the right
   // report type) before the sheet opens.
   const [signatories, setSignatories] = useState<Signatories>(() => emptySignatories(fullName, 'inspection', 'water_monitoring'));
+  // Set once, in openSheet — NOT re-derived from whatever items a later
+  // retry passes runExport, which may be a filtered subset of a mixed
+  // selection (e.g. only the Air report out of a Water+Air run, once the
+  // Water one already succeeded) and would otherwise save the
+  // Water-prefilled approvers under air_monitoring.
+  const [sheetType, setSheetType] = useState<SheetType | null>(null);
   const busy = exporter.phase.status !== 'idle';
 
   // Derived from the live list rather than stored alongside it, so a
@@ -115,10 +127,15 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
   const openSheet = async () => {
     // Prefilled from the FIRST selected item's report type — the only one
     // the sheet can sensibly key off when the selection spans several (see
-    // mixedTypes above, which tells the inspector as much).
+    // mixedTypes above, which tells the inspector as much). Captured in
+    // sheetType too, so a later save (in runExport) keys off the type the
+    // sheet was actually opened/confirmed for, not whatever subset of items
+    // a retry happens to pass it.
     const first = selectedItems[0];
     if (!first) return;
-    const loaded = await asyncStorageSignatoryProvider.loadFor(first.kind, first.reportType);
+    const type: SheetType = { kind: first.kind, reportType: first.reportType };
+    setSheetType(type);
+    const loaded = await asyncStorageSignatoryProvider.loadFor(type.kind, type.reportType);
     // loadFor resolves the inspector name from storage, blank if nothing
     // was ever saved — the profile's fullName is only a fallback for that
     // "nothing saved yet" case, same as the previous emptySignatories(fullName)
@@ -128,19 +145,26 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
     setSheetOpen(true);
   };
 
-  const runExport = async (items: AllReportItem[], s: Signatories) => {
+  // `remember` is false for a retry (see retryFailed below): a retry reuses
+  // the `signatories` the sheet was already confirmed with, saved once at
+  // that confirm — re-saving it under sheetType on every retry would be at
+  // best redundant, and if a filtered subset of a mixed-type run is being
+  // retried, `items` no longer represents the type the sheet was actually
+  // for, so it must not be used to key a save at all here (that's exactly
+  // last review's bug: saving under items[0] instead of sheetType).
+  const runExport = async (items: AllReportItem[], s: Signatories, remember = true) => {
     setSheetOpen(false);
     setSignatories(s);
-    // Remembering the signatories is a convenience, not a gate — a full
-    // AsyncStorage or a write failure shouldn't leave the sheet closed with
-    // nothing running (and, unhandled, would surface as an unhandled
-    // rejection). Saved under the run's own first item's report type, so
-    // editing Water's approvers never touches what Hazwaste remembers.
-    const first = items[0];
-    try {
-      if (first) await asyncStorageSignatoryProvider.save(s, first.kind, first.reportType);
-    } catch (e) {
-      console.warn('[ExportReportsTab] could not remember signatories', e);
+    if (remember && sheetType) {
+      // Remembering the signatories is a convenience, not a gate — a full
+      // AsyncStorage or a write failure shouldn't leave the sheet closed
+      // with nothing running (and, unhandled, would surface as an
+      // unhandled rejection).
+      try {
+        await asyncStorageSignatoryProvider.save(s, sheetType.kind, sheetType.reportType);
+      } catch (e) {
+        console.warn('[ExportReportsTab] could not remember signatories', e);
+      }
     }
     await exporter.start(items.map(toExportItem), s);
   };
@@ -161,7 +185,9 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
       exporter.phase.status === 'done' ? new Set(exporter.phase.result.failures.map(f => f.key)) : null;
     const items =
       failedKeys && !failedKeys.has('export') ? selectedItems.filter(item => failedKeys.has(item.key)) : selectedItems;
-    void runExport(items, signatories);
+    // Reuses the signatories already saved at the original confirm — a
+    // retry never re-saves (see runExport's `remember` param above).
+    void runExport(items, signatories, false);
   };
 
   // Mirrors ManageReportsTab's handle: Home drives this from pull-to-refresh
