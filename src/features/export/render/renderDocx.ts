@@ -38,7 +38,7 @@ function withPhotoDrawings(data: TemplateData, drawings: Map<string, string>): T
   }
   if (typeof data.photo_id === 'string') {
     const missing = typeof data.photo_missing_text === 'string' ? data.photo_missing_text : '';
-    out.photo_drawing = drawings.get(data.photo_id) ?? textParagraph(missing);
+    out.photo_drawing = drawings.get(data.photo_id) ?? textParagraph(missing, 'center');
   }
   return out;
 }

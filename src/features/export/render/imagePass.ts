@@ -19,8 +19,9 @@ export function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-export function textParagraph(s: string): string {
-  return `<w:p><w:r><w:t xml:space="preserve">${escapeXml(s)}</w:t></w:r></w:p>`;
+export function textParagraph(s: string, align?: 'center'): string {
+  const pPr = align === 'center' ? '<w:pPr><w:jc w:val="center"/></w:pPr>' : '';
+  return `<w:p>${pPr}<w:r><w:t xml:space="preserve">${escapeXml(s)}</w:t></w:r></w:p>`;
 }
 
 function fitExtent(width: number, height: number): { cx: number; cy: number } {
@@ -48,7 +49,7 @@ function ensureContentType(zip: PizZip, ext: string, mime: string): void {
 
 function drawingParagraph(relId: string, index: number, name: string, cx: number, cy: number): string {
   return (
-    '<w:p><w:r><w:drawing>' +
+    '<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:drawing>' +
     `<wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">` +
     `<wp:extent cx="${cx}" cy="${cy}"/>` +
     '<wp:effectExtent l="0" t="0" r="0" b="0"/>' +

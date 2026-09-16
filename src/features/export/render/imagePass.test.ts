@@ -1,5 +1,5 @@
 import PizZip from 'pizzip';
-import { embedImages, MAX_WIDTH_EMU, MAX_HEIGHT_EMU } from './imagePass';
+import { embedImages, textParagraph, MAX_WIDTH_EMU, MAX_HEIGHT_EMU } from './imagePass';
 
 const CONTENT_TYPES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="png" ContentType="image/png"/><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>`;
 const RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml" Id="rId2"/></Relationships>`;
@@ -55,10 +55,10 @@ describe('embedImages', () => {
     expect(b.cx).toBe(Math.round((MAX_HEIGHT_EMU * 600) / 1200));
   });
 
-  it('wraps the drawing in a paragraph so the raw tag can replace its paragraph', () => {
+  it('wraps the drawing in a centred paragraph so the raw tag can replace its paragraph', () => {
     const zip = zipWith();
     const xml = embedImages(zip, [jpeg]).get('a')!;
-    expect(xml.startsWith('<w:p>')).toBe(true);
+    expect(xml.startsWith('<w:p><w:pPr><w:jc w:val="center"/></w:pPr>')).toBe(true);
     expect(xml.endsWith('</w:p>')).toBe(true);
     expect(xml).toContain('<w:drawing>');
     expect(xml).toContain('<pic:pic');
@@ -68,5 +68,15 @@ describe('embedImages', () => {
     const zip = zipWith();
     const xml = embedImages(zip, [{ ...jpeg, width: 0, height: 0 }]).get('a')!;
     expect(xml).toContain(`<wp:extent cx="${MAX_WIDTH_EMU}" cy="${Math.round((MAX_WIDTH_EMU * 3) / 4)}"/>`);
+  });
+});
+
+describe('textParagraph', () => {
+  it('renders plain by default', () => {
+    expect(textParagraph('hi')).toBe('<w:p><w:r><w:t xml:space="preserve">hi</w:t></w:r></w:p>');
+  });
+
+  it('centres the paragraph when asked', () => {
+    expect(textParagraph('hi', 'center')).toBe('<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:t xml:space="preserve">hi</w:t></w:r></w:p>');
   });
 });

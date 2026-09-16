@@ -69,6 +69,19 @@ describe('every checked-in template starts ATTACHMENTS on its own page', () => {
   });
 });
 
+describe('every checked-in template centres its photo cells', () => {
+  it.each(CHECKED_IN_TEMPLATES)('%s', file => {
+    const xml = docXml(load(file));
+    const i = xml.indexOf('{#photo_rows}');
+    expect(i).toBeGreaterThanOrEqual(0);
+    const trStart = xml.lastIndexOf('<w:tr>', i);
+    const trEnd = xml.indexOf('</w:tr>', i) + '</w:tr>'.length;
+    const cells = xml.slice(trStart, trEnd).match(/<w:tc>[\s\S]*?<\/w:tc>/g) ?? [];
+    expect(cells).toHaveLength(2);
+    for (const cell of cells) expect(cell).toContain('<w:vAlign w:val="center"/>');
+  });
+});
+
 describe('water-monitoring.docx renders', () => {
   it('a full report with no tag left behind', () => {
     const out = renderDocx(load('water-monitoring.docx'), mapBundle(fullWaterBundle(), ctx), [
@@ -85,6 +98,12 @@ describe('water-monitoring.docx renders', () => {
     expect(xml.split(TICKED).length - 1).toBeGreaterThan(5);
     expect(new PizZip(out).file('word/media/export_1.png')).toBeTruthy();
     expect(() => assertWellFormed(xml)).not.toThrow();
+    // Every drawing paragraph centres itself — the raw {@photo_drawing} tag
+    // replaces its whole paragraph, so the recipe's own <w:jc> on that
+    // paragraph doesn't survive; drawingParagraph() must supply its own.
+    const drawingParagraphs = xml.match(/<w:p>[\s\S]*?<w:drawing>[\s\S]*?<\/w:p>/g) ?? [];
+    expect(drawingParagraphs.length).toBeGreaterThan(0);
+    for (const p of drawingParagraphs) expect(p).toContain('<w:jc w:val="center"/>');
     // The plain case (no additional inspectors) prints the primary
     // inspector's name and position once each, as separate paragraphs.
     expect(submittedByParagraphs(xml, signatories.inspectorName)).toEqual([signatories.inspectorName, signatories.inspectorPosition, '']);

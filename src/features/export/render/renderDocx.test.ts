@@ -62,6 +62,9 @@ describe('renderDocx', () => {
     expect(xml).toContain('(photo not downloaded)');
     expect(xml.match(/\(photo not downloaded\)/g)).toHaveLength(1);
     expect(xml).not.toContain('{');
+    // Both an embedded photo and the missing-photo placeholder centre their paragraph.
+    expect(xml).toContain('<w:drawing>');
+    expect(xml.match(/<w:jc w:val="center"\/>/g)!.length).toBeGreaterThanOrEqual(2);
   });
 
   it('escapes XML-significant characters in values', () => {
