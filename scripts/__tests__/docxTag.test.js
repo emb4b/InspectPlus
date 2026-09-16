@@ -1,9 +1,15 @@
-const { applyRecipe } = require('../docx-tag');
+const { applyRecipe, assertWellFormed } = require('../docx-tag');
 
 const P = (t, rpr = '') => `<w:p><w:pPr><w:rPr><w:sz w:val="20"/></w:rPr></w:pPr>${t === null ? '' : `<w:r>${rpr}<w:t xml:space="preserve">${t}</w:t></w:r>`}</w:p>`;
 const TC = (...ps) => `<w:tc><w:tcPr/>${ps.join('')}</w:tc>`;
 const TR = (...tcs) => `<w:tr>${tcs.join('')}</w:tr>`;
 const SDT = inner => `<w:sdt><w:sdtPr><w14:checkbox><w14:checked w14:val="0"/></w14:checkbox></w:sdtPr><w:sdtContent>${inner}</w:sdtContent></w:sdt>`;
+// Word writes a <w:sdtEndPr>…</w:sdtEndPr> between </w:sdtContent> and
+// </w:sdt> for the EIA form's cell-level checkbox controls (17 of them,
+// adjacent within the same cells) — the shape the original lazy unwrap
+// regex ran into the NEXT control on.
+const SDT_ENDPR = inner =>
+  `<w:sdt><w:sdtPr><w14:checkbox><w14:checked w14:val="0"/></w14:checkbox></w:sdtPr><w:sdtContent>${inner}</w:sdtContent><w:sdtEndPr><w:rPr><w:rFonts w:ascii="MS Gothic" w:hAnsi="MS Gothic"/></w:rPr></w:sdtEndPr></w:sdt>`;
 const CB = '<w:r><w:rPr><w:rFonts w:ascii="MS Gothic"/></w:rPr><w:t>☐</w:t></w:r>';
 
 const doc = body => `<w:document><w:body>${body}<w:sectPr/></w:body></w:document>`;
@@ -126,5 +132,44 @@ describe('applyRecipe', () => {
     expect(() => applyRecipe(xml, { checkboxes: ['a', 'b'], ops: [] })).toThrow(/2 names .* 1 checkbox/);
     expect(() => applyRecipe(xml, { checkboxes: ['a'], ops: [{ op: 'cell', table: 2, row: 1, cell: 1, tag: 'x' }] })).toThrow(/table 2/);
     expect(() => applyRecipe(xml, { checkboxes: ['a'], ops: [{ op: 'replaceText', find: 'nope', with: 'x', nth: 1 }] })).toThrow(/nope/);
+  });
+
+  it('unwraps adjacent checkbox controls that carry an sdtEndPr, without one swallowing the next', () => {
+    // Regression for the EIA template: a lazy </w:sdtContent></w:sdt> match
+    // with no sdtEndPr allowance runs past the first control's own close and
+    // consumes the second control's checkbox glyph along with everything
+    // between them, corrupting the document and losing a checkbox.
+    const xml = doc(`<w:tbl>${TR(TC(`<w:p>${SDT_ENDPR(CB)}${SDT_ENDPR(CB)}</w:p>`))}</w:tbl>`);
+    const out = applyRecipe(xml, { checkboxes: ['one', 'two'], ops: [] });
+    expect(out).not.toContain('<w:sdt>');
+    expect(out).not.toContain('<w:sdtEndPr>');
+    expect(out).not.toContain('☐');
+    expect(out).toContain('<w:t>{one}</w:t>');
+    expect(out).toContain('<w:t>{two}</w:t>');
+    assertWellFormed(out);
+  });
+
+  it('guards against a leftover content control after tagging', () => {
+    // A content control the checkbox unwrap doesn't recognize (no
+    // <w14:checkbox> in its sdtPr) survives normalise() untouched — always a
+    // bug for these forms, which must never ship with a control in place.
+    const nonCheckboxSdt = '<w:sdt><w:sdtPr><w:alias w:val="x"/></w:sdtPr><w:sdtContent><w:r><w:t>x</w:t></w:r></w:sdtContent></w:sdt>';
+    const xml = doc(`<w:p>${nonCheckboxSdt}</w:p>`);
+    expect(() => applyRecipe(xml, { checkboxes: [], ops: [] })).toThrow(/leftover/);
+  });
+});
+
+describe('assertWellFormed', () => {
+  it('accepts well-formed xml with a prolog, attributes, and self-closing tags', () => {
+    const xml =
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+      '<w:document><w:body><w:p w:rsidR="00AB12CD" w14:textId="77777777"/>' +
+      '<w:r><w:t xml:space="preserve">hi &gt; there</w:t></w:r></w:body></w:document>';
+    expect(() => assertWellFormed(xml)).not.toThrow();
+  });
+
+  it('throws on an unbalanced fragment', () => {
+    const xml = '<w:document><w:body><w:p></w:body></w:document>';
+    expect(() => assertWellFormed(xml)).toThrow(/mismatched tag/);
   });
 });

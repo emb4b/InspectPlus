@@ -5,12 +5,35 @@ import { renderDocx } from './renderDocx';
 import { mapBundle } from '../mappers';
 import { emptyWaterBundle, fullSurveyBundle, fullWaterBundle, signatories } from '../mappers/fixtures';
 import { TICKED } from '../mappers/primitives';
+// scripts/docx-tag.js is a plain Node script, not part of the app bundle —
+// Jest transpiles it like any other CommonJS module, and templates/index.ts
+// already imports the sibling .docx assets the same require()-based way.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { assertWellFormed } = require('../../../../scripts/docx-tag');
 
 const TEMPLATES_DIR = path.join(__dirname, '..', '..', '..', '..', 'assets', 'templates');
 const ctx = { signatories };
 const load = (file: string) => new Uint8Array(fs.readFileSync(path.join(TEMPLATES_DIR, file)));
 const docXml = (bytes: Uint8Array) => new PizZip(bytes).file('word/document.xml')!.asText();
 const png1x1 = Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64'));
+
+// A checked-in template with a malformed document.xml (e.g. the EIA
+// checkbox-unwrap bug that produced a mismatched-tag document) would break
+// silently until someone opened the output in Word — assert every source
+// template, and every render of it, parses as well-formed XML.
+const CHECKED_IN_TEMPLATES = [
+  'water-monitoring.docx',
+  'air-monitoring.docx',
+  'eia.docx',
+  'hazardous-waste-generators.docx',
+  'survey.docx',
+];
+
+describe('every checked-in template is well-formed XML', () => {
+  it.each(CHECKED_IN_TEMPLATES)('%s', file => {
+    expect(() => assertWellFormed(docXml(load(file)))).not.toThrow();
+  });
+});
 
 describe('water-monitoring.docx renders', () => {
   it('a full report with no tag left behind', () => {
@@ -26,6 +49,7 @@ describe('water-monitoring.docx renders', () => {
     expect(xml).toContain('<w:drawing>');
     expect(xml.split(TICKED).length - 1).toBeGreaterThan(5);
     expect(new PizZip(out).file('word/media/export_1.png')).toBeTruthy();
+    expect(() => assertWellFormed(xml)).not.toThrow();
   });
 
   it('an empty draft, still showing the printed row counts', () => {
@@ -33,6 +57,7 @@ describe('water-monitoring.docx renders', () => {
     expect(xml).not.toMatch(/\{[#/@]?[A-Za-z0-9_]+\}/);
     // 3 outlet rows + 2 component rows survive padding
     expect(xml).toContain('Receiving Body of Water');
+    expect(() => assertWellFormed(xml)).not.toThrow();
   });
 });
 
@@ -42,6 +67,7 @@ describe('the other tagged templates render', () => {
     const xml = docXml(renderDocx(load('air-monitoring.docx'), mapBundle(bundle, ctx), []));
     expect(xml).not.toMatch(/\{[#/@]?[A-Za-z0-9_]+\}/);
     expect(xml).toContain('Alpha Water Refilling');
+    expect(() => assertWellFormed(xml)).not.toThrow();
   });
 
   it('eia.docx with no tag left behind', () => {
@@ -49,6 +75,7 @@ describe('the other tagged templates render', () => {
     const xml = docXml(renderDocx(load('eia.docx'), mapBundle(bundle, ctx), []));
     expect(xml).not.toMatch(/\{[#/@]?[A-Za-z0-9_]+\}/);
     expect(xml).toContain('Alpha Water Refilling');
+    expect(() => assertWellFormed(xml)).not.toThrow();
   });
 
   it('hazardous-waste-generators.docx with no tag left behind', () => {
@@ -56,11 +83,13 @@ describe('the other tagged templates render', () => {
     const xml = docXml(renderDocx(load('hazardous-waste-generators.docx'), mapBundle(bundle, ctx), []));
     expect(xml).not.toMatch(/\{[#/@]?[A-Za-z0-9_]+\}/);
     expect(xml).toContain('Alpha Water Refilling');
+    expect(() => assertWellFormed(xml)).not.toThrow();
   });
 
   it('survey.docx with no tag left behind', () => {
     const xml = docXml(renderDocx(load('survey.docx'), mapBundle(fullSurveyBundle(), ctx), []));
     expect(xml).not.toMatch(/\{[#/@]?[A-Za-z0-9_]+\}/);
     expect(xml).toContain('Bucayao Bridge');
+    expect(() => assertWellFormed(xml)).not.toThrow();
   });
 });

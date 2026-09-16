@@ -39,7 +39,15 @@ function spans(xml, tag, from = 0, to = xml.length) {
 
 function normalise(xml) {
   // Unwrap checkbox content controls: keep what's inside <w:sdtContent>.
-  let out = xml.replace(/<w:sdt>(?:(?!<w:sdt>)[\s\S])*?<w14:checkbox>[\s\S]*?<\/w:sdtPr><w:sdtContent>([\s\S]*?)<\/w:sdtContent><\/w:sdt>/g, '$1');
+  // The content itself must stop at the control's OWN closing
+  // </w:sdtContent> — a lazy [\s\S]*? followed directly by </w:sdt> runs
+  // into the NEXT control whenever a <w:sdtEndPr>…</w:sdtEndPr> sits between
+  // </w:sdtContent> and </w:sdt> (Word writes this for cell-level checkbox
+  // controls), producing an unbalanced document.xml.
+  let out = xml.replace(
+    /<w:sdt>(?:(?!<w:sdt>)[\s\S])*?<w14:checkbox>[\s\S]*?<\/w:sdtPr><w:sdtContent>((?:(?!<\/w:sdtContent>)[\s\S])*)<\/w:sdtContent>(?:<w:sdtEndPr>[\s\S]*?<\/w:sdtEndPr>)?<\/w:sdt>/g,
+    '$1',
+  );
   // Remove legacy FORMCHECKBOX fields (begin … end runs, plus bookmarks around them).
   out = out.replace(/<w:r>(?:(?!<\/w:r>)[\s\S])*?<w:fldChar w:fldCharType="begin">(?:(?!<w:fldChar w:fldCharType="end")[\s\S])*?FORMCHECKBOX[\s\S]*?<w:fldChar w:fldCharType="end"\s*\/><\/w:r>/g, '');
   // Only strip the bookmarks that wrap the checkbox fields — other bookmarks (e.g. Word's
@@ -202,7 +210,45 @@ function applyRecipe(originalXml, recipe) {
   }
   let i = 0;
   out = out.replace(/<w:t>☐<\/w:t>/g, () => `<w:t>{${names[i++]}}</w:t>`);
+
+  // A leftover content control after the glyph pass means the checkbox
+  // unwrap above missed one (e.g. a new sdtEndPr/nesting shape it doesn't
+  // handle) — always a bug for these forms, which are never meant to ship
+  // with any control still in place.
+  if (/<w:sdt[\s>]|<w14:checkbox>/.test(out)) {
+    throw new Error('leftover <w:sdt> content control after tagging — the checkbox-unwrap regex missed one');
+  }
+
+  assertWellFormed(out);
   return out;
+}
+
+// A minimal stack-based well-formedness check: confirms every open tag has a
+// matching close tag, in order. Not a full XML validator — just enough to
+// catch a generator bug that leaves document.xml unbalanced (see the
+// checkbox-unwrap fix above, which one such bug produced). The tag-name
+// regex only matches "<" immediately followed by an optional "/" and a name
+// character, so the "<?xml …?>" prolog (whose first char is "?") is never
+// matched and needs no special-casing; attribute values are consumed as
+// opaque quoted strings so a stray "<" or ">" inside one can't desync it.
+function assertWellFormed(xml) {
+  const tagRe = /<(\/?)([A-Za-z_][\w:.-]*)(?:"[^"]*"|'[^']*'|[^'"<>])*?(\/?)>/g;
+  const stack = [];
+  let m;
+  while ((m = tagRe.exec(xml))) {
+    const [, closing, name, selfClosing] = m;
+    if (closing) {
+      const top = stack.pop();
+      if (top !== name) {
+        throw new Error(`mismatched tag </${name}> at offset ${m.index} (expected ${top ? `</${top}>` : 'no open tag'})`);
+      }
+    } else if (!selfClosing) {
+      stack.push(name);
+    }
+  }
+  if (stack.length) {
+    throw new Error(`unclosed tag(s) at end of document: ${stack.join(', ')}`);
+  }
 }
 
 function tagFile(originalPath, recipePath, outPath) {
@@ -223,7 +269,7 @@ function tagAll() {
   }
 }
 
-module.exports = { applyRecipe, tagFile, normalise, tableGrid };
+module.exports = { applyRecipe, tagFile, normalise, tableGrid, assertWellFormed };
 
 if (require.main === module) {
   const [a, b, c] = process.argv.slice(2);
