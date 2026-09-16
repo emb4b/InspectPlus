@@ -44,12 +44,20 @@ export async function resolveLocalFileUri(attachment: Pick<Attachment, 'attachme
     throw new Error('Could not reach the photo — check your connection and try again.');
   }
 
-  const downloaded = await withTimeout(
-    File.downloadFileAsync(data.signedUrl, destination),
+  // Download to a side file and move it into place only once it's complete.
+  // On Android, downloadFileAsync writes straight into its destination with
+  // no temp file/atomic rename of its own — a crash or connection drop
+  // mid-download must not leave a truncated file at `destination` for the
+  // exists() check above to reuse forever.
+  const partial = new File(Paths.cache, `download-${attachment.attachmentId}.partial.jpg`);
+  if (partial.exists) partial.delete();
+  await withTimeout(
+    File.downloadFileAsync(data.signedUrl, partial),
     NETWORK_TIMEOUT_MS,
     'downloadFileAsync'
   );
-  return downloaded.uri;
+  partial.move(destination);
+  return destination.uri;
 }
 
 // Saves into a dedicated "InspectPlus" album rather than dumping straight
