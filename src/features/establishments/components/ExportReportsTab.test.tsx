@@ -16,6 +16,25 @@ import { Skeleton } from '../../../components/Skeleton';
 // import/first rule requires it.
 import { ExportReportsTab, ExportReportsTabHandle } from './ExportReportsTab';
 import { ReportListCard } from './ReportListCard';
+import { SignatorySheet } from '../../export/components/SignatorySheet';
+import { ExportProgressBar } from '../../export/components/ExportProgressBar';
+
+const mockStart = jest.fn();
+const mockCancel = jest.fn();
+const mockReset = jest.fn();
+let mockPhase: { status: string; [k: string]: unknown } = { status: 'idle' };
+jest.mock('../../export/hooks/useExportReports', () => ({
+  useExportReports: () => ({ phase: mockPhase, start: mockStart, cancel: mockCancel, reset: mockReset }),
+}));
+jest.mock('../../export/templates', () => ({
+  hasTemplate: (_kind: string, type: string) => type !== 'hazwaste_tsd',
+}));
+const mockSignatoryLoad = jest.fn();
+const mockSignatorySave = jest.fn();
+jest.mock('../../export/signatories', () => ({
+  asyncStorageSignatoryProvider: { load: () => mockSignatoryLoad(), save: (s: unknown) => mockSignatorySave(s) },
+  emptySignatories: (name: string | null) => ({ inspectorName: name ?? '', inspectorPosition: '', supervisorName: '', supervisorPosition: '' }),
+}));
 
 // ExportReportsTab renders the real ReportListCard, which pulls in
 // confirmResolveConflict -> the WatermelonDB sync adapter chain, which
@@ -139,7 +158,13 @@ jest.mock('../../home/context/FabVisibilityContext', () => {
 });
 
 jest.mock('../../../core/providers/AuthProvider', () => ({
-  useAuthContext: () => ({ municipalities: [], session: { user: { id: 'u1' } }, role: 'Inspector' }),
+  useAuthContext: () => ({
+    municipalities: [],
+    session: { user: { id: 'u1' } },
+    role: 'Inspector',
+    fullName: 'Juan Dela Cruz',
+    province: 'P',
+  }),
 }));
 
 // canManageAllRecords is the only runtime import ExportReportsTab takes from
@@ -257,45 +282,6 @@ describe('ExportReportsTab', () => {
     const r = render();
     selectRow(r, 0);
     expect(footerText()).toContain('1 selected');
-  });
-
-  describe('the Generate button', () => {
-    // The most important assertion in this task: Generate must render
-    // disabled with copy explaining why, never as a live-looking control that
-    // silently does nothing — document generation is a separate spec/spike
-    // not part of this branch. A future refactor that accidentally enables it
-    // must fail this test.
-    it('renders disabled, with copy saying document generation is not available yet', () => {
-      const r = render();
-      selectRow(r, 0);
-
-      const footer = renderFooter();
-      const generateButton = footer.root.findByType(Button);
-      expect(generateButton.props.label).toBe('Generate');
-      expect(generateButton.props.disabled).toBe(true);
-
-      // Button.tsx computes accessibilityState.disabled from the `disabled`
-      // prop it was given (`isInactive = disabled || loading`) and sets it on
-      // the TouchableOpacity it renders internally — asserting that resolved,
-      // screen-reader-visible value too, not just the prop ExportReportsTab
-      // passed in, so a future rewrite of that computation can't quietly stop
-      // propagating it.
-      const innerTouchable = generateButton.findByType(TouchableOpacity);
-      expect(innerTouchable.props.accessibilityState).toEqual({ disabled: true, busy: false });
-      expect(innerTouchable.props.disabled).toBe(true);
-
-      expect(JSON.stringify(footer.toJSON())).toContain(
-        'Document generation arrives in a future release.',
-      );
-    });
-
-    it('stays disabled regardless of how many reports are selected', () => {
-      const r = render();
-      act(() => { findSelectAllToggle(r).props.onPress(); });
-
-      const generateButton = renderFooter().root.findByType(Button);
-      expect(generateButton.props.disabled).toBe(true);
-    });
   });
 
   describe('draft warning reflects the SELECTED reports, not the visible list', () => {
@@ -439,5 +425,117 @@ describe('ExportReportsTab', () => {
 
       expect(mockRefetch).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe('the Generate flow', () => {
+  beforeEach(() => {
+    mockPhase = { status: 'idle' };
+    mockStart.mockReset();
+    mockSignatoryLoad.mockResolvedValue(null);
+    mockSignatorySave.mockReset();
+    mockCancel.mockReset();
+    mockReset.mockReset();
+    mockUseReportBrowser.mockReset();
+    mockUseReportBrowser.mockImplementation(() => makeBrowserReturn());
+  });
+
+  it('is enabled once something is selected and opens the signatory sheet', async () => {
+    const r = render();
+    selectRow(r, 0);
+    const generate = renderFooter().root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
+    expect(generate.props.disabled).toBe(false);
+    await act(async () => { generate.props.onPress(); });
+    const sheet = r.root.findByType(SignatorySheet);
+    expect(sheet.props.visible).toBe(true);
+    expect(sheet.props.initial.inspectorName).toBe('Juan Dela Cruz');
+  });
+
+  it('prefills the sheet from the saved signatories', async () => {
+    mockSignatoryLoad.mockResolvedValue({ inspectorName: 'Saved', inspectorPosition: 'Eng', supervisorName: 'Sup', supervisorPosition: 'Chief' });
+    const r = render();
+    selectRow(r, 0);
+    // renderFooter() (below) already wraps its own TestRenderer.create() in
+    // its own act() — nesting a second, outer act() around that call (as an
+    // earlier draft of this test did, mirroring the brief's snippet) made
+    // react-test-renderer report "Can't access .root on unmounted test
+    // renderer" on the very next access in this test environment. Fetching
+    // the button reference outside any act(), then invoking onPress() inside
+    // a single act() (matching the pattern the "is enabled once something is
+    // selected" test above already uses successfully), avoids the nesting.
+    const generate = renderFooter().root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
+    await act(async () => { generate.props.onPress(); });
+    expect(r.root.findByType(SignatorySheet).props.initial.inspectorName).toBe('Saved');
+  });
+
+  it('confirming the sheet saves the signatories and starts the run with the selected items', async () => {
+    const r = render();
+    selectRow(r, 0);
+    // See the note in the previous test: renderFooter() must not be called
+    // from inside another act() callback.
+    const generate = renderFooter().root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
+    await act(async () => { generate.props.onPress(); });
+    const s = { inspectorName: 'J', inspectorPosition: 'E', supervisorName: 'M', supervisorPosition: 'C' };
+    await act(async () => { r.root.findByType(SignatorySheet).props.onConfirm(s); });
+    expect(mockSignatorySave).toHaveBeenCalledWith(s);
+    expect(mockStart).toHaveBeenCalledWith(
+      [{ key: 'inspection-r1', kind: 'inspection', reportId: 'r1', reportType: 'water_monitoring', title: 'Water Monitoring', estabName: 'Alpha Corp', date: '2026-08-01' }],
+      s,
+    );
+    expect(r.root.findByType(SignatorySheet).props.visible).toBe(false);
+  });
+
+  it('shows the progress bar instead of the selection bar while running, and Cancel cancels', () => {
+    mockPhase = { status: 'running', progress: { index: 1, total: 2, title: 'Alpha Corp' } };
+    const r = render();
+    selectRow(r, 0);
+    const footer = renderFooter();
+    expect(footer.root.findAllByType(ExportProgressBar)).toHaveLength(1);
+    expect(JSON.stringify(footer.toJSON())).toContain('Generating 1 of 2');
+    act(() => footer.root.findByType(ExportProgressBar).props.onCancel());
+    expect(mockCancel).toHaveBeenCalled();
+  });
+
+  it('keeps the selection after a run and Done returns to the selection bar', () => {
+    mockPhase = { status: 'done', result: { shareUri: 'u', succeeded: 1, failures: [], skippedPhotos: 2, cancelled: false } };
+    const r = render();
+    selectRow(r, 0);
+    // A single renderFooter() call, reused for both the text assertion and
+    // the onDismiss() interaction — calling renderFooter() a second time
+    // from inside the act() below hit the same nested-act issue described
+    // above.
+    const footer = renderFooter();
+    expect(JSON.stringify(footer.toJSON())).toContain('1 report generated, 2 photos not downloaded');
+    act(() => footer.root.findByType(ExportProgressBar).props.onDismiss());
+    expect(mockReset).toHaveBeenCalled();
+  });
+
+  it('Retry failed re-runs only the failed reports', async () => {
+    mockPhase = { status: 'done', result: { shareUri: null, succeeded: 0, failures: [{ key: 'inspection-r2', title: 'x', reason: 'y' }], skippedPhotos: 0, cancelled: false } };
+    const r = render();
+    selectRow(r, 0);
+    selectRow(r, 1);
+    const footer = renderFooter();
+    await act(async () => { footer.root.findByType(ExportProgressBar).props.onRetry(); });
+    expect(mockStart).toHaveBeenCalledWith([expect.objectContaining({ key: 'inspection-r2' })], expect.anything());
+  });
+});
+
+describe('a report type with no template', () => {
+  const tsd: AllReportItem = { ...mockReports[0], key: 'inspection-r9', reportId: 'r9', reportType: 'hazwaste_tsd', title: 'Hazardous Waste TSD' };
+
+  beforeEach(() => {
+    mockPhase = { status: 'idle' };
+    mockUseReportBrowser.mockReset();
+  });
+
+  it('cannot be selected and says why; Select all skips it', () => {
+    mockUseReportBrowser.mockImplementation(() => makeBrowserReturn({ reports: [mockReports[0], tsd] }));
+    const r = render();
+    const card = r.root.find(n => n.type === ReportListCard && (n.props as { item: AllReportItem }).item.key === tsd.key);
+    expect(card.props.selectDisabled).toBe(true);
+    expect(card.props.selectDisabledReason).toBe('No template yet');
+    act(() => { r.root.findByProps({ accessibilityLabel: 'Select all reports' }).props.onPress(); });
+    expect(footerText()).toContain('1 selected');
   });
 });

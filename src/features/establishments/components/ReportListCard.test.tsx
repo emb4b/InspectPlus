@@ -514,6 +514,32 @@ describe('ReportListCard selection mode', () => {
     expect(onPress).not.toHaveBeenCalled();
   });
 
+  it('renders a disabled selector with the reason and ignores taps', () => {
+    const onToggleSelect = jest.fn();
+    let r!: TestRenderer.ReactTestRenderer;
+    TestRenderer.act(() => {
+      r = TestRenderer.create(
+        <ReportListCard
+          item={ownedDraftInspection}
+          currentUid="uid-1"
+          canManageAll={false}
+          onPress={noop}
+          onEdit={noop}
+          onDelete={noop}
+          selectable
+          selectDisabled
+          selectDisabledReason="No template yet"
+          onToggleSelect={onToggleSelect}
+        />,
+      );
+    });
+    expect(JSON.stringify(r.toJSON())).toContain('No template yet');
+    TestRenderer.act(() => {
+      findCard(r, ownedDraftInspection).props.onPress();
+    });
+    expect(onToggleSelect).not.toHaveBeenCalled();
+  });
+
   it('exposes accessibilityRole="button" and no accessibilityState when not selectable', () => {
     const r = render(
       <ReportListCard item={ownedDraftInspection} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,

@@ -14,6 +14,13 @@ import { Type } from '../../../design/typography';
 import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { useSetFabHidden } from '../../home/context/FabVisibilityContext';
 import { useScreenFooter } from '../../home/context/ScreenFooterContext';
+import { useExportReports } from '../../export/hooks/useExportReports';
+import { hasTemplate } from '../../export/templates';
+import { asyncStorageSignatoryProvider, emptySignatories } from '../../export/signatories';
+import { SignatorySheet } from '../../export/components/SignatorySheet';
+import { ExportProgressBar } from '../../export/components/ExportProgressBar';
+import type { ExportItem } from '../../export/exportReports';
+import type { Signatories } from '../../export/types';
 import { AllReportItem, canManageAllRecords } from '../hooks/useEstablishment';
 import { useReportBrowser } from '../hooks/useReportBrowser';
 import { ReportFilterSheet } from './ReportFilterSheet';
@@ -25,15 +32,32 @@ export interface ExportReportsTabHandle {
   refresh: () => Promise<void>;
 }
 
+const NO_TEMPLATE_REASON = 'No template yet';
+const canExport = (item: AllReportItem) => hasTemplate(item.kind, item.reportType);
+const toExportItem = (item: AllReportItem): ExportItem => ({
+  key: item.key,
+  kind: item.kind,
+  reportId: item.reportId,
+  reportType: item.reportType,
+  title: item.title,
+  estabName: item.estabName,
+  date: item.date,
+});
+
 export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref) => {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const browser = useReportBrowser();
   const { reports, loading, error, refetch, activeFilterCount, state } = browser;
 
-  const { municipalities, session, role } = useAuthContext();
+  const { municipalities, session, role, fullName } = useAuthContext();
   const currentUid = (session as { user?: { id?: string } } | null)?.user?.id ?? '';
   const isDeveloper = canManageAllRecords(role ?? '');
+
+  const exporter = useExportReports();
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [signatories, setSignatories] = useState<Signatories>(() => emptySignatories(fullName));
+  const busy = exporter.phase.status !== 'idle';
 
   // Derived from the live list rather than stored alongside it, so a
   // selection can't survive a filter change that removes the report.
@@ -42,13 +66,19 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
     [reports, selectedKeys],
   );
   const draftCount = selectedItems.filter(report => report.status === 'draft').length;
-  const allSelected = reports.length > 0 && selectedItems.length === reports.length;
+  // Only reports with a template can be selected/exported at all, so "every
+  // report" for Select all's purposes means every exportable one — a
+  // Hazwaste TSD (say) sitting in the list shouldn't stop the toggle from
+  // ever reading as "all selected", nor get swept in when it fires.
+  const exportable = useMemo(() => reports.filter(canExport), [reports]);
+  const allSelected = exportable.length > 0 && selectedItems.length === exportable.length;
 
   // The FAB would sit on top of the selection bar. Restored automatically
   // when the selection clears or the tab unmounts.
   useSetFabHidden(selectedItems.length > 0);
 
   const toggleSelect = (item: AllReportItem) => {
+    if (!canExport(item)) return;
     setSelectedKeys(previous => {
       const next = new Set(previous);
       if (next.has(item.key)) {
@@ -61,7 +91,31 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
   };
 
   const toggleSelectAll = () => {
-    setSelectedKeys(allSelected ? new Set() : new Set(reports.map(report => report.key)));
+    setSelectedKeys(allSelected ? new Set() : new Set(exportable.map(report => report.key)));
+  };
+
+  const openSheet = async () => {
+    const saved = await asyncStorageSignatoryProvider.load();
+    setSignatories(saved ?? emptySignatories(fullName));
+    setSheetOpen(true);
+  };
+
+  const runExport = async (items: AllReportItem[], s: Signatories) => {
+    setSheetOpen(false);
+    setSignatories(s);
+    await asyncStorageSignatoryProvider.save(s);
+    await exporter.start(items.map(toExportItem), s);
+  };
+
+  // Retrying after a run that fully failed (status 'error', thrown before
+  // any per-item result existed) re-sends every selected report; retrying
+  // after a run that reached 'done' with some failures re-sends only those.
+  const retryFailed = () => {
+    if (exporter.phase.status !== 'done' && exporter.phase.status !== 'error') return;
+    const failedKeys =
+      exporter.phase.status === 'done' ? new Set(exporter.phase.result.failures.map(f => f.key)) : null;
+    const items = failedKeys ? selectedItems.filter(item => failedKeys.has(item.key)) : selectedItems;
+    void runExport(items, signatories);
   };
 
   // Mirrors ManageReportsTab's handle: Home drives this from pull-to-refresh
@@ -80,8 +134,21 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
   // the scrolling content and slide away instead of pinning to the viewport.
   // See useScreenFooter for why this takes a factory plus deps.
   useScreenFooter(
-    () =>
-      selectedItems.length > 0 ? (
+    () => {
+      // A run in flight (or just finished) replaces the selection bar
+      // outright — its own Cancel/Retry/Done actions are the only ones that
+      // make sense while exporter.phase isn't idle.
+      if (busy) {
+        return (
+          <ExportProgressBar
+            phase={exporter.phase}
+            onCancel={exporter.cancel}
+            onRetry={retryFailed}
+            onDismiss={exporter.reset}
+          />
+        );
+      }
+      return selectedItems.length > 0 ? (
         <View style={styles.selectionBar}>
           {/* A template literal, not `{n} selected` — JSX would split that into
               two separate text child nodes ("1", " selected"), which the
@@ -97,13 +164,18 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
               </Text>
             </View>
           )}
-          <Button label="Generate" onPress={() => {}} variant="primary" size="md" disabled fullWidth />
-          <Text style={styles.comingSoon}>
-            Document generation arrives in a future release.
-          </Text>
+          <Button
+            label="Generate"
+            onPress={() => { void openSheet(); }}
+            variant="primary"
+            size="md"
+            disabled={selectedItems.length === 0}
+            fullWidth
+          />
         </View>
-      ) : null,
-    [selectedItems.length, draftCount],
+      ) : null;
+    },
+    [selectedItems, draftCount, exporter.phase, signatories],
   );
 
   if (loading) {
@@ -149,6 +221,7 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
         <TouchableOpacity
           style={[styles.filterBtn, activeFilterCount > 0 && styles.filterBtnActive]}
           onPress={() => setFiltersOpen(true)}
+          disabled={busy}
           activeOpacity={0.75}
           accessibilityRole="button"
           accessibilityLabel="Filter reports">
@@ -198,6 +271,11 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
             selectable
             selected={selectedKeys.has(item.key)}
             onToggleSelect={toggleSelect}
+            // Untemplated types can't be selected at all; a run in flight
+            // additionally freezes whatever is already picked, but only the
+            // "no template" case gets an explanatory badge.
+            selectDisabled={busy || !canExport(item)}
+            selectDisabledReason={canExport(item) ? undefined : NO_TEMPLATE_REASON}
           />
         ))
       )}
@@ -207,6 +285,13 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
         onClose={() => setFiltersOpen(false)}
         browser={browser}
         municipalities={municipalities}
+      />
+
+      <SignatorySheet
+        visible={sheetOpen}
+        initial={signatories}
+        onCancel={() => setSheetOpen(false)}
+        onConfirm={s => { void runExport(selectedItems, s); }}
       />
     </View>
   );
@@ -285,11 +370,5 @@ const styles = StyleSheet.create({
     fontSize: Type.caption.fontSize,
     lineHeight: Type.caption.lineHeight,
     color: Colors.textMuted,
-  },
-  comingSoon: {
-    fontSize: Type.caption.fontSize,
-    lineHeight: Type.caption.lineHeight,
-    color: Colors.textMuted,
-    textAlign: 'center',
   },
 });
