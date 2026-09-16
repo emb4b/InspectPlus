@@ -23,7 +23,7 @@ several.
 | Data outgrowing the printed rows | Row loops grow to fit, padded with blank rows up to the form's printed count so a sparse report still looks like the form |
 | After Generate | OS share sheet (`expo-sharing`); nothing kept in the app beyond a cache cleared on the next run |
 | Photos | Embedded on the ATTACHMENTS page, 2 per row, with caption; a photo not on the device prints as its filename + "(not downloaded)" |
-| Signature block | Inspector/supervisor name + position, and the recommending/approving signatories, all asked in an on-device sheet and remembered; the approvers default to what the forms printed before this was editable (see `DEFAULT_APPROVERS`). Behind a `SignatoryProvider` seam so the future admin-defined chain of command replaces the storage, not the engine |
+| Signature block | Inspector/supervisor name + position, the recommending/approving signatories, and any number of additional inspectors under "Submitted by", all asked in an on-device sheet and remembered; the approvers default to what the forms printed before this was editable (see `DEFAULT_APPROVERS`). Behind a `SignatoryProvider` seam so the future admin-defined chain of command replaces the storage, not the engine |
 | Scope of mapping | Water end-to-end. The other four templates get the shared sections (General Information, Purpose, DENR Permits, Documents Reviewed, signatures, ATTACHMENTS) tagged and mapped now; their type-specific sections are tagged and mapped when each form is built, since only the Water form exists in the app today |
 | Engine | docxtemplater + pizzip on-device (both MIT, pure JS, Hermes-safe). Image support decided by the spike: the MIT community image module if it holds up, otherwise a small post-pass of our own. Server-side rendering rejected — the app is offline-first |
 
@@ -76,7 +76,7 @@ src/features/export/
 - **Purpose:** `purpose_cb_verify`, `purpose_cb_compliance`, `purpose_cb_complaints`, `purpose_cb_commitments`, `purpose_cb_others` from the booleans. Verify sub-table New/Renewal checkboxes from `verify_info_list[item_key].status`. Commitments sub-list checkboxes from `check_commitments_list`. `purpose_others` text.
 - **DENR Permits:** fixed-label rows keyed by `(envi_law, permit_type)`; `permitsSnapshot` is matched to the printed labels, ECC 1/2/3 taking the first three PD 1586 entries in order. Unmatched permits go into a padded loop appended under the last printed row so nothing is dropped silently.
 - **Documents reviewed:** a checkbox per printed option from `documentsReviewed[]`; an entry not in the printed list goes in the Others blank.
-- **Signatures:** `sig_inspector_name`, `sig_inspector_position`, `sig_supervisor_name`, `sig_supervisor_position`, `sig_recommending_name`, `sig_recommending_position`, `sig_approver_name`, `sig_approver_position` from `SignatoryProvider`.
+- **Signatures:** `sig_inspector_name`, `sig_inspector_position`, `sig_supervisor_name`, `sig_supervisor_position`, `sig_recommending_name`, `sig_recommending_position`, `sig_approver_name`, `sig_approver_position` from `SignatoryProvider`. `sig_inspectors[]` (`sig_inspector_name`, `sig_inspector_position`) loops the primary inspector plus any additional ones under "Submitted by" whose name isn't blank — min 1 row (the primary inspector always appears).
 - **Photos:** `photos[]` = `{ image, caption }` ordered by `capturedAt`; caption is `caption ?? fileName` followed by the geotag when present.
 
 ### Water block (`mappers/water.ts`)

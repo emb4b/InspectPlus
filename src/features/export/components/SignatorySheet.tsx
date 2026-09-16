@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { TextField } from '../../../components/form';
 import { Button } from '../../../components/Button';
+import { AddRowButton } from '../../../components/AddRowButton';
 import { Colors } from '../../../design/colors';
 import { Radius } from '../../../design/radius';
 import { Spacing } from '../../../design/spacing';
@@ -38,6 +39,16 @@ export const SignatorySheet: React.FC<SignatorySheetProps> = ({ visible, initial
   const canGenerate = value.inspectorName.trim().length > 0;
   const insets = useSafeAreaInsets();
 
+  const updateInspector = (index: number, key: 'name' | 'position', text: string) =>
+    setValue(v => ({
+      ...v,
+      additionalInspectors: v.additionalInspectors.map((insp, i) => (i === index ? { ...insp, [key]: text } : insp)),
+    }));
+  const removeInspector = (index: number) =>
+    setValue(v => ({ ...v, additionalInspectors: v.additionalInspectors.filter((_, i) => i !== index) }));
+  const addInspector = () =>
+    setValue(v => ({ ...v, additionalInspectors: [...v.additionalInspectors, { name: '', position: '' }] }));
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <AnimatedTouchableOpacity
@@ -58,6 +69,33 @@ export const SignatorySheet: React.FC<SignatorySheetProps> = ({ visible, initial
             showsVerticalScrollIndicator={false}>
             <TextField label="Inspector name" value={value.inspectorName} onChangeText={set('inspectorName')} required style={styles.field} />
             <TextField label="Inspector position/designation" value={value.inspectorPosition} onChangeText={set('inspectorPosition')} style={styles.field} />
+            {value.additionalInspectors.map((inspector, index) => (
+              // eslint-disable-next-line react/no-array-index-key -- rows have no stable id; index is fine since only appends/removes at the end matter and React doesn't need to preserve keyboard focus across a reorder here
+              <View key={index} style={styles.inspectorRow}>
+                <View style={styles.inspectorFields}>
+                  <TextField
+                    label={`Additional inspector ${index + 1} — name`}
+                    value={inspector.name}
+                    onChangeText={text => updateInspector(index, 'name', text)}
+                    style={styles.field}
+                  />
+                  <TextField
+                    label={`Additional inspector ${index + 1} — position`}
+                    value={inspector.position}
+                    onChangeText={text => updateInspector(index, 'position', text)}
+                    style={styles.field}
+                  />
+                </View>
+                <TouchableOpacity
+                  onPress={() => removeInspector(index)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove inspector ${index + 1}`}
+                  style={styles.removeInspectorBtn}>
+                  <Ionicons name="close-circle-outline" size={22} color={Colors.textMuted} />
+                </TouchableOpacity>
+              </View>
+            ))}
+            <AddRowButton label="Add inspector" onPress={addInspector} style={styles.addInspectorBtn} />
             <TextField label="Immediate supervisor name" value={value.supervisorName} onChangeText={set('supervisorName')} style={styles.field} />
             <TextField label="Supervisor position/designation" value={value.supervisorPosition} onChangeText={set('supervisorPosition')} style={styles.field} />
             <Text style={styles.sectionHeading}>Approvers</Text>
@@ -77,7 +115,9 @@ export const SignatorySheet: React.FC<SignatorySheetProps> = ({ visible, initial
               recommendingPosition: value.recommendingPosition.trim(),
               approverName: value.approverName.trim(),
               approverPosition: value.approverPosition.trim(),
-              additionalInspectors: value.additionalInspectors,
+              additionalInspectors: value.additionalInspectors
+                .map(i => ({ name: i.name.trim(), position: i.position.trim() }))
+                .filter(i => i.name.length > 0),
             })} variant="primary" size="md" fullWidth disabled={!canGenerate} />
           </View>
         </TouchableOpacity>
@@ -94,6 +134,10 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md },
   field: { flex: undefined },
+  inspectorRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
+  inspectorFields: { flex: 1 },
+  removeInspectorBtn: { marginTop: Spacing.md, padding: Spacing.xs },
+  addInspectorBtn: { marginBottom: Spacing.md },
   sectionHeading: {
     fontSize: Type.label.fontSize,
     lineHeight: Type.label.lineHeight,

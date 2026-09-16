@@ -115,6 +115,17 @@ export function mapPhotos(photos: readonly ExportPhoto[]): TemplateData[] {
 }
 
 export function mapSignatures(ctx: MapContext): TemplateData {
+  // Primary inspector first, then any additional one whose trimmed name is
+  // non-empty — a blank row the inspector added but never filled in (or
+  // removed) is silently dropped rather than printing an empty line under
+  // "Submitted by". The top-level sig_inspector_name/position stay so a
+  // template that hasn't been updated to loop sig_inspectors still prints
+  // the primary inspector.
+  const additionalInspectorRows = asArray(ctx.signatories.additionalInspectors)
+    .map(i => i as unknown as { name: string; position: string })
+    .filter(i => text(i.name).trim().length > 0)
+    .map(i => ({ sig_inspector_name: text(i.name), sig_inspector_position: text(i.position) }));
+
   return {
     sig_inspector_name: text(ctx.signatories.inspectorName),
     sig_inspector_position: text(ctx.signatories.inspectorPosition),
@@ -124,6 +135,10 @@ export function mapSignatures(ctx: MapContext): TemplateData {
     sig_recommending_position: text(ctx.signatories.recommendingPosition),
     sig_approver_name: text(ctx.signatories.approverName),
     sig_approver_position: text(ctx.signatories.approverPosition),
+    sig_inspectors: [
+      { sig_inspector_name: text(ctx.signatories.inspectorName), sig_inspector_position: text(ctx.signatories.inspectorPosition) },
+      ...additionalInspectorRows,
+    ],
   };
 }
 

@@ -1,4 +1,5 @@
 import React from 'react';
+import { TouchableOpacity } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { TextField } from '../../../components/form';
 import { Button } from '../../../components/Button';
@@ -74,5 +75,55 @@ describe('SignatorySheet', () => {
     const initialB = { ...initial, inspectorName: 'Maria' };
     act(() => { r.update(<SignatorySheet visible initial={initialB} onCancel={() => {}} onConfirm={() => {}} />); });
     expect(r.root.findAllByType(TextField)[0].props.value).toBe('Maria');
+  });
+});
+
+describe('SignatorySheet additional inspectors', () => {
+  it('adds a name + position pair when "Add inspector" is pressed', () => {
+    let r!: TestRenderer.ReactTestRenderer;
+    act(() => { r = TestRenderer.create(<SignatorySheet visible initial={initial} onCancel={() => {}} onConfirm={() => {}} />); });
+    expect(r.root.findAllByType(TextField).map(f => f.props.label)).not.toContain('Additional inspector 1 — name');
+
+    const add = r.root.findAllByType(Button).find(b => b.props.label === 'Add inspector')!;
+    act(() => add.props.onPress());
+
+    const labels = r.root.findAllByType(TextField).map(f => f.props.label);
+    expect(labels).toContain('Additional inspector 1 — name');
+    expect(labels).toContain('Additional inspector 1 — position');
+  });
+
+  it('removes the pair when its remove control is pressed', () => {
+    let r!: TestRenderer.ReactTestRenderer;
+    act(() => { r = TestRenderer.create(<SignatorySheet visible initial={initial} onCancel={() => {}} onConfirm={() => {}} />); });
+    const add = r.root.findAllByType(Button).find(b => b.props.label === 'Add inspector')!;
+    act(() => add.props.onPress());
+    expect(r.root.findAllByType(TextField).map(f => f.props.label)).toContain('Additional inspector 1 — name');
+
+    const remove = r.root.find(n => n.type === TouchableOpacity && n.props.accessibilityLabel === 'Remove inspector 1');
+    act(() => remove.props.onPress());
+    expect(r.root.findAllByType(TextField).map(f => f.props.label)).not.toContain('Additional inspector 1 — name');
+  });
+
+  it('confirms with additionalInspectors trimmed, dropping entries with an empty name', () => {
+    const onConfirm = jest.fn();
+    let r!: TestRenderer.ReactTestRenderer;
+    act(() => { r = TestRenderer.create(<SignatorySheet visible initial={initial} onCancel={() => {}} onConfirm={onConfirm} />); });
+    const add = r.root.findAllByType(Button).find(b => b.props.label === 'Add inspector')!;
+    // Two added rows: one filled in (with surrounding whitespace to trim),
+    // one left with only a position and no name — the empty-name one must
+    // be dropped from what Generate confirms.
+    act(() => add.props.onPress());
+    act(() => add.props.onPress());
+    const nameFields = () => r.root.findAllByType(TextField).filter(f => (f.props.label as string).includes('— name') && (f.props.label as string).startsWith('Additional inspector'));
+    const positionFields = () => r.root.findAllByType(TextField).filter(f => (f.props.label as string).includes('— position') && (f.props.label as string).startsWith('Additional inspector'));
+    act(() => nameFields()[0].props.onChangeText('  Second Inspector  '));
+    act(() => positionFields()[0].props.onChangeText('  Engineer I  '));
+    act(() => positionFields()[1].props.onChangeText('No name given'));
+
+    const generate = r.root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
+    act(() => generate.props.onPress());
+    expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({
+      additionalInspectors: [{ name: 'Second Inspector', position: 'Engineer I' }],
+    }));
   });
 });

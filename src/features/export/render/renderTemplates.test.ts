@@ -74,6 +74,27 @@ describe('water-monitoring.docx renders', () => {
     expect(xml).toContain('Receiving Body of Water');
     expect(() => assertWellFormed(xml)).not.toThrow();
   });
+
+  it('stacks additional inspectors under the primary one, with no tag left behind', () => {
+    const ctxWithExtras = {
+      signatories: {
+        ...signatories,
+        additionalInspectors: [
+          { name: 'Second Inspector', position: 'Engineer I' },
+          { name: 'Third Inspector', position: 'Engineer III' },
+        ],
+      },
+    };
+    const xml = docXml(renderDocx(load('water-monitoring.docx'), mapBundle(fullWaterBundle(), ctxWithExtras), []));
+    expect(xml).not.toMatch(/\{[#/@]?[A-Za-z0-9_]+\}/);
+    expect(xml).toContain(signatories.inspectorName);
+    expect(xml).toContain('Second Inspector');
+    expect(xml).toContain('Third Inspector');
+    // The primary inspector's name prints exactly once — the loop doesn't
+    // duplicate it alongside the top-level sig_inspector_name tag.
+    expect(xml.split(signatories.inspectorName).length - 1).toBe(1);
+    expect(() => assertWellFormed(xml)).not.toThrow();
+  });
 });
 
 describe('the other tagged templates render', () => {

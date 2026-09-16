@@ -186,13 +186,13 @@
     {
       "op": "replaceText",
       "find": "NAME OF INSPECTOR",
-      "with": "{sig_inspector_name}",
+      "with": "{#sig_inspectors}{sig_inspector_name}",
       "nth": 1
     },
     {
       "op": "replaceText",
       "find": "Position/Designation of Inspector",
-      "with": "{sig_inspector_position}",
+      "with": "{sig_inspector_position}{/sig_inspectors}",
       "nth": 1
     },
     {

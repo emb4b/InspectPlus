@@ -271,8 +271,8 @@
     { "op": "cell", "table": 11, "row": 4, "cell": 1, "tag": "remarks_recommendations" },
     { "op": "cell", "table": 11, "row": 6, "cell": 2, "tag": "doc_others" },
 
-    { "op": "replaceText", "find": "NAME OF INSPECTOR", "with": "{sig_inspector_name}", "nth": 1 },
-    { "op": "replaceText", "find": "Position/Designation of Inspector", "with": "{sig_inspector_position}", "nth": 1 },
+    { "op": "replaceText", "find": "NAME OF INSPECTOR", "with": "{#sig_inspectors}{sig_inspector_name}", "nth": 1 },
+    { "op": "replaceText", "find": "Position/Designation of Inspector", "with": "{sig_inspector_position}{/sig_inspectors}", "nth": 1 },
     { "op": "replaceText", "find": "NAME OF IMMEDIATE SUPERVISOR", "with": "{sig_supervisor_name}", "nth": 1 },
     { "op": "replaceText", "find": "Position/Designation of Immediate Supervisor", "with": "{sig_supervisor_position}", "nth": 1 },
     { "op": "replaceText", "find": "ERWIN R. LIZARDO", "with": "{sig_recommending_name}", "nth": 1 },

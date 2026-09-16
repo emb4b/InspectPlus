@@ -92,6 +92,31 @@ describe('mapCommon', () => {
     expect(full.sig_recommending_position).toBe('OIC, Regional Division');
     expect(full.sig_approver_name).toBe('Ana Villanueva');
     expect(full.sig_approver_position).toBe('Regional Director');
+    // fixtures.ts' signatories has no additionalInspectors, so the loop is
+    // just the primary inspector.
+    expect(full.sig_inspectors).toEqual([{ sig_inspector_name: 'Juan Dela Cruz', sig_inspector_position: 'Engineer II' }]);
+  });
+
+  it('lists the primary inspector first, then each additional inspector with a non-empty trimmed name', () => {
+    const ctxWithExtras = {
+      signatories: {
+        ...signatories,
+        additionalInspectors: [
+          { name: 'Second Inspector', position: 'Engineer I' },
+          { name: '   ', position: 'Blank name is dropped' },
+          { name: 'Third Inspector', position: '' },
+        ],
+      },
+    };
+    const out = mapCommon(fullWaterBundle(), ctxWithExtras);
+    expect(out.sig_inspectors).toEqual([
+      { sig_inspector_name: 'Juan Dela Cruz', sig_inspector_position: 'Engineer II' },
+      { sig_inspector_name: 'Second Inspector', sig_inspector_position: 'Engineer I' },
+      { sig_inspector_name: 'Third Inspector', sig_inspector_position: '' },
+    ]);
+    // The flat top-level tags still carry the primary inspector, for a
+    // template that doesn't loop sig_inspectors.
+    expect(out.sig_inspector_name).toBe('Juan Dela Cruz');
   });
 
   it('lays photos out two per row with a caption that falls back to the file name and adds the geotag', () => {
