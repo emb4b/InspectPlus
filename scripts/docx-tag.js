@@ -177,6 +177,20 @@ function applyRecipe(originalXml, recipe) {
         edits.push({ at: target.start, end: target.end, text: `<w:t xml:space="preserve">${escapeXml(op.with)}</w:t>` });
         break;
       }
+      case 'pageBreakBefore': {
+        const ps = spans(xml, 'w:p');
+        const p = ps.find(s => paragraphText(xml, s) === op.find);
+        if (!p) throw new Error(`pageBreakBefore: no paragraph reads exactly "${op.find}"`);
+        const pPrMatch = /<w:pPr(?:\s[^>]*)?>/.exec(xml.slice(p.start, p.end));
+        if (pPrMatch) {
+          const at = p.start + pPrMatch.index + pPrMatch[0].length;
+          edits.push({ at, end: at, text: '<w:pageBreakBefore/>' });
+        } else {
+          const openEnd = xml.indexOf('>', p.start) + 1;
+          edits.push({ at: openEnd, end: openEnd, text: '<w:pPr><w:pageBreakBefore/></w:pPr>' });
+        }
+        break;
+      }
       case 'insertAfterParagraph': {
         // find: "" is special-cased to mean "the last <w:p> in the body,
         // before <w:sectPr>" — for a form whose final paragraph is wholly

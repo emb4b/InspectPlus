@@ -35,6 +35,21 @@ describe('every checked-in template is well-formed XML', () => {
   });
 });
 
+describe('every checked-in template starts ATTACHMENTS on its own page', () => {
+  it.each(CHECKED_IN_TEMPLATES)('%s', file => {
+    const xml = docXml(load(file));
+    const paragraphs = xml.match(/<w:p\b[\s\S]*?<\/w:p>/g) ?? [];
+    const attachmentsParagraph = paragraphs.find(p => {
+      const text = [...p.matchAll(/<w:t(?:\s[^>]*)?>([\s\S]*?)<\/w:t>/g)].map(m => m[1]).join('');
+      return text === 'ATTACHMENTS';
+    });
+    expect(attachmentsParagraph).toBeDefined();
+    const pPr = /<w:pPr>[\s\S]*?<\/w:pPr>/.exec(attachmentsParagraph!);
+    expect(pPr).toBeTruthy();
+    expect(pPr![0]).toContain('<w:pageBreakBefore/>');
+  });
+});
+
 describe('water-monitoring.docx renders', () => {
   it('a full report with no tag left behind', () => {
     const out = renderDocx(load('water-monitoring.docx'), mapBundle(fullWaterBundle(), ctx), [

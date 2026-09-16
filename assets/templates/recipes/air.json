@@ -91,6 +91,7 @@
     { "op": "replaceText", "find": "NAME OF IMMEDIATE SUPERVISOR", "with": "{sig_supervisor_name}", "nth": 1 },
     { "op": "replaceText", "find": "Position/Designation of Immediate Supervisor", "with": "{sig_supervisor_position}", "nth": 1 },
 
+    { "op": "pageBreakBefore", "find": "ATTACHMENTS" },
     { "op": "insertAfterParagraph", "find": "ATTACHMENTS", "xml": "<w:tbl><w:tblPr><w:tblW w:w=\"5000\" w:type=\"pct\"/><w:tblLook w:val=\"04A0\"/></w:tblPr><w:tblGrid><w:gridCol w:w=\"4680\"/><w:gridCol w:w=\"4680\"/></w:tblGrid><w:tr><w:tc><w:tcPr><w:tcW w:w=\"2500\" w:type=\"pct\"/></w:tcPr><w:p><w:r><w:t>{#photo_rows}{#left}</w:t></w:r></w:p><w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr><w:r><w:t>{@photo_drawing}</w:t></w:r></w:p><w:p><w:pPr><w:jc w:val=\"center\"/><w:rPr><w:sz w:val=\"18\"/></w:rPr></w:pPr><w:r><w:rPr><w:sz w:val=\"18\"/></w:rPr><w:t>{caption}{/left}</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w=\"2500\" w:type=\"pct\"/></w:tcPr><w:p><w:r><w:t>{#right}</w:t></w:r></w:p><w:p><w:pPr><w:jc w:val=\"center\"/></w:pPr><w:r><w:t>{@photo_drawing}</w:t></w:r></w:p><w:p><w:pPr><w:jc w:val=\"center\"/><w:rPr><w:sz w:val=\"18\"/></w:rPr></w:pPr><w:r><w:rPr><w:sz w:val=\"18\"/></w:rPr><w:t>{caption}{/right}{/photo_rows}</w:t></w:r></w:p></w:tc></w:tr></w:tbl>" }
   ]
 }

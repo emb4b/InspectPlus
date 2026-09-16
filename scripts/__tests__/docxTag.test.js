@@ -87,6 +87,23 @@ describe('applyRecipe', () => {
     expect(out).toContain('ATTACHMENTS</w:t></w:r></w:p><w:tbl>T</w:tbl>');
   });
 
+  it('sets pageBreakBefore on an existing pPr, ahead of its other children', () => {
+    const xml = doc(P('ATTACHMENTS'));
+    const out = applyRecipe(xml, { checkboxes: [], ops: [{ op: 'pageBreakBefore', find: 'ATTACHMENTS' }] });
+    expect(out).toContain('<w:pPr><w:pageBreakBefore/><w:rPr><w:sz w:val="20"/></w:rPr></w:pPr>');
+  });
+
+  it('wraps a fresh pPr with pageBreakBefore when the paragraph has none', () => {
+    const xml = doc('<w:p><w:r><w:t>ATTACHMENTS</w:t></w:r></w:p>');
+    const out = applyRecipe(xml, { checkboxes: [], ops: [{ op: 'pageBreakBefore', find: 'ATTACHMENTS' }] });
+    expect(out).toContain('<w:p><w:pPr><w:pageBreakBefore/></w:pPr><w:r><w:t>ATTACHMENTS</w:t></w:r></w:p>');
+  });
+
+  it('throws when no paragraph reads exactly the pageBreakBefore target text', () => {
+    const xml = doc(P('ATTACHMENTS'));
+    expect(() => applyRecipe(xml, { checkboxes: [], ops: [{ op: 'pageBreakBefore', find: 'NOPE' }] })).toThrow(/no paragraph reads exactly "NOPE"/);
+  });
+
   it('find: "" targets the last paragraph in the body, not the first empty one', () => {
     // Some forms (e.g. Survey) have no ATTACHMENTS heading at all, and their
     // final paragraph before <w:sectPr> is wholly empty — there's no literal
