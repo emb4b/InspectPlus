@@ -17,7 +17,7 @@ const NETWORK_TIMEOUT_MS = 20000;
 // which only accepts a local file:// uri, never a remote URL. Reuses
 // whatever's already on-device if present; otherwise pulls the bytes down
 // from a signed URL into a temp cache file first.
-export async function resolveLocalFileUri(attachment: Attachment): Promise<string> {
+export async function resolveLocalFileUri(attachment: Pick<Attachment, 'attachmentId' | 'localUri' | 'storagePath'>): Promise<string> {
   if (attachment.localUri) {
     const file = new File(attachment.localUri);
     if (file.exists) return attachment.localUri;
