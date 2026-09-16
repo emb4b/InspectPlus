@@ -11,12 +11,15 @@ interface HomeFooterProps {
   showCredits?: boolean;
 }
 
-// The plain bar's own height plus the credits footer's vertical padding on
-// both sides — exported so other layout math (e.g. the export sheet's
-// footer) can't drift out of sync with the styles derived from it below.
-export const HOME_FOOTER_HEIGHT = 28;
-const BAR_HEIGHT = 20;
-const FOOTER_PADDING_VERTICAL = (HOME_FOOTER_HEIGHT - BAR_HEIGHT) / 2;
+// The plain bar's height on every authenticated screen (showCredits=false —
+// the login page's credits variant is taller and irrelevant there). This is
+// the number any other chrome math (e.g. the export sheet's footer) must use
+// to line up with HomeFooter — exported so styles.bar can't drift from it.
+export const HOME_FOOTER_BAR_HEIGHT = 20;
+const BAR_HEIGHT = HOME_FOOTER_BAR_HEIGHT;
+// The credits footer's own vertical padding — unrelated to the plain bar
+// above; nothing outside this file should need it.
+const CREDITS_FOOTER_PADDING_VERTICAL = 4;
 
 export const HomeFooter: React.FC<HomeFooterProps> = ({ showCredits = false }) => {
   // The one place the running version is visible - the recovery guide and
@@ -56,7 +59,7 @@ export const HomeFooter: React.FC<HomeFooterProps> = ({ showCredits = false }) =
 
 const styles = StyleSheet.create({
   footer: {
-    paddingVertical: FOOTER_PADDING_VERTICAL,
+    paddingVertical: CREDITS_FOOTER_PADDING_VERTICAL,
     paddingHorizontal: 16,
     alignItems: 'center',
   },

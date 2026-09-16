@@ -4,7 +4,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { TextField } from '../../../components/form';
 import { Button } from '../../../components/Button';
 import { Colors } from '../../../design/colors';
-import { HOME_FOOTER_HEIGHT } from '../../home/components/HomeFooter';
+import { HOME_FOOTER_BAR_HEIGHT } from '../../home/components/HomeFooter';
 import { GENERATE_BOTTOM_GAP } from '../exportLayout';
 import { SignatorySheet } from './SignatorySheet';
 
@@ -60,11 +60,11 @@ describe('SignatorySheet', () => {
     });
   });
 
-  it('lifts the pinned footer by HOME_FOOTER_HEIGHT + GENERATE_BOTTOM_GAP above the (mocked, zero) safe-area inset', () => {
+  it('lifts the pinned footer by HOME_FOOTER_BAR_HEIGHT + GENERATE_BOTTOM_GAP above the (mocked, zero) safe-area inset', () => {
     let r!: TestRenderer.ReactTestRenderer;
     act(() => { r = TestRenderer.create(<SignatorySheet visible initial={initial} onCancel={() => {}} onConfirm={() => {}} />); });
     const footer = r.root.find(n => n.type === View && flattenStyle(n.props.style).borderTopColor === Colors.border);
-    expect(flattenStyle(footer.props.style).paddingBottom).toBe(HOME_FOOTER_HEIGHT + GENERATE_BOTTOM_GAP);
+    expect(flattenStyle(footer.props.style).paddingBottom).toBe(HOME_FOOTER_BAR_HEIGHT + GENERATE_BOTTOM_GAP);
   });
 
   it('disables Generate until the inspector name is filled', () => {

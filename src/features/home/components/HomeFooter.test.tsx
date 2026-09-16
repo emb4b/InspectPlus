@@ -2,7 +2,7 @@ import React from 'react';
 import { Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import TestRenderer, { act } from 'react-test-renderer';
-import { HomeFooter, HOME_FOOTER_HEIGHT } from './HomeFooter';
+import { HomeFooter, HOME_FOOTER_BAR_HEIGHT } from './HomeFooter';
 
 jest.mock('expo-constants', () => ({
   __esModule: true,
@@ -34,13 +34,13 @@ describe('HomeFooter version stamp', () => {
   });
 });
 
-// HOME_FOOTER_HEIGHT is exported for other screens' layout math (e.g. the
-// export sheet's footer) to line up against — guard that the bar height and
-// the credits footer's padding, computed from it, still add back up to it.
+// HOME_FOOTER_BAR_HEIGHT is exported for other screens' layout math (e.g.
+// the export sheet's footer) to line up against — guard that it's still what
+// the plain bar (the variant every authenticated screen renders) is styled
+// to, not the taller login-only credits variant.
 describe('HomeFooter height math', () => {
-  it('derives the bar height and the credits footer padding from HOME_FOOTER_HEIGHT', () => {
+  it('renders the plain bar at HOME_FOOTER_BAR_HEIGHT', () => {
     const bar = render(<HomeFooter />).root.findByType(LinearGradient).props.style;
-    const footer = render(<HomeFooter showCredits />).root.findByType(LinearGradient).props.style;
-    expect(bar.height + footer.paddingVertical * 2).toBe(HOME_FOOTER_HEIGHT);
+    expect(bar.height).toBe(HOME_FOOTER_BAR_HEIGHT);
   });
 });

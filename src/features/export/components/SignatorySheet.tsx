@@ -11,7 +11,7 @@ import { Colors } from '../../../design/colors';
 import { Radius } from '../../../design/radius';
 import { Spacing } from '../../../design/spacing';
 import { Type } from '../../../design/typography';
-import { HOME_FOOTER_HEIGHT } from '../../home/components/HomeFooter';
+import { HOME_FOOTER_BAR_HEIGHT } from '../../home/components/HomeFooter';
 import { GENERATE_BOTTOM_GAP } from '../exportLayout';
 import type { Signatories } from '../types';
 
@@ -144,10 +144,10 @@ export const SignatorySheet: React.FC<SignatorySheetProps> = ({ visible, initial
             )}
           </ScrollView>
           {/* The Modal covers the app's own HomeFooter, so the button must be
-              lifted by that footer's height (on top of the usual gap and the
+              lifted by that bar's height (on top of the usual gap and the
               device's own inset) to land at the same y as the selection
               bar's, which sits above HomeFooter rather than over it. */}
-          <View style={[styles.footer, { paddingBottom: HOME_FOOTER_HEIGHT + GENERATE_BOTTOM_GAP + insets.bottom }]}>
+          <View style={[styles.footer, { paddingBottom: HOME_FOOTER_BAR_HEIGHT + GENERATE_BOTTOM_GAP + insets.bottom }]}>
             <Button label="Generate" onPress={() => onConfirm({
               inspectorName: value.inspectorName.trim(),
               inspectorPosition: value.inspectorPosition.trim(),
