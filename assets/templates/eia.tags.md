@@ -36,7 +36,7 @@ same way and mean the same thing — see `mapCommon` in `src/features/export/map
 | `sig_inspector_name`, `sig_inspector_position`, `sig_supervisor_name`, `sig_supervisor_position` | `ctx.signatories` |
 | `sig_recommending_name`, `sig_recommending_position`, `sig_approver_name`, `sig_approver_position` | `ctx.signatories`; default to `DEFAULT_APPROVERS` (what the forms printed before this was editable) |
 | `sig_inspectors[]` → `sig_inspector_name`, `sig_inspector_position` | primary inspector + `additionalInspectors[]` with a non-blank name, min 1 |
-| `photo_rows[]` → `left[]` / `right[]` → `photo_id`, `caption`, `photo_missing_text` | `bundle.photos`, two per row; `right` is `[]` for an odd last photo |
+| `photo_rows[]` → `left[]` / `right[]` → `photo_id`, `caption`, `photo_missing_text` | `bundle.photos`, two per row; `right` is `[]` for an odd last photo; `caption` is `Figure N` (1-based across the report), plus `: <text>` when the inspector gave one |
 
 No `unused_N` checkboxes: tables 6 (DAO 2003-30 CMR/MMT compliance checklist) and 7 (ECC/EMP Conditions
 compliance) have zero pre-existing checkbox glyphs — every Yes/No/N/A cell in those tables is a truly

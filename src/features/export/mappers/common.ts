@@ -1,6 +1,5 @@
 import { formatReportDate } from '../../../utils/formatReportDate';
 import { formatEstablishmentLocation } from '../../../utils/establishmentLocation';
-import { formatDmsPair } from '../../attachments/geotagStamp';
 import { DOCUMENTS_REVIEWED_OPTIONS } from '../../inspections/water/waterChecklistData';
 import type { PermitSnapshotItem } from '../../../services/sync/syncTypes';
 import { ROW_MINIMUMS } from '../rowMinimums';
@@ -95,16 +94,20 @@ function mapDocuments(reviewed: unknown): TemplateData {
 
 // Two photos per printed row: photo_rows[] → left[] / right[], each a 0- or
 // 1-element list so the template's cell loops print nothing for a missing
-// right-hand photo.
+// right-hand photo. Captions are numbered "Figure N" (1-based across the
+// whole report) followed by the inspector's own caption when they gave one.
 export function mapPhotos(photos: readonly ExportPhoto[]): TemplateData[] {
-  const cells = asArray(photos).map(p => {
+  const cells = asArray(photos).map((p, i) => {
     const photo = p as unknown as ExportPhoto;
-    const base = text(photo.caption).trim() || text(photo.fileName);
-    const geo = photo.geoLat != null && photo.geoLng != null ? formatDmsPair(photo.geoLat, photo.geoLng) : '';
+    const n = i + 1;
+    const caption = text(photo.caption).trim();
     return {
       photo_id: text(photo.attachmentId),
-      caption: geo ? `${base} — ${geo}` : base,
-      photo_missing_text: `${text(photo.fileName)} (not downloaded)`,
+      caption: caption ? `Figure ${n}: ${caption}` : `Figure ${n}`,
+      // The caption paragraph already prints "Figure N…", so the missing-photo
+      // placeholder (printed in the drawing's own paragraph, above it) doesn't
+      // repeat the figure number.
+      photo_missing_text: '(photo not downloaded)',
     };
   });
   const rows: TemplateData[] = [];

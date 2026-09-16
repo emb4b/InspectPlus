@@ -22,7 +22,7 @@ several.
 | How the engine finds fields | Merge tags inserted into the templates (tagged copies checked in) — not positional lookup |
 | Data outgrowing the printed rows | Row loops grow to fit, padded with blank rows up to the form's printed count so a sparse report still looks like the form |
 | After Generate | OS share sheet (`expo-sharing`); nothing kept in the app beyond a cache cleared on the next run |
-| Photos | Embedded on the ATTACHMENTS page, 2 per row, with caption; a photo not on the device prints as its filename + "(not downloaded)" |
+| Photos | Embedded on the ATTACHMENTS page, 2 per row, captioned "Figure N" (1-based across the report) plus the inspector's own caption when given; a photo not on the device prints "(photo not downloaded)" under its figure caption |
 | Signature block | Inspector/supervisor name + position, the recommending/approving signatories, and any number of additional inspectors under "Submitted by", all asked in an on-device sheet. Inspector/supervisor/additional-inspectors are one value shared across every report type; the recommending/approving signatories are remembered PER report type (keyed the same way `templateFor` looks templates up) and default to that type's own printed names (see `defaultApproversFor` in `features/export/templates/index.ts`) — editing the approvers for a Water export never changes what a Hazwaste export prefills, or vice versa. Behind a `SignatoryProvider` seam so the future admin-defined chain of command replaces the storage, not the engine |
 | Scope of mapping | Water end-to-end. The other four templates get the shared sections (General Information, Purpose, DENR Permits, Documents Reviewed, signatures, ATTACHMENTS) tagged and mapped now; their type-specific sections are tagged and mapped when each form is built, since only the Water form exists in the app today |
 | Engine | docxtemplater + pizzip on-device (both MIT, pure JS, Hermes-safe). Image support decided by the spike: the MIT community image module if it holds up, otherwise a small post-pass of our own. Server-side rendering rejected — the app is offline-first |
@@ -77,7 +77,7 @@ src/features/export/
 - **DENR Permits:** fixed-label rows keyed by `(envi_law, permit_type)`; `permitsSnapshot` is matched to the printed labels, ECC 1/2/3 taking the first three PD 1586 entries in order. Unmatched permits go into a padded loop appended under the last printed row so nothing is dropped silently.
 - **Documents reviewed:** a checkbox per printed option from `documentsReviewed[]`; an entry not in the printed list goes in the Others blank.
 - **Signatures:** `sig_inspector_name`, `sig_inspector_position`, `sig_supervisor_name`, `sig_supervisor_position`, `sig_recommending_name`, `sig_recommending_position`, `sig_approver_name`, `sig_approver_position` from `SignatoryProvider`. `sig_inspectors[]` (`sig_inspector_name`, `sig_inspector_position`) loops the primary inspector plus any additional ones under "Submitted by" whose name isn't blank — min 1 row (the primary inspector always appears).
-- **Photos:** `photos[]` = `{ image, caption }` ordered by `capturedAt`; caption is `caption ?? fileName` followed by the geotag when present.
+- **Photos:** `photos[]` = `{ image, caption }` ordered by `capturedAt`; caption is `Figure N: <caption>` (1-based across the report) when the inspector gave one, else just `Figure N`. A photo not on the device prints `(photo not downloaded)` in place of the drawing, under its figure caption.
 
 ### Water block (`mappers/water.ts`)
 

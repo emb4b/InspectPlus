@@ -119,15 +119,15 @@ describe('mapCommon', () => {
     expect(out.sig_inspector_name).toBe('Juan Dela Cruz');
   });
 
-  it('lays photos out two per row with a caption that falls back to the file name and adds the geotag', () => {
+  it('lays photos out two per row, numbering captions as Figure N across the report', () => {
     expect(full.photo_rows).toEqual([
       {
-        left: [{ photo_id: 'a1', caption: 'Main gate — 13° 24\' 42" N, 121° 10\' 49" E', photo_missing_text: 'IMG_0001.jpg (not downloaded)' }],
-        right: [{ photo_id: 'a2', caption: 'IMG_0002.jpg', photo_missing_text: 'IMG_0002.jpg (not downloaded)' }],
+        left: [{ photo_id: 'a1', caption: 'Figure 1: Main gate', photo_missing_text: '(photo not downloaded)' }],
+        right: [{ photo_id: 'a2', caption: 'Figure 2', photo_missing_text: '(photo not downloaded)' }],
       },
     ]);
     const three = mapCommon({ ...fullWaterBundle(), photos: [...fullWaterBundle().photos, { ...fullWaterBundle().photos[0], attachmentId: 'a3' }] }, ctx);
-    expect((three.photo_rows as TemplateData[])[1]).toEqual({ left: [expect.objectContaining({ photo_id: 'a3' })], right: [] });
+    expect((three.photo_rows as TemplateData[])[1]).toEqual({ left: [{ photo_id: 'a3', caption: 'Figure 3: Main gate', photo_missing_text: '(photo not downloaded)' }], right: [] });
     expect(empty.photo_rows).toEqual([]);
   });
 

@@ -79,7 +79,8 @@ describe('water-monitoring.docx renders', () => {
     expect(xml).toContain('Alpha Water Refilling');
     expect(xml).toContain('05 September 2026');
     expect(xml).toContain('Calapan River (Class C)');
-    expect(xml).toContain('IMG_0002.jpg (not downloaded)');
+    expect(xml).toContain('Figure 2');
+    expect(xml).toContain('(photo not downloaded)');
     expect(xml).toContain('<w:drawing>');
     expect(xml.split(TICKED).length - 1).toBeGreaterThan(5);
     expect(new PizZip(out).file('word/media/export_1.png')).toBeTruthy();

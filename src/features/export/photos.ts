@@ -10,7 +10,7 @@ export const MAX_PHOTO_EDGE = 1600;
 
 // Best effort: the local file if the phone took the photo, else a download
 // (resolveLocalFileUri already applies the network timeout). Null when
-// neither works — the form prints "<file> (not downloaded)" instead.
+// neither works — the form prints "(photo not downloaded)" instead.
 export async function preparePhoto(photo: ExportPhoto): Promise<ImageInput | null> {
   let uri: string;
   try {

@@ -49,17 +49,18 @@ describe('renderDocx', () => {
       {
         photo_rows: [
           {
-            left: [{ photo_id: 'a1', caption: 'front gate', photo_missing_text: 'IMG_1.jpg (not downloaded)' }],
-            right: [{ photo_id: 'a2', caption: 'outfall', photo_missing_text: 'IMG_2.jpg (not downloaded)' }],
+            left: [{ photo_id: 'a1', caption: 'Figure 1: front gate', photo_missing_text: '(photo not downloaded)' }],
+            right: [{ photo_id: 'a2', caption: 'Figure 2: outfall', photo_missing_text: '(photo not downloaded)' }],
           },
         ],
       },
       [{ id: 'a1', bytes: png, mime: 'image/png', width: 800, height: 600 }],
     );
     const xml = documentXml(out);
-    expect(xml).toContain('front gate');
-    expect(xml).toContain('IMG_2.jpg (not downloaded)');
-    expect(xml).not.toContain('IMG_1.jpg (not downloaded)');
+    expect(xml).toContain('Figure 1: front gate');
+    expect(xml).toContain('Figure 2: outfall');
+    expect(xml).toContain('(photo not downloaded)');
+    expect(xml.match(/\(photo not downloaded\)/g)).toHaveLength(1);
     expect(xml).not.toContain('{');
   });
 
