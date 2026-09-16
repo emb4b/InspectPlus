@@ -1,7 +1,7 @@
 # Export Inspection Report — Design
 
 **Date:** 2026-09-15
-**Status:** Approved, awaiting implementation plan
+**Status:** Implemented — see docs/superpowers/plans/2026-09-15-export-inspection-report.md
 **Supersedes:** the "out of scope" note on document generation in
 `2026-09-03-modern-ui-harmony-design.md`
 
@@ -63,9 +63,9 @@ src/features/export/
 - **Checkboxes:** every `w14:checkbox` content control is replaced by a plain run with the same run properties and the text `{cb_<name>}`. The mapper emits `☒` (U+2612) or `☐` (U+2610). Survey's legacy `FORMCHECKBOX` fields and `__ Label` blanks are converted the same way. Radio-style groups are independent checkboxes; the mapper guarantees at most one is ticked.
 - **Repeating rows:** the first data row carries `{#rows_name}` at the start of its first cell and `{/rows_name}` at the end of its last cell; the other printed blank rows are deleted. The mapper pads with blank records up to the printed count (`padRows(items, min)`; each table's `min` is recorded next to the tag in the `.tags.md`). Fixed-label tables (Summary of Findings, Water Sources, DENR Permits) are not looped — each printed row has its own tags so the legal text stays exactly as printed.
 - **Free text:** plain tags; multi-line fields (remarks, observations) use docxtemplater's `linebreaks: true` so `\n` renders as a line break.
-- **Photos:** the ATTACHMENTS page gets one 2-column table with `{#photos}` … image tag … `{caption}` … `{/photos}`. The image tag's exact form follows the spike.
+- **Photos:** the ATTACHMENTS page gets a two-per-row layout: `{#photo_rows}{#left}` … `{@photo_drawing}` … `{caption}` … `{/left}{#right}` … `{@photo_drawing}` … `{caption}` … `{/right}{/photo_rows}`, one row of the loop per pair of photos.
 - **Untouched:** headers/footers, the pre-printed approver names, all legal reference text, styling.
-- **Tooling:** `scripts/docx-template.js` unpacks a `.docx` to a folder and packs it back, so `word/document.xml` can be edited directly. Every tagged template has a sibling `assets/templates/<name>.tags.md` listing each tag, its meaning, and each loop's minimum row count.
+- **Tooling:** `scripts/docx-tag.js` inserts merge tags into an EMB `.docx` from a JSON recipe (`npm run tag-templates` runs it against every template). The untagged originals live in `assets/templates/originals/`; each template's recipe (coordinates, tag names, loop minimums) lives in `assets/templates/recipes/`. Every tagged template has a sibling `assets/templates/<name>.tags.md` listing each tag, its meaning, and each loop's minimum row count.
 
 ## Data mapping
 

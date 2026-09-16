@@ -150,3 +150,20 @@ The project already has two forward-looking docs (`ci-cd.md`, `production-deploy
 - **Once the conflict-resolution flow stabilizes** (it's had the most churn of any area — three related commits in recent history) → this is the first and best candidate for introducing E2E automation (Detox or Maestro), specifically the two-device conflict scenario in § 3.5, since it's the hardest class of bug to catch by manual testing alone (requires two physical/virtual devices in a coordinated timing sequence) and the one with the worst failure mode (silent data loss).
 - **Once `compliance_air`/`hazwaste`/`eia` get UI implementations** → extend § 3.3 and the RPC/RLS test pattern already established for water to each new report type, following the same reference structure `src/features/inspections/water` sets today.
 - **Longer-term**, once the app has a larger inspector user base: revisit § 8.6 (coverage thresholds) and consider a device farm (Firebase Test Lab / BrowserStack App Automate) for the Android matrix in § 5, since manual device coverage won't scale with field rollout.
+
+---
+
+## Export inspection reports
+
+Device: a mid-range Android (≤ 4 GB RAM) and the newest one available.
+
+1. Water report, submitted, with 3+ photos taken on this phone → Generate → share to Drive → open in Word: every section filled, checkboxes are ☒/☐, three outlet rows, photos two per row with captions, no `{` anywhere.
+2. Same report exported from a *different* phone (photos not local) while online → photos downloaded and embedded; while in airplane mode → "(not downloaded)" placeholders and the "N photos not downloaded" line.
+3. A draft with most sections empty → the form still shows its printed row counts (3 outlets, 2 sampling points, 5 DP-condition rows).
+4. A report with 5 outlets and 12 sampling parameters → rows grow, table borders intact.
+5. Multi-select 5 reports (mix water/air/eia) → one zip, five uniquely named .docx inside; air/eia have the shared block filled and their checklists blank.
+6. Cancel mid-run → the reports finished so far are offered; the rest are not listed as failures.
+7. Hazwaste TSD card → "No template yet", not selectable, Select all skips it (no TSD report existed on the test device on 2026-09-16; verify when one does).
+8. Signatory sheet remembers last values; clearing app data resets it to the profile name.
+9. 20-photo report on the low-RAM device → completes without the app being killed; file opens.
+10. Export, dismiss the share sheet, export again → no stale files (only the new run's files in the cache dir).
