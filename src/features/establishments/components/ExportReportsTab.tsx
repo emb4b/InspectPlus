@@ -91,6 +91,13 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
   };
 
   const toggleSelectAll = () => {
+    // A run in flight already freezes selection at the card level (see
+    // selectDisabled below) — this closes the same door at the Select
+    // all/Clear all control, which would otherwise bypass it entirely and
+    // mutate selectedKeys out from under a run that's using selectedItems
+    // (un-hiding the FAB over the progress bar, changing what a subsequent
+    // "Retry failed" operates on).
+    if (busy) return;
     setSelectedKeys(allSelected ? new Set() : new Set(exportable.map(report => report.key)));
   };
 
@@ -103,7 +110,15 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
   const runExport = async (items: AllReportItem[], s: Signatories) => {
     setSheetOpen(false);
     setSignatories(s);
-    await asyncStorageSignatoryProvider.save(s);
+    // Remembering the signatories is a convenience, not a gate — a full
+    // AsyncStorage or a write failure shouldn't leave the sheet closed with
+    // nothing running (and, unhandled, would surface as an unhandled
+    // rejection).
+    try {
+      await asyncStorageSignatoryProvider.save(s);
+    } catch (e) {
+      console.warn('[ExportReportsTab] could not remember signatories', e);
+    }
     await exporter.start(items.map(toExportItem), s);
   };
 
@@ -219,7 +234,7 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
           />
         </View>
         <TouchableOpacity
-          style={[styles.filterBtn, activeFilterCount > 0 && styles.filterBtnActive]}
+          style={[styles.filterBtn, activeFilterCount > 0 && styles.filterBtnActive, busy && styles.controlDisabled]}
           onPress={() => setFiltersOpen(true)}
           disabled={busy}
           activeOpacity={0.75}
@@ -238,7 +253,9 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
         right={
           reports.length > 0 ? (
             <TouchableOpacity
+              style={busy && styles.controlDisabled}
               onPress={toggleSelectAll}
+              disabled={busy}
               accessibilityRole="button"
               accessibilityLabel={allSelected ? 'Clear all reports' : 'Select all reports'}>
               <Text style={styles.selectAllText}>{allSelected ? 'Clear all' : 'Select all'}</Text>
@@ -339,6 +356,13 @@ const styles = StyleSheet.create({
   },
   filterBtnActive: {
     backgroundColor: Colors.navy,
+  },
+  // Shared by every header control (filter, Select all/Clear all) that
+  // freezes while a run is in flight — same reduced-emphasis treatment
+  // Button.tsx's own `inactive` style uses, so a disabled control here reads
+  // consistently with a disabled Button elsewhere in the app.
+  controlDisabled: {
+    opacity: 0.55,
   },
   selectAllText: {
     fontSize: Type.bodySm.fontSize,

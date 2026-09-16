@@ -485,6 +485,25 @@ describe('the Generate flow', () => {
     expect(r.root.findByType(SignatorySheet).props.visible).toBe(false);
   });
 
+  it('still starts the run even if remembering the signatories fails', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockSignatorySave.mockRejectedValueOnce(new Error('quota'));
+    const r = render();
+    selectRow(r, 0);
+    const generate = renderFooter().root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
+    await act(async () => { generate.props.onPress(); });
+    const s = { inspectorName: 'J', inspectorPosition: 'E', supervisorName: 'M', supervisorPosition: 'C' };
+    // The rejection must not escape as an unhandled promise rejection — this
+    // await/act only resolves cleanly if runExport's own try/catch actually
+    // caught it.
+    await act(async () => { r.root.findByType(SignatorySheet).props.onConfirm(s); });
+    expect(mockStart).toHaveBeenCalledWith(
+      [{ key: 'inspection-r1', kind: 'inspection', reportId: 'r1', reportType: 'water_monitoring', title: 'Water Monitoring', estabName: 'Alpha Corp', date: '2026-08-01' }],
+      s,
+    );
+    warnSpy.mockRestore();
+  });
+
   it('shows the progress bar instead of the selection bar while running, and Cancel cancels', () => {
     mockPhase = { status: 'running', progress: { index: 1, total: 2, title: 'Alpha Corp' } };
     const r = render();
@@ -494,6 +513,19 @@ describe('the Generate flow', () => {
     expect(JSON.stringify(footer.toJSON())).toContain('Generating 1 of 2');
     act(() => footer.root.findByType(ExportProgressBar).props.onCancel());
     expect(mockCancel).toHaveBeenCalled();
+  });
+
+  it('freezes Select all while a run is in flight, and dims the control', () => {
+    mockPhase = { status: 'running', progress: { index: 1, total: 2, title: 'Alpha Corp' } };
+    const r = render();
+    selectRow(r, 0);
+    const toggle = findSelectAllToggle(r);
+    expect(toggle.props.disabled).toBe(true);
+    act(() => { toggle.props.onPress(); });
+    // Still only the one row selected — a broken guard would have selected
+    // every exportable report (both mockReports) instead.
+    const selectedCount = r.root.findAllByType(ReportListCard).filter(c => c.props.selected).length;
+    expect(selectedCount).toBe(1);
   });
 
   it('keeps the selection after a run and Done returns to the selection bar', () => {
