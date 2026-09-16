@@ -84,13 +84,18 @@ export async function exportReports(items: ExportItem[], options: ExportOptions,
   }
 
   let shareUri: string | null = null;
-  if (rendered.length === 1) {
-    shareUri = await ports.files.write(dir, rendered[0].name, rendered[0].bytes);
-    await ports.share(shareUri, DOCX_MIME);
-  } else if (rendered.length > 1) {
-    for (const file of rendered) await ports.files.write(dir, file.name, file.bytes);
-    shareUri = await ports.files.write(dir, zipFileName(ports.now()), ports.zip(rendered));
-    await ports.share(shareUri, ZIP_MIME);
+  try {
+    if (rendered.length === 1) {
+      shareUri = await ports.files.write(dir, rendered[0].name, rendered[0].bytes);
+      await ports.share(shareUri, DOCX_MIME);
+    } else if (rendered.length > 1) {
+      for (const file of rendered) await ports.files.write(dir, file.name, file.bytes);
+      shareUri = await ports.files.write(dir, zipFileName(ports.now()), ports.zip(rendered));
+      await ports.share(shareUri, ZIP_MIME);
+    }
+  } catch (e) {
+    shareUri = null;
+    failures.push({ key: 'export', title: 'Saving the export', reason: reason(e) });
   }
 
   return { shareUri, succeeded: rendered.length, failures, skippedPhotos, cancelled };

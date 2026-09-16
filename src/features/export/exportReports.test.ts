@@ -92,6 +92,27 @@ describe('exportReports', () => {
     expect(shared).toHaveLength(1);
   });
 
+  it('reports a failed export write instead of throwing, without sharing', async () => {
+    const { ports, shared } = makePorts({
+      files: {
+        resetExportDir: jest.fn(async () => 'file:///cache/exports'),
+        write: jest.fn(async (dir, name) => {
+          if (name.endsWith('.zip')) throw new Error('disk full');
+          return `${dir}/${name}`;
+        }),
+      },
+    });
+    const result = await exportReports([item('r1'), item('r2')], { signatories }, ports);
+    expect(shared).toEqual([]);
+    expect(result).toEqual({
+      shareUri: null,
+      succeeded: 2,
+      failures: [{ key: 'export', title: 'Saving the export', reason: 'disk full' }],
+      skippedPhotos: 2,
+      cancelled: false,
+    });
+  });
+
   it('shares nothing when everything failed', async () => {
     const { ports, shared } = makePorts({ loadBundle: jest.fn(async () => { throw new Error('Report not found'); }) });
     const result = await exportReports([item('r1')], { signatories }, ports);
