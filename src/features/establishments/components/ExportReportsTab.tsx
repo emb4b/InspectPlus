@@ -124,12 +124,20 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
 
   // Retrying after a run that fully failed (status 'error', thrown before
   // any per-item result existed) re-sends every selected report; retrying
-  // after a run that reached 'done' with some failures re-sends only those.
+  // after a run that reached 'done' with some failures re-sends only those —
+  // UNLESS the failures include the orchestrator's synthetic 'export' entry
+  // (a failure saving/sharing the whole export, not any one item — see
+  // exportReports.ts), which matches no report's key. Filtering by
+  // failedKeys against that entry alone would empty the retry set entirely
+  // and runExport([]) would reset the export dir and report 0 done, silently
+  // discarding every already-succeeded file. The run's items are always
+  // exactly the selection (frozen while busy), so retry the whole thing.
   const retryFailed = () => {
     if (exporter.phase.status !== 'done' && exporter.phase.status !== 'error') return;
     const failedKeys =
       exporter.phase.status === 'done' ? new Set(exporter.phase.result.failures.map(f => f.key)) : null;
-    const items = failedKeys ? selectedItems.filter(item => failedKeys.has(item.key)) : selectedItems;
+    const items =
+      failedKeys && !failedKeys.has('export') ? selectedItems.filter(item => failedKeys.has(item.key)) : selectedItems;
     void runExport(items, signatories);
   };
 
@@ -231,6 +239,7 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
             autoCapitalize="none"
             returnKeyType="search"
             onSubmitEditing={() => Keyboard.dismiss()}
+            editable={!busy}
           />
         </View>
         <TouchableOpacity

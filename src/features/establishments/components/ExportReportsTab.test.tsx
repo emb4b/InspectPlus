@@ -551,6 +551,34 @@ describe('the Generate flow', () => {
     await act(async () => { footer.root.findByType(ExportProgressBar).props.onRetry(); });
     expect(mockStart).toHaveBeenCalledWith([expect.objectContaining({ key: 'inspection-r2' })], expect.anything());
   });
+
+  it('Retry failed re-runs the whole selection when the failure is the synthetic save/share entry', async () => {
+    // exportReports.ts pushes { key: 'export', ... } when saving/sharing the
+    // whole export fails, after every per-item report already rendered — it
+    // matches no item's key. Filtering selectedItems by failedKeys against
+    // that entry alone would produce an empty list, and runExport([]) resets
+    // the export dir and reports 0 done, silently discarding the work.
+    mockPhase = {
+      status: 'done',
+      result: { shareUri: null, succeeded: 2, failures: [{ key: 'export', title: 'Saving the export', reason: 'disk full' }], skippedPhotos: 0, cancelled: false },
+    };
+    const r = render();
+    selectRow(r, 0);
+    selectRow(r, 1);
+    const footer = renderFooter();
+    await act(async () => { footer.root.findByType(ExportProgressBar).props.onRetry(); });
+    expect(mockStart).toHaveBeenCalledWith(
+      [expect.objectContaining({ key: 'inspection-r1' }), expect.objectContaining({ key: 'inspection-r2' })],
+      expect.anything(),
+    );
+  });
+
+  it('locks the search field while a run is in flight', () => {
+    mockPhase = { status: 'running', progress: { index: 1, total: 2, title: 'Alpha Corp' } };
+    const r = render();
+    const search = r.root.findByProps({ placeholder: 'Search by establishment name...' });
+    expect(search.props.editable).toBe(false);
+  });
 });
 
 describe('a report type with no template', () => {
