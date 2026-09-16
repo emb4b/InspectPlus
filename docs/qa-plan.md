@@ -163,7 +163,7 @@ Device: a mid-range Android (≤ 4 GB RAM) and the newest one available.
 4. A report with 5 outlets and 12 sampling parameters → rows grow, table borders intact.
 5. Multi-select 5 reports (mix water/air/eia) → one zip, five uniquely named .docx inside; air/eia have the shared block filled and their checklists blank.
 6. Cancel mid-run → the reports finished so far are offered; the rest are not listed as failures.
-7. Hazwaste TSD card → "No template yet", not selectable, Select all skips it (no TSD report existed on the test device on 2026-09-16; verify when one does).
+7. Hazwaste TSD card → "No template yet", not selectable, Select all skips it (no TSD report existed on the test device on 2026-09-16; verify when one does). Note: both hazwaste create paths store `report_type = 'hazardous_waste'` (see `src/constants/reportTypeDisplay.ts`), so this guard is currently latent — `hasTemplate()` can never actually see a `hazwaste_tsd` report until the TSD form gets its own storage key.
 8. Signatory sheet remembers last values; clearing app data resets it to the profile name.
 9. 20-photo report on the low-RAM device → completes without the app being killed; file opens.
 10. Export, dismiss the share sheet, export again → no stale files (only the new run's files in the cache dir).

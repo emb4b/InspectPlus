@@ -101,7 +101,7 @@ null → `''`; an unknown `YnValue` → no box ticked; a JSON row missing fields
 
 ## UI flow
 
-- **Untemplated types** (`hazwaste_tsd`): the card shows a "No template yet" badge and is not selectable; Select all skips it.
+- **Untemplated types** (`hazwaste_tsd`): the card shows a "No template yet" badge and is not selectable; Select all skips it. Both hazwaste create paths currently store `report_type = 'hazardous_waste'` (see `src/constants/reportTypeDisplay.ts`), so this guard is latent until the TSD form gets its own storage key.
 - **Generate** opens the signatory sheet (same style as `ReportFilterSheet`): inspector name (prefilled from the profile's `fullName`), inspector position, supervisor name, supervisor position. Values persist under `export.signatories`; the sheet's confirm is the real Generate.
 - **Progress:** the selection bar becomes a progress row — "Generating 2 of 5 — <establishment>", a determinate bar, and Cancel (stops after the current report). Selection and filters are locked. Reports render sequentially to keep peak memory low.
 - **Completion:** the OS share sheet opens with the `.docx` or `.zip`. Dismissing it returns to the tab with the selection intact. A toast reports skipped photos ("3 photos weren't downloaded").
