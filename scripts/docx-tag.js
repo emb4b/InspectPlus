@@ -191,6 +191,13 @@ function applyRecipe(originalXml, recipe) {
         }
         break;
       }
+      case 'insertBeforeParagraph': {
+        const ps = spans(xml, 'w:p');
+        const p = ps.find(s => paragraphText(xml, s) === op.find);
+        if (!p) throw new Error(`insertBeforeParagraph: no paragraph reads exactly "${op.find}"`);
+        edits.push({ at: p.start, end: p.start, text: op.xml });
+        break;
+      }
       case 'insertAfterParagraph': {
         // find: "" is special-cased to mean "the last <w:p> in the body,
         // before <w:sectPr>" — for a form whose final paragraph is wholly

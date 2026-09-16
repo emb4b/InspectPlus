@@ -87,6 +87,18 @@ describe('applyRecipe', () => {
     expect(out).toContain('ATTACHMENTS</w:t></w:r></w:p><w:tbl>T</w:tbl>');
   });
 
+  it('inserts XML before a paragraph with exact text', () => {
+    const xml = doc(P('ATTACHMENTS'));
+    const out = applyRecipe(xml, { checkboxes: [], ops: [{ op: 'insertBeforeParagraph', find: 'ATTACHMENTS', xml: '<w:tbl>T</w:tbl>' }] });
+    expect(out).toContain('<w:tbl>T</w:tbl><w:p>');
+    expect(out.indexOf('<w:tbl>T</w:tbl>')).toBeLessThan(out.indexOf('ATTACHMENTS'));
+  });
+
+  it('throws when no paragraph reads exactly the insertBeforeParagraph target text', () => {
+    const xml = doc(P('ATTACHMENTS'));
+    expect(() => applyRecipe(xml, { checkboxes: [], ops: [{ op: 'insertBeforeParagraph', find: 'NOPE', xml: '<w:tbl>T</w:tbl>' }] })).toThrow(/no paragraph reads exactly "NOPE"/);
+  });
+
   it('sets pageBreakBefore on an existing pPr, ahead of its other children', () => {
     const xml = doc(P('ATTACHMENTS'));
     const out = applyRecipe(xml, { checkboxes: [], ops: [{ op: 'pageBreakBefore', find: 'ATTACHMENTS' }] });

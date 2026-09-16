@@ -184,16 +184,26 @@
       "nth": 1
     },
     {
+      "op": "insertBeforeParagraph",
+      "find": "NAME OF INSPECTOR",
+      "xml": "<w:p><w:r><w:t>{#sig_inspectors}</w:t></w:r></w:p>"
+    },
+    {
       "op": "replaceText",
       "find": "NAME OF INSPECTOR",
-      "with": "{#sig_inspectors}{sig_inspector_name}",
+      "with": "{sig_inspector_name}",
       "nth": 1
     },
     {
       "op": "replaceText",
       "find": "Position/Designation of Inspector",
-      "with": "{sig_inspector_position}{/sig_inspectors}",
+      "with": "{sig_inspector_position}",
       "nth": 1
+    },
+    {
+      "op": "insertAfterParagraph",
+      "find": "Position/Designation of Inspector",
+      "xml": "<w:p><w:pPr><w:spacing w:after=\"0\"/></w:pPr></w:p><w:p><w:r><w:t>{/sig_inspectors}</w:t></w:r></w:p>"
     },
     {
       "op": "replaceText",

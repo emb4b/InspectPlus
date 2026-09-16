@@ -17,6 +17,25 @@ const load = (file: string) => new Uint8Array(fs.readFileSync(path.join(TEMPLATE
 const docXml = (bytes: Uint8Array) => new PizZip(bytes).file('word/document.xml')!.asText();
 const png1x1 = Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64'));
 
+// Finds the <w:tc>…</w:tc> that contains `primaryInspectorName` (unique to
+// the "Submitted by" cell) and returns the plain text of each of its
+// paragraphs from the primary inspector's name onward — the cell's own two
+// blank spacing paragraphs above the printed name are skipped, leaving just
+// the sig_inspectors loop's output. Used to assert name and position land in
+// separate paragraphs per inspector rather than being glued together inside
+// one (see the inline-loop bug this guards against).
+function submittedByParagraphs(xml: string, primaryInspectorName: string): string[] {
+  const i = xml.indexOf(primaryInspectorName);
+  expect(i).toBeGreaterThanOrEqual(0);
+  const tcStart = xml.lastIndexOf('<w:tc>', i);
+  const tcEnd = xml.indexOf('</w:tc>', i) + '</w:tc>'.length;
+  const tc = xml.slice(tcStart, tcEnd);
+  const paragraphs = [...tc.matchAll(/<w:p[\s>][\s\S]*?<\/w:p>/g)].map(m => m[0].replace(/<[^>]+>/g, ''));
+  const start = paragraphs.indexOf(primaryInspectorName);
+  expect(start).toBeGreaterThanOrEqual(0);
+  return paragraphs.slice(start);
+}
+
 // A checked-in template with a malformed document.xml (e.g. the EIA
 // checkbox-unwrap bug that produced a mismatched-tag document) would break
 // silently until someone opened the output in Word — assert every source
@@ -65,6 +84,9 @@ describe('water-monitoring.docx renders', () => {
     expect(xml.split(TICKED).length - 1).toBeGreaterThan(5);
     expect(new PizZip(out).file('word/media/export_1.png')).toBeTruthy();
     expect(() => assertWellFormed(xml)).not.toThrow();
+    // The plain case (no additional inspectors) prints the primary
+    // inspector's name and position once each, as separate paragraphs.
+    expect(submittedByParagraphs(xml, signatories.inspectorName)).toEqual([signatories.inspectorName, signatories.inspectorPosition, '']);
   });
 
   it('an empty draft, still showing the printed row counts', () => {
@@ -94,6 +116,14 @@ describe('water-monitoring.docx renders', () => {
     // duplicate it alongside the top-level sig_inspector_name tag.
     expect(xml.split(signatories.inspectorName).length - 1).toBe(1);
     expect(() => assertWellFormed(xml)).not.toThrow();
+    // Whole paragraphs repeat per inspector: name and position are separate
+    // paragraphs, each followed by a blank spacer paragraph, for every
+    // inspector — never a name glued onto the next inspector's position.
+    expect(submittedByParagraphs(xml, signatories.inspectorName)).toEqual([
+      signatories.inspectorName, signatories.inspectorPosition, '',
+      'Second Inspector', 'Engineer I', '',
+      'Third Inspector', 'Engineer III', '',
+    ]);
   });
 });
 
