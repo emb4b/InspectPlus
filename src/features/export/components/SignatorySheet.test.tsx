@@ -32,4 +32,24 @@ describe('SignatorySheet', () => {
     act(() => r.root.findAllByType(TextField)[0].props.onChangeText('X'));
     expect(r.root.findAllByType(Button).find(b => b.props.label === 'Generate')!.props.disabled).toBe(false);
   });
+
+  it('keeps in-progress edits across a re-render with a new `initial` identity while open, and only resets on reopen', () => {
+    let r!: TestRenderer.ReactTestRenderer;
+    act(() => { r = TestRenderer.create(<SignatorySheet visible initial={initial} onCancel={() => {}} onConfirm={() => {}} />); });
+    act(() => r.root.findAllByType(TextField)[0].props.onChangeText('Edited'));
+    expect(r.root.findAllByType(TextField)[0].props.value).toBe('Edited');
+
+    // A new `initial` object with the same values, still visible — this
+    // simulates a parent re-render (e.g. a AsyncStorage load resolving)
+    // that shouldn't stomp on what the user already typed.
+    const sameValuesNewIdentity = { ...initial };
+    act(() => { r.update(<SignatorySheet visible initial={sameValuesNewIdentity} onCancel={() => {}} onConfirm={() => {}} />); });
+    expect(r.root.findAllByType(TextField)[0].props.value).toBe('Edited');
+
+    // Close, then reopen with a genuinely different `initial` — now it resets.
+    act(() => { r.update(<SignatorySheet visible={false} initial={sameValuesNewIdentity} onCancel={() => {}} onConfirm={() => {}} />); });
+    const initialB = { inspectorName: 'Maria', inspectorPosition: '', supervisorName: '', supervisorPosition: '' };
+    act(() => { r.update(<SignatorySheet visible initial={initialB} onCancel={() => {}} onConfirm={() => {}} />); });
+    expect(r.root.findAllByType(TextField)[0].props.value).toBe('Maria');
+  });
 });

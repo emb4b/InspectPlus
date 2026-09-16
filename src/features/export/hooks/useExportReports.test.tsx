@@ -64,4 +64,35 @@ describe('useExportReports', () => {
     act(() => get().reset());
     expect(get().phase).toEqual({ status: 'idle' });
   });
+
+  it('ignores a second start while one is already running, and allows a new run once it resolves', async () => {
+    const get = mount();
+    let resolveFirst!: (r: unknown) => void;
+    mockExport.mockImplementationOnce(() => new Promise(r => { resolveFirst = r; }));
+
+    let firstRun!: Promise<void>;
+    act(() => { firstRun = get().start([item], signatories); });
+    expect(mockExport).toHaveBeenCalledTimes(1);
+    const phaseWhileRunning = get().phase;
+
+    // A second start() call while the first is still pending must not touch
+    // the orchestrator or the phase.
+    let secondRun!: Promise<void>;
+    act(() => { secondRun = get().start([item], signatories); });
+    await act(async () => { await secondRun; });
+    expect(mockExport).toHaveBeenCalledTimes(1);
+    expect(get().phase).toEqual(phaseWhileRunning);
+
+    await act(async () => {
+      resolveFirst({ shareUri: 'u', succeeded: 1, failures: [], skippedPhotos: 0, cancelled: false });
+      await firstRun;
+    });
+    expect(get().phase).toEqual({ status: 'done', result: { shareUri: 'u', succeeded: 1, failures: [], skippedPhotos: 0, cancelled: false } });
+
+    // Now that the run finished, start() works again.
+    mockExport.mockImplementationOnce(async () => ({ shareUri: 'u2', succeeded: 1, failures: [], skippedPhotos: 0, cancelled: false }));
+    await act(async () => { await get().start([item], signatories); });
+    expect(mockExport).toHaveBeenCalledTimes(2);
+    expect(get().phase).toEqual({ status: 'done', result: { shareUri: 'u2', succeeded: 1, failures: [], skippedPhotos: 0, cancelled: false } });
+  });
 });

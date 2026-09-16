@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, Modal, Keyboard, StyleSheet } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
@@ -25,7 +25,12 @@ interface SignatorySheetProps {
 // admin-defined chain of command exists — see signatories.ts.
 export const SignatorySheet: React.FC<SignatorySheetProps> = ({ visible, initial, onCancel, onConfirm }) => {
   const [value, setValue] = useState<Signatories>(initial);
-  useEffect(() => { if (visible) setValue(initial); }, [visible, initial]);
+  // `initial` can change identity while the sheet stays open (e.g. an
+  // AsyncStorage load resolving after mount) — that shouldn't stomp on
+  // edits the user already made. Only reset when the sheet actually opens.
+  const initialRef = useRef(initial);
+  initialRef.current = initial;
+  useEffect(() => { if (visible) setValue(initialRef.current); }, [visible]);
   const { height: keyboardHeight } = useReanimatedKeyboardAnimation();
   const overlayStyle = useAnimatedStyle(() => ({ paddingBottom: -keyboardHeight.value }));
   const set = (key: keyof Signatories) => (text: string) => setValue(v => ({ ...v, [key]: text }));
