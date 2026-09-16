@@ -56,7 +56,10 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
 
   const exporter = useExportReports();
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [signatories, setSignatories] = useState<Signatories>(() => emptySignatories(fullName));
+  // The initial value here is never actually shown — sheetOpen starts
+  // false, and openSheet always overwrites it (resolved for the right
+  // report type) before the sheet opens.
+  const [signatories, setSignatories] = useState<Signatories>(() => emptySignatories(fullName, 'inspection', 'water_monitoring'));
   const busy = exporter.phase.status !== 'idle';
 
   // Derived from the live list rather than stored alongside it, so a
@@ -66,6 +69,14 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
     [reports, selectedKeys],
   );
   const draftCount = selectedItems.filter(report => report.status === 'draft').length;
+  // The approvers a form prints are per report type — mixing Water and
+  // Hazwaste in one run means whichever type's approvers the sheet shows
+  // (the first selected item's) apply to every report in the run, not just
+  // that one, so the sheet says so.
+  const mixedTypes = useMemo(
+    () => new Set(selectedItems.map(item => `${item.kind}:${item.reportType}`)).size > 1,
+    [selectedItems],
+  );
   // Only reports with a template can be selected/exported at all, so "every
   // report" for Select all's purposes means every exportable one — a
   // Hazwaste TSD (say) sitting in the list shouldn't stop the toggle from
@@ -102,8 +113,18 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
   };
 
   const openSheet = async () => {
-    const saved = await asyncStorageSignatoryProvider.load();
-    setSignatories(saved ?? emptySignatories(fullName));
+    // Prefilled from the FIRST selected item's report type — the only one
+    // the sheet can sensibly key off when the selection spans several (see
+    // mixedTypes above, which tells the inspector as much).
+    const first = selectedItems[0];
+    if (!first) return;
+    const loaded = await asyncStorageSignatoryProvider.loadFor(first.kind, first.reportType);
+    // loadFor resolves the inspector name from storage, blank if nothing
+    // was ever saved — the profile's fullName is only a fallback for that
+    // "nothing saved yet" case, same as the previous emptySignatories(fullName)
+    // fallback (Generate requires a non-empty inspector name to save at
+    // all, so a genuinely saved record's name is never blank in practice).
+    setSignatories(loaded.inspectorName ? loaded : { ...loaded, inspectorName: fullName ?? '' });
     setSheetOpen(true);
   };
 
@@ -113,9 +134,11 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
     // Remembering the signatories is a convenience, not a gate — a full
     // AsyncStorage or a write failure shouldn't leave the sheet closed with
     // nothing running (and, unhandled, would surface as an unhandled
-    // rejection).
+    // rejection). Saved under the run's own first item's report type, so
+    // editing Water's approvers never touches what Hazwaste remembers.
+    const first = items[0];
     try {
-      await asyncStorageSignatoryProvider.save(s);
+      if (first) await asyncStorageSignatoryProvider.save(s, first.kind, first.reportType);
     } catch (e) {
       console.warn('[ExportReportsTab] could not remember signatories', e);
     }
@@ -316,6 +339,7 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
       <SignatorySheet
         visible={sheetOpen}
         initial={signatories}
+        mixedTypes={mixedTypes}
         onCancel={() => setSheetOpen(false)}
         onConfirm={s => { void runExport(selectedItems, s); }}
       />

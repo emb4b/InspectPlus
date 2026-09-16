@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity } from 'react-native';
+import { Text, TouchableOpacity } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { TextField } from '../../../components/form';
 import { Button } from '../../../components/Button';
@@ -125,5 +125,28 @@ describe('SignatorySheet additional inspectors', () => {
     expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({
       additionalInspectors: [{ name: 'Second Inspector', position: 'Engineer I' }],
     }));
+  });
+});
+
+describe('SignatorySheet mixedTypes hint', () => {
+  const findMixedHint = (r: TestRenderer.ReactTestRenderer) =>
+    r.root.findAll(n => n.type === Text && n.props.children === 'Approvers apply to every report in this run.');
+
+  it('shows no extra hint line by default (mixedTypes omitted)', () => {
+    let r!: TestRenderer.ReactTestRenderer;
+    act(() => { r = TestRenderer.create(<SignatorySheet visible initial={initial} onCancel={() => {}} onConfirm={() => {}} />); });
+    expect(findMixedHint(r)).toHaveLength(0);
+  });
+
+  it('shows no extra hint line when mixedTypes is explicitly false', () => {
+    let r!: TestRenderer.ReactTestRenderer;
+    act(() => { r = TestRenderer.create(<SignatorySheet visible initial={initial} mixedTypes={false} onCancel={() => {}} onConfirm={() => {}} />); });
+    expect(findMixedHint(r)).toHaveLength(0);
+  });
+
+  it('adds the "applies to every report" line when the selection spans more than one report type', () => {
+    let r!: TestRenderer.ReactTestRenderer;
+    act(() => { r = TestRenderer.create(<SignatorySheet visible initial={initial} mixedTypes onCancel={() => {}} onConfirm={() => {}} />); });
+    expect(findMixedHint(r)).toHaveLength(1);
   });
 });

@@ -20,12 +20,17 @@ interface SignatorySheetProps {
   initial: Signatories;
   onCancel: () => void;
   onConfirm: (signatories: Signatories) => void;
+  // True when the selection driving this run spans more than one report
+  // type — the approvers shown here (prefilled/remembered for only ONE of
+  // those types) still apply to every report the run produces, since
+  // there's just one Generate for the whole selection.
+  mixedTypes?: boolean;
 }
 
 // Asked before every export and remembered, so the second time it's a
 // glance and a tap. Positions and the supervisor are free text until the
 // admin-defined chain of command exists — see signatories.ts.
-export const SignatorySheet: React.FC<SignatorySheetProps> = ({ visible, initial, onCancel, onConfirm }) => {
+export const SignatorySheet: React.FC<SignatorySheetProps> = ({ visible, initial, onCancel, onConfirm, mixedTypes = false }) => {
   const [value, setValue] = useState<Signatories>(initial);
   // `initial` can change identity while the sheet stays open (e.g. an
   // AsyncStorage load resolving after mount) — that shouldn't stomp on
@@ -104,6 +109,9 @@ export const SignatorySheet: React.FC<SignatorySheetProps> = ({ visible, initial
             <TextField label="Approved by — name" value={value.approverName} onChangeText={set('approverName')} style={styles.field} />
             <TextField label="Approved by — position" value={value.approverPosition} onChangeText={set('approverPosition')} style={styles.field} />
             <Text style={styles.hint}>Names and positions are remembered on this phone.</Text>
+            {mixedTypes && (
+              <Text style={styles.hint}>Approvers apply to every report in this run.</Text>
+            )}
           </ScrollView>
           <View style={[styles.footer, { paddingBottom: Spacing.lg + insets.bottom }]}>
             <Button label="Generate" onPress={() => onConfirm({

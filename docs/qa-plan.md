@@ -167,3 +167,4 @@ Device: a mid-range Android (≤ 4 GB RAM) and the newest one available.
 8. Signatory sheet remembers last values; clearing app data resets it to the profile name.
 9. 20-photo report on the low-RAM device → completes without the app being killed; file opens.
 10. Export, dismiss the share sheet, export again → no stale files (only the new run's files in the cache dir).
+11. Export a Hazwaste report → the sheet's recommending approver prefills "JANE T. DUMENDEN" (Hazwaste's own printed default). Edit the recommending/approving names and Generate, then export a Water report → the sheet prefills "ERWIN R. LIZARDO" (Water's own default), unaffected by the Hazwaste edit. Re-export Hazwaste → the edited names are still remembered there.

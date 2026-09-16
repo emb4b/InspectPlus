@@ -64,8 +64,10 @@ export interface Signatories {
   supervisorName: string;
   supervisorPosition: string;
   // The recommending and approving signatories used to be printed as
-  // fixed text on every form (see DEFAULT_APPROVERS in signatories.ts);
-  // they're now editable, defaulting to what the forms printed before.
+  // fixed text on every form (see defaultApproversFor in
+  // features/export/templates/index.ts); they're now editable, remembered
+  // per report type (asyncStorageSignatoryProvider), defaulting to what
+  // that type's form printed before.
   recommendingName: string;
   recommendingPosition: string;
   approverName: string;

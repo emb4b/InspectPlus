@@ -30,9 +30,14 @@ jest.mock('../../export/templates', () => ({
   hasTemplate: (_kind: string, type: string) => type !== 'hazwaste_tsd',
 }));
 const mockSignatoryLoad = jest.fn();
+const mockSignatoryLoadFor = jest.fn();
 const mockSignatorySave = jest.fn();
 jest.mock('../../export/signatories', () => ({
-  asyncStorageSignatoryProvider: { load: () => mockSignatoryLoad(), save: (s: unknown) => mockSignatorySave(s) },
+  asyncStorageSignatoryProvider: {
+    load: () => mockSignatoryLoad(),
+    loadFor: (kind: string, reportType: string) => mockSignatoryLoadFor(kind, reportType),
+    save: (s: unknown, kind: string, reportType: string) => mockSignatorySave(s, kind, reportType),
+  },
   emptySignatories: (name: string | null) => ({
     inspectorName: name ?? '', inspectorPosition: '', supervisorName: '', supervisorPosition: '',
     recommendingName: 'Default Rec', recommendingPosition: 'Default Rec Position',
@@ -440,11 +445,22 @@ describe('ExportReportsTab', () => {
   });
 });
 
+// A full Signatories row, as loadFor would resolve it — used as the
+// default mockSignatoryLoadFor return so any test that doesn't care about
+// prefill specifics still gets a well-formed value.
+const blankLoadForResult = {
+  inspectorName: '', inspectorPosition: '', supervisorName: '', supervisorPosition: '',
+  recommendingName: 'Def Rec', recommendingPosition: 'Def RecPos', approverName: 'Def App', approverPosition: 'Def AppPos',
+  additionalInspectors: [],
+};
+
 describe('the Generate flow', () => {
   beforeEach(() => {
     mockPhase = { status: 'idle' };
     mockStart.mockReset();
     mockSignatoryLoad.mockResolvedValue(null);
+    mockSignatoryLoadFor.mockReset();
+    mockSignatoryLoadFor.mockResolvedValue(blankLoadForResult);
     mockSignatorySave.mockReset();
     mockCancel.mockReset();
     mockReset.mockReset();
@@ -452,7 +468,7 @@ describe('the Generate flow', () => {
     mockUseReportBrowser.mockImplementation(() => makeBrowserReturn());
   });
 
-  it('is enabled once something is selected and opens the signatory sheet', async () => {
+  it('is enabled once something is selected and opens the signatory sheet, prefilled from the profile name when nothing was ever saved', async () => {
     const r = render();
     selectRow(r, 0);
     const generate = renderFooter().root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
@@ -461,12 +477,14 @@ describe('the Generate flow', () => {
     const sheet = r.root.findByType(SignatorySheet);
     expect(sheet.props.visible).toBe(true);
     expect(sheet.props.initial.inspectorName).toBe('Juan Dela Cruz');
+    // r1 (the only selected report) is water_monitoring.
+    expect(mockSignatoryLoadFor).toHaveBeenCalledWith('inspection', 'water_monitoring');
   });
 
-  it('prefills the sheet from the saved signatories', async () => {
-    mockSignatoryLoad.mockResolvedValue({ inspectorName: 'Saved', inspectorPosition: 'Eng', supervisorName: 'Sup', supervisorPosition: 'Chief', recommendingName: 'Rec', recommendingPosition: 'RecPos', approverName: 'App', approverPosition: 'AppPos', additionalInspectors: [] });
+  it('prefills the sheet from the signatories remembered for the FIRST selected item\'s report type', async () => {
+    mockSignatoryLoadFor.mockResolvedValue({ ...blankLoadForResult, inspectorName: 'Saved', recommendingName: 'Saved Rec' });
     const r = render();
-    selectRow(r, 0);
+    selectRow(r, 0); // r1: water_monitoring
     // renderFooter() (below) already wraps its own TestRenderer.create() in
     // its own act() — nesting a second, outer act() around that call (as an
     // earlier draft of this test did, mirroring the brief's snippet) made
@@ -478,9 +496,36 @@ describe('the Generate flow', () => {
     const generate = renderFooter().root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
     await act(async () => { generate.props.onPress(); });
     expect(r.root.findByType(SignatorySheet).props.initial.inspectorName).toBe('Saved');
+    expect(r.root.findByType(SignatorySheet).props.initial.recommendingName).toBe('Saved Rec');
+    expect(mockSignatoryLoadFor).toHaveBeenCalledWith('inspection', 'water_monitoring');
   });
 
-  it('confirming the sheet saves the signatories and starts the run with the selected items', async () => {
+  it('prefills from the air_monitoring type when that is the first selected item, not water', async () => {
+    mockSignatoryLoadFor.mockImplementation((kind: string, reportType: string) =>
+      Promise.resolve({ ...blankLoadForResult, inspectorName: `${kind}:${reportType}` }));
+    const r = render();
+    selectRow(r, 1); // r2: air_monitoring
+    const generate = renderFooter().root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
+    await act(async () => { generate.props.onPress(); });
+    expect(mockSignatoryLoadFor).toHaveBeenCalledWith('inspection', 'air_monitoring');
+    expect(r.root.findByType(SignatorySheet).props.initial.inspectorName).toBe('inspection:air_monitoring');
+  });
+
+  it('does not flag mixedTypes for a single-type selection, but does once the selection spans two types', async () => {
+    const r = render();
+    selectRow(r, 0); // water_monitoring only
+    let generate = renderFooter().root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
+    await act(async () => { generate.props.onPress(); });
+    expect(r.root.findByType(SignatorySheet).props.mixedTypes).toBe(false);
+    await act(async () => { r.root.findByType(SignatorySheet).props.onCancel(); });
+
+    selectRow(r, 1); // now both water_monitoring and air_monitoring are selected
+    generate = renderFooter().root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
+    await act(async () => { generate.props.onPress(); });
+    expect(r.root.findByType(SignatorySheet).props.mixedTypes).toBe(true);
+  });
+
+  it('confirming the sheet saves the signatories under the run\'s report type and starts the run with the selected items', async () => {
     const r = render();
     selectRow(r, 0);
     // See the note in the previous test: renderFooter() must not be called
@@ -489,7 +534,7 @@ describe('the Generate flow', () => {
     await act(async () => { generate.props.onPress(); });
     const s = { inspectorName: 'J', inspectorPosition: 'E', supervisorName: 'M', supervisorPosition: 'C', recommendingName: 'R', recommendingPosition: 'RP', approverName: 'AP', approverPosition: 'APP', additionalInspectors: [] };
     await act(async () => { r.root.findByType(SignatorySheet).props.onConfirm(s); });
-    expect(mockSignatorySave).toHaveBeenCalledWith(s);
+    expect(mockSignatorySave).toHaveBeenCalledWith(s, 'inspection', 'water_monitoring');
     expect(mockStart).toHaveBeenCalledWith(
       [{ key: 'inspection-r1', kind: 'inspection', reportId: 'r1', reportType: 'water_monitoring', title: 'Water Monitoring', estabName: 'Alpha Corp', date: '2026-08-01' }],
       s,
