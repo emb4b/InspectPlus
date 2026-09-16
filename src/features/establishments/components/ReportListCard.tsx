@@ -138,31 +138,37 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
 
   return (
     <View style={styles.rowWrap}>
-      {/* Actions revealed behind the card when swiped left */}
-      <View style={styles.swipeActions}>
-        {showEdit && (
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.actionEdit]}
-            onPress={() => handleAction(onEdit)}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel={`Edit ${item.title}`}>
-            <Ionicons name="pencil" size={20} color={Colors.textWhite} />
-            <Text style={styles.actionText}>Edit</Text>
-          </TouchableOpacity>
-        )}
-        {showDelete && (
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.actionDelete]}
-            onPress={() => handleAction(onDelete)}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel={`Delete ${item.title}`}>
-            <Ionicons name="trash-outline" size={20} color={Colors.textWhite} />
-            <Text style={styles.actionText}>Delete</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      {/* Actions revealed behind the card when swiped left. Selection mode
+          already disables the pan gesture that would reveal them (see
+          panGesture above), but a dimmed card (a run in flight, or "No
+          template yet") is translucent enough to let them show through
+          underneath — so they're not rendered at all while selectable. */}
+      {!selectable && (
+        <View style={styles.swipeActions}>
+          {showEdit && (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionEdit]}
+              onPress={() => handleAction(onEdit)}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`Edit ${item.title}`}>
+              <Ionicons name="pencil" size={20} color={Colors.textWhite} />
+              <Text style={styles.actionText}>Edit</Text>
+            </TouchableOpacity>
+          )}
+          {showDelete && (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionDelete]}
+              onPress={() => handleAction(onDelete)}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`Delete ${item.title}`}>
+              <Ionicons name="trash-outline" size={20} color={Colors.textWhite} />
+              <Text style={styles.actionText}>Delete</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {/* Foreground card — slides left via gesture to reveal the actions */}
       <GestureDetector gesture={panGesture}>

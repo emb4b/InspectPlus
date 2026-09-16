@@ -227,7 +227,7 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
   return (
     <View style={styles.container}>
       <View style={styles.searchRow}>
-        <View style={styles.searchWrap}>
+        <View style={[styles.searchWrap, busy && styles.controlDisabled]}>
           <Ionicons name="search-outline" size={14} color={Colors.textMuted} />
           <TextInput
             style={styles.searchInput}

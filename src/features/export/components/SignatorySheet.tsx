@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, Modal, Keyboard, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, Keyboard, ScrollView, StyleSheet } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useReanimatedKeyboardAnimation } from 'react-native-keyboard-controller';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { TextField } from '../../../components/form';
 import { Button } from '../../../components/Button';
@@ -35,6 +36,7 @@ export const SignatorySheet: React.FC<SignatorySheetProps> = ({ visible, initial
   const overlayStyle = useAnimatedStyle(() => ({ paddingBottom: -keyboardHeight.value }));
   const set = (key: keyof Signatories) => (text: string) => setValue(v => ({ ...v, [key]: text }));
   const canGenerate = value.inspectorName.trim().length > 0;
+  const insets = useSafeAreaInsets();
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
@@ -44,22 +46,30 @@ export const SignatorySheet: React.FC<SignatorySheetProps> = ({ visible, initial
         onPress={() => (Keyboard.isVisible() ? Keyboard.dismiss() : onCancel())}>
         <TouchableOpacity activeOpacity={1} style={styles.sheet} onPress={() => {}}>
           <View style={styles.header}>
-            <Text style={styles.title}>Who signs this report?</Text>
+            <Text style={styles.title}>Signatories</Text>
             <TouchableOpacity onPress={onCancel} accessibilityRole="button" accessibilityLabel="Close">
               <Ionicons name="close" size={20} color={Colors.textMuted} />
             </TouchableOpacity>
           </View>
-          <TextField label="Inspector name" value={value.inspectorName} onChangeText={set('inspectorName')} required style={styles.field} />
-          <TextField label="Inspector position/designation" value={value.inspectorPosition} onChangeText={set('inspectorPosition')} style={styles.field} />
-          <TextField label="Immediate supervisor name" value={value.supervisorName} onChangeText={set('supervisorName')} style={styles.field} />
-          <TextField label="Supervisor position/designation" value={value.supervisorPosition} onChangeText={set('supervisorPosition')} style={styles.field} />
-          <Text style={styles.hint}>The approvers printed on the form stay as they are. These details are remembered on this phone.</Text>
-          <Button label="Generate" onPress={() => onConfirm({
-            inspectorName: value.inspectorName.trim(),
-            inspectorPosition: value.inspectorPosition.trim(),
-            supervisorName: value.supervisorName.trim(),
-            supervisorPosition: value.supervisorPosition.trim(),
-          })} variant="primary" size="md" fullWidth disabled={!canGenerate} />
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}>
+            <TextField label="Inspector name" value={value.inspectorName} onChangeText={set('inspectorName')} required style={styles.field} />
+            <TextField label="Inspector position/designation" value={value.inspectorPosition} onChangeText={set('inspectorPosition')} style={styles.field} />
+            <TextField label="Immediate supervisor name" value={value.supervisorName} onChangeText={set('supervisorName')} style={styles.field} />
+            <TextField label="Supervisor position/designation" value={value.supervisorPosition} onChangeText={set('supervisorPosition')} style={styles.field} />
+            <Text style={styles.hint}>Names and positions are remembered on this phone.</Text>
+          </ScrollView>
+          <View style={[styles.footer, { paddingBottom: Spacing.lg + insets.bottom }]}>
+            <Button label="Generate" onPress={() => onConfirm({
+              inspectorName: value.inspectorName.trim(),
+              inspectorPosition: value.inspectorPosition.trim(),
+              supervisorName: value.supervisorName.trim(),
+              supervisorPosition: value.supervisorPosition.trim(),
+            })} variant="primary" size="md" fullWidth disabled={!canGenerate} />
+          </View>
         </TouchableOpacity>
       </AnimatedTouchableOpacity>
     </Modal>
@@ -68,9 +78,12 @@ export const SignatorySheet: React.FC<SignatorySheetProps> = ({ visible, initial
 
 const styles = StyleSheet.create({
   overlay: { flex: 1, backgroundColor: Colors.overlay, justifyContent: 'flex-end' },
-  sheet: { backgroundColor: Colors.white, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, padding: Spacing.lg, maxHeight: '85%' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.md },
+  sheet: { backgroundColor: Colors.white, borderTopLeftRadius: Radius.xl, borderTopRightRadius: Radius.xl, height: '85%' },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, marginBottom: Spacing.md },
   title: { fontSize: Type.subheading.fontSize, lineHeight: Type.subheading.lineHeight, fontWeight: '700', color: Colors.navy },
+  scroll: { flex: 1 },
+  scrollContent: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md },
   field: { flex: undefined },
   hint: { fontSize: Type.caption.fontSize, lineHeight: Type.caption.lineHeight, color: Colors.textMuted, marginBottom: Spacing.md },
+  footer: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm },
 });

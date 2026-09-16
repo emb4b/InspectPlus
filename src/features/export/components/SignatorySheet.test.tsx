@@ -6,6 +6,11 @@ import { SignatorySheet } from './SignatorySheet';
 
 jest.mock('react-native-keyboard-controller', () => jest.requireActual('react-native-keyboard-controller/jest'));
 jest.mock('react-native-reanimated', () => ({ ...jest.requireActual('react-native-reanimated'), useReducedMotion: () => false }));
+// The library ships its own jest mock (no provider needed — useSafeAreaInsets
+// falls back to zero insets), but nothing wires it in automatically the way
+// jest-expo does for some other native modules.
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- factory can't close over top-level imports (babel-plugin-jest-hoist)
+jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 
 const initial = { inspectorName: 'Juan', inspectorPosition: '', supervisorName: '', supervisorPosition: '' };
 

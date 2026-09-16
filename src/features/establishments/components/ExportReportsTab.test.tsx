@@ -66,6 +66,13 @@ jest.mock('react-native-reanimated', () => ({
   useReducedMotion: () => false,
 }));
 
+// The real SignatorySheet (rendered here, not mocked) reads
+// useSafeAreaInsets — the library ships its own jest mock, but nothing
+// wires it in automatically the way jest-expo does for some other native
+// modules.
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- factory can't close over top-level imports (babel-plugin-jest-hoist)
+jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
+
 // Prefixed `mock` — babel-plugin-jest-hoist hoists every jest.mock() call to
 // the top of the file, ahead of ordinary top-level declarations, and
 // statically rejects any out-of-scope identifier a hoisted factory closes
@@ -578,6 +585,12 @@ describe('the Generate flow', () => {
     const r = render();
     const search = r.root.findByProps({ placeholder: 'Search by establishment name...' });
     expect(search.props.editable).toBe(false);
+    // The wrapper around the search field gets the same reduced-emphasis
+    // treatment as the filter button and Select all while a run is in
+    // flight — see styles.controlDisabled.
+    expect(search.parent!.props.style).toEqual(
+      expect.arrayContaining([expect.objectContaining({ opacity: 0.55 })]),
+    );
   });
 });
 

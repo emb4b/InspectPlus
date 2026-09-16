@@ -586,6 +586,36 @@ describe('ReportListCard selection mode', () => {
   });
 });
 
+describe('ReportListCard swipe actions hidden while selecting', () => {
+  // ownedDraftInspection has both showEdit and showDelete true, so this is
+  // the exact case where a dimmed selectable card (or the "No template yet"
+  // one) could otherwise let the Edit/Delete buttons show through behind it.
+  it('renders neither Edit nor Delete when selectable', () => {
+    const r = render(
+      <ReportListCard
+        item={ownedDraftInspection}
+        currentUid="uid-1"
+        canManageAll={false}
+        selectable
+        onPress={noop}
+        onEdit={noop}
+        onDelete={noop}
+        onToggleSelect={noop}
+      />,
+    );
+    expect(findEditButtons(r, ownedDraftInspection)).toHaveLength(0);
+    expect(findDeleteButtons(r, ownedDraftInspection)).toHaveLength(0);
+  });
+
+  it('still renders Edit and Delete for the same owned draft report when not selectable', () => {
+    const r = render(
+      <ReportListCard item={ownedDraftInspection} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    expect(findEditButtons(r, ownedDraftInspection)).toHaveLength(1);
+    expect(findDeleteButtons(r, ownedDraftInspection)).toHaveLength(1);
+  });
+});
+
 describe('ReportListCard swipe gesture', () => {
   it('is enabled outside selection mode when at least one swipe action is visible', () => {
     // ownedDraftInspection has both showEdit and showDelete true, so this
