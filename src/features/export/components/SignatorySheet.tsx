@@ -141,7 +141,9 @@ export const SignatorySheet: React.FC<SignatorySheetProps> = ({ visible, initial
               <Text style={styles.hint}>Approvers apply to every report in this run.</Text>
             )}
           </ScrollView>
-          <View style={[styles.footer, { paddingBottom: Spacing.lg + insets.bottom }]}>
+          {/* Never flush against the gesture bar: this phone reports a 0 bottom
+              inset under gesture navigation, so keep a floor as well as the inset. */}
+          <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.lg) + Spacing.lg }]}>
             <Button label="Generate" onPress={() => onConfirm({
               inspectorName: value.inspectorName.trim(),
               inspectorPosition: value.inspectorPosition.trim(),
@@ -168,7 +170,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.lg, paddingTop: Spacing.lg, marginBottom: Spacing.md },
   title: { fontSize: Type.subheading.fontSize, lineHeight: Type.subheading.lineHeight, fontWeight: '700', color: Colors.navy },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.md },
+  scrollContent: { paddingHorizontal: Spacing.lg, paddingBottom: Spacing.lg },
   field: { flex: undefined },
   inspectorRow: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm },
   inspectorFields: { flex: 1 },
@@ -182,5 +184,13 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   hint: { fontSize: Type.caption.fontSize, lineHeight: Type.caption.lineHeight, color: Colors.textMuted, marginBottom: Spacing.md },
-  footer: { paddingHorizontal: Spacing.lg, paddingTop: Spacing.sm },
+  // A visible edge between the scrolling fields and the pinned action, so
+  // the last field reads as cut off by a bar rather than clipped.
+  footer: {
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    backgroundColor: Colors.white,
+  },
 });
