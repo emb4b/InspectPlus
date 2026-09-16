@@ -1,8 +1,11 @@
 import React from 'react';
-import { Text, TouchableOpacity } from 'react-native';
+import { Text, TouchableOpacity, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import { TextField } from '../../../components/form';
 import { Button } from '../../../components/Button';
+import { Colors } from '../../../design/colors';
+import { HOME_FOOTER_HEIGHT } from '../../home/components/HomeFooter';
+import { GENERATE_BOTTOM_GAP } from '../exportLayout';
 import { SignatorySheet } from './SignatorySheet';
 
 jest.mock('react-native-keyboard-controller', () => jest.requireActual('react-native-keyboard-controller/jest'));
@@ -18,6 +21,15 @@ const initial = {
   recommendingName: 'Rec Name', recommendingPosition: 'Rec Position',
   approverName: 'App Name', approverPosition: 'App Position',
   additionalInspectors: [],
+};
+
+// Flatten a StyleProp (single object or array) into a single resolved style
+// object — same convention as Card.test.tsx's helper of the same name.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const flattenStyle = (style: any): any => {
+  if (!style) return {};
+  if (Array.isArray(style)) return style.reduce((acc, s) => ({ ...acc, ...(s || {}) }), {});
+  return style;
 };
 
 describe('SignatorySheet', () => {
@@ -46,6 +58,13 @@ describe('SignatorySheet', () => {
       approverName: 'New Approver', approverPosition: 'App Position',
       additionalInspectors: [],
     });
+  });
+
+  it('lifts the pinned footer by HOME_FOOTER_HEIGHT + GENERATE_BOTTOM_GAP above the (mocked, zero) safe-area inset', () => {
+    let r!: TestRenderer.ReactTestRenderer;
+    act(() => { r = TestRenderer.create(<SignatorySheet visible initial={initial} onCancel={() => {}} onConfirm={() => {}} />); });
+    const footer = r.root.find(n => n.type === View && flattenStyle(n.props.style).borderTopColor === Colors.border);
+    expect(flattenStyle(footer.props.style).paddingBottom).toBe(HOME_FOOTER_HEIGHT + GENERATE_BOTTOM_GAP);
   });
 
   it('disables Generate until the inspector name is filled', () => {

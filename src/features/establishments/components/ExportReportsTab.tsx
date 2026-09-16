@@ -15,6 +15,7 @@ import { useAuthContext } from '../../../core/providers/AuthProvider';
 import { useSetFabHidden } from '../../home/context/FabVisibilityContext';
 import { useScreenFooter } from '../../home/context/ScreenFooterContext';
 import { useExportReports } from '../../export/hooks/useExportReports';
+import { GENERATE_BOTTOM_GAP } from '../../export/exportLayout';
 import { hasTemplate } from '../../export/templates';
 import { asyncStorageSignatoryProvider, emptySignatories } from '../../export/signatories';
 import { SignatorySheet } from '../../export/components/SignatorySheet';
@@ -433,7 +434,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderTopWidth: 1,
     borderTopColor: Colors.border,
-    padding: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    // Raises the Generate button off the app's bottom chrome (HomeFooter),
+    // matching the signatory sheet's own footer so the button lands at the
+    // same y whether or not the sheet is open — see exportLayout.ts.
+    paddingBottom: GENERATE_BOTTOM_GAP,
     gap: Spacing.sm,
     ...Elevation.overlay,
   },

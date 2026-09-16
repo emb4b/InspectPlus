@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity } from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import type { AllReportItem } from '../hooks/useEstablishment';
 import type { UseReportBrowserReturn } from '../hooks/useReportBrowser';
@@ -7,6 +7,8 @@ import { Badge } from '../../../components/Badge';
 import { Button } from '../../../components/Button';
 import { EmptyState } from '../../../components/EmptyState';
 import { Skeleton } from '../../../components/Skeleton';
+import { Colors } from '../../../design/colors';
+import { GENERATE_BOTTOM_GAP } from '../../export/exportLayout';
 // Imported here at the top rather than after the jest.mock() calls below
 // (as the brief originally had it): babel-plugin-jest-hoist hoists every
 // jest.mock() call to the top of the module regardless of where it's
@@ -257,6 +259,15 @@ const flattenText = (node: JsonNode | JsonNode[] | null): string => {
 };
 const footerFlatText = (): string => flattenText(renderFooter().toJSON());
 
+// Flatten a StyleProp (single object or array) into a single resolved style
+// object — same convention as Card.test.tsx's helper of the same name.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const flattenStyle = (style: any): any => {
+  if (!style) return {};
+  if (Array.isArray(style)) return style.reduce((acc, s) => ({ ...acc, ...(s || {}) }), {});
+  return style;
+};
+
 // RN's own TouchableOpacity module is a thin wrapper that spreads every prop
 // it receives onto an inner, unexported class component of the same
 // displayName, so a props-only predicate (matching just accessibilityLabel)
@@ -299,6 +310,15 @@ describe('ExportReportsTab', () => {
     const r = render();
     selectRow(r, 0);
     expect(footerText()).toContain('1 selected');
+  });
+
+  it('gives the selection bar GENERATE_BOTTOM_GAP of paddingBottom, so its Generate button lands at the same height as the sheet\'s', () => {
+    const r = render();
+    selectRow(r, 0);
+    const bar = renderFooter().root.find(
+      n => n.type === View && flattenStyle(n.props.style).borderTopColor === Colors.border,
+    );
+    expect(flattenStyle(bar.props.style).paddingBottom).toBe(GENERATE_BOTTOM_GAP);
   });
 
   describe('draft warning reflects the SELECTED reports, not the visible list', () => {

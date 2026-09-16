@@ -11,6 +11,13 @@ interface HomeFooterProps {
   showCredits?: boolean;
 }
 
+// The plain bar's own height plus the credits footer's vertical padding on
+// both sides — exported so other layout math (e.g. the export sheet's
+// footer) can't drift out of sync with the styles derived from it below.
+export const HOME_FOOTER_HEIGHT = 28;
+const BAR_HEIGHT = 20;
+const FOOTER_PADDING_VERTICAL = (HOME_FOOTER_HEIGHT - BAR_HEIGHT) / 2;
+
 export const HomeFooter: React.FC<HomeFooterProps> = ({ showCredits = false }) => {
   // The one place the running version is visible - the recovery guide and
   // support both ask for it, and the footer is on every screen including
@@ -49,12 +56,12 @@ export const HomeFooter: React.FC<HomeFooterProps> = ({ showCredits = false }) =
 
 const styles = StyleSheet.create({
   footer: {
-    paddingVertical: 4,
+    paddingVertical: FOOTER_PADDING_VERTICAL,
     paddingHorizontal: 16,
     alignItems: 'center',
   },
   bar: {
-    height: 20,
+    height: BAR_HEIGHT,
   },
   line: {
     fontSize: 7.5,
@@ -69,8 +76,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 10,
     top: 0,
-    height: 20,
-    lineHeight: 20,
+    height: BAR_HEIGHT,
+    lineHeight: BAR_HEIGHT,
     fontSize: 9,
     fontVariant: ['tabular-nums'],
     color: 'rgba(255,255,255,0.7)',

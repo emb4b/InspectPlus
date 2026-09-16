@@ -6,6 +6,7 @@ import { Elevation } from '../../../design/elevation';
 import { Radius } from '../../../design/radius';
 import { Spacing } from '../../../design/spacing';
 import { Type } from '../../../design/typography';
+import { GENERATE_BOTTOM_GAP } from '../exportLayout';
 import type { ExportPhase } from '../hooks/useExportReports';
 
 interface ExportProgressBarProps {
@@ -66,7 +67,19 @@ export const ExportProgressBar: React.FC<ExportProgressBarProps> = ({ phase, onC
 };
 
 const styles = StyleSheet.create({
-  bar: { backgroundColor: Colors.white, borderTopWidth: 1, borderTopColor: Colors.border, padding: Spacing.lg, gap: Spacing.sm, ...Elevation.overlay },
+  // This bar replaces the selection bar during a run, and paddingTop/paddingHorizontal
+  // stay Spacing.lg like it — but paddingBottom matches GENERATE_BOTTOM_GAP so
+  // Cancel/Retry/Done don't jump relative to where Generate sat (see exportLayout.ts).
+  bar: {
+    backgroundColor: Colors.white,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
+    paddingTop: Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: GENERATE_BOTTOM_GAP,
+    gap: Spacing.sm,
+    ...Elevation.overlay,
+  },
   heading: { fontSize: Type.subheading.fontSize, lineHeight: Type.subheading.lineHeight, fontWeight: '700', color: Colors.textPrimary },
   detail: { fontSize: Type.bodySm.fontSize, lineHeight: Type.bodySm.lineHeight, color: Colors.textMuted },
   failure: { fontSize: Type.caption.fontSize, lineHeight: Type.caption.lineHeight, color: Colors.conflict },
