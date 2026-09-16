@@ -1,4 +1,4 @@
-# EIA.docx — merge tags
+# eia.docx — merge tags
 
 Regenerate with `npm run tag-templates` from `originals/EIA.docx` + `recipes/eia.json`.
 Loop minimums (rows padded by the mapper): product_lines 1 · permits_extra 0 · photo_rows 0.

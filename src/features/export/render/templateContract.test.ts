@@ -45,11 +45,11 @@ function keysOf(data: TemplateData) {
 }
 
 const cases: [string, TemplateData][] = [
-  ['Water Monitoring.docx', mapBundle(fullWaterBundle(), ctx)],
-  ['Air Monitoring.docx', mapBundle({ ...fullWaterBundle(), report: { ...fullWaterBundle().report, reportType: 'air_monitoring' }, compliance: { kind: 'none' } }, ctx)],
-  ['EIA.docx', mapBundle({ ...fullWaterBundle(), report: { ...fullWaterBundle().report, reportType: 'eia' }, compliance: { kind: 'none' } }, ctx)],
-  ['Hazardous Waste Generators.docx', mapBundle({ ...fullWaterBundle(), report: { ...fullWaterBundle().report, reportType: 'hazardous_waste' }, compliance: { kind: 'none' } }, ctx)],
-  ['Survey.docx', mapBundle(fullSurveyBundle(), ctx)],
+  ['water-monitoring.docx', mapBundle(fullWaterBundle(), ctx)],
+  ['air-monitoring.docx', mapBundle({ ...fullWaterBundle(), report: { ...fullWaterBundle().report, reportType: 'air_monitoring' }, compliance: { kind: 'none' } }, ctx)],
+  ['eia.docx', mapBundle({ ...fullWaterBundle(), report: { ...fullWaterBundle().report, reportType: 'eia' }, compliance: { kind: 'none' } }, ctx)],
+  ['hazardous-waste-generators.docx', mapBundle({ ...fullWaterBundle(), report: { ...fullWaterBundle().report, reportType: 'hazardous_waste' }, compliance: { kind: 'none' } }, ctx)],
+  ['survey.docx', mapBundle(fullSurveyBundle(), ctx)],
 ];
 
 // mapCommon's DOC_ROWS carries both `doc_cb_opms` and `doc_cb_hwms` on every

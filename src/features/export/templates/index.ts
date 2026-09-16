@@ -10,15 +10,15 @@ export interface TemplateEntry {
 
 export const TEMPLATES: Partial<Record<string, TemplateEntry>> = {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  water_monitoring: { label: 'Water Monitoring', file: 'Water Monitoring.docx', module: require('../../../../assets/templates/Water Monitoring.docx') },
+  water_monitoring: { label: 'Water Monitoring', file: 'water-monitoring.docx', module: require('../../../../assets/templates/water-monitoring.docx') },
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  air_monitoring: { label: 'Air Monitoring', file: 'Air Monitoring.docx', module: require('../../../../assets/templates/Air Monitoring.docx') },
+  air_monitoring: { label: 'Air Monitoring', file: 'air-monitoring.docx', module: require('../../../../assets/templates/air-monitoring.docx') },
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  eia: { label: 'EIA', file: 'EIA.docx', module: require('../../../../assets/templates/EIA.docx') },
+  eia: { label: 'EIA', file: 'eia.docx', module: require('../../../../assets/templates/eia.docx') },
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  hazardous_waste: { label: 'Hazardous Waste Generators', file: 'Hazardous Waste Generators.docx', module: require('../../../../assets/templates/Hazardous Waste Generators.docx') },
+  hazardous_waste: { label: 'Hazardous Waste Generators', file: 'hazardous-waste-generators.docx', module: require('../../../../assets/templates/hazardous-waste-generators.docx') },
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  survey: { label: 'Survey', file: 'Survey.docx', module: require('../../../../assets/templates/Survey.docx') },
+  survey: { label: 'Survey', file: 'survey.docx', module: require('../../../../assets/templates/survey.docx') },
 };
 
 // How many `unused_N` checkbox placeholders each shared-block-only recipe

@@ -1,4 +1,4 @@
-# Survey.docx — merge tags
+# survey.docx — merge tags
 
 Regenerate with `npm run tag-templates` from `originals/Survey.docx` + `recipes/survey.json`.
 Loop minimum: photo_rows 0.

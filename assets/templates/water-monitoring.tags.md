@@ -1,4 +1,4 @@
-# Water Monitoring.docx — merge tags
+# water-monitoring.docx — merge tags
 
 Regenerate with `npm run tag-templates` from `originals/Water Monitoring.docx` + `recipes/water.json`.
 Loop minimums (rows padded by the mapper): product_lines 1 · permits_extra 0 · abstracted_rows 5 · wwtp_outlets 3 · wwtp_components 2 · sampling_points 2 · parameters 4 · prev_parameters 4 · dp_conditions 5 · photo_rows 0.

@@ -1,4 +1,4 @@
-# Hazardous Waste Generators.docx — merge tags
+# hazardous-waste-generators.docx — merge tags
 
 Regenerate with `npm run tag-templates` from `originals/Hazardous Waste Generators.docx` + `recipes/hazwaste.json`.
 Loop minimums (rows padded by the mapper): product_lines 1 · permits_extra 0 · photo_rows 0.

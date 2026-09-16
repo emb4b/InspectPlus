@@ -1,4 +1,4 @@
-# Air Monitoring.docx — merge tags
+# air-monitoring.docx — merge tags
 
 Regenerate with `npm run tag-templates` from `originals/Air Monitoring.docx` + `recipes/air.json`.
 Loop minimums (rows padded by the mapper): product_lines 1 · permits_extra 0 · photo_rows 0.

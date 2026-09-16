@@ -1,6 +1,6 @@
 {
   "original": "EIA.docx",
-  "output": "EIA.docx",
+  "output": "eia.docx",
   "checkboxes": [
     "purpose_cb_verify",
     "purpose_cb_pmpin_new", "purpose_cb_pmpin_renewal",
