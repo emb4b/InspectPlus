@@ -436,7 +436,7 @@ describe('ReportListCard selection mode', () => {
     );
     const tile = flattenStyle(findIconWrap(r).props.style);
     expect(tile.borderWidth).toBeUndefined();
-    expect(tile.backgroundColor).not.toBe(Colors.accent);
+    expect(tile.backgroundColor).not.toBe(Colors.navy);
     expect(findCheckmarkIcons(r)).toHaveLength(0);
   });
 
@@ -452,16 +452,16 @@ describe('ReportListCard selection mode', () => {
     // tint, confirmed on device, and the ring is the only thing saying the
     // row is pickable.
     expect(tile.borderColor).toBe(Colors.textLight);
-    expect(tile.backgroundColor).not.toBe(Colors.accent);
+    expect(tile.backgroundColor).not.toBe(Colors.navy);
     expect(findCheckmarkIcons(r)).toHaveLength(0);
     expect(findReportIcon(r)).toBeDefined();
   });
 
-  it('flips the tile to an accent checkmark when selected', () => {
+  it('flips the tile to a navy checkmark when selected — the same fill as every other filled control', () => {
     const r = renderSelectable(true);
     const tile = flattenStyle(findIconWrap(r).props.style);
 
-    expect(tile.backgroundColor).toBe(Colors.accent);
+    expect(tile.backgroundColor).toBe(Colors.navy);
     expect(findCheckmarkIcons(r)).toHaveLength(1);
     // The ring would double up with the filled state.
     expect(tile.borderWidth).toBeUndefined();

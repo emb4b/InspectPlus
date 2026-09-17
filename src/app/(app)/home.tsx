@@ -5,12 +5,19 @@ import {
   ScrollView,
   RefreshControl,
   StyleSheet,
+  useWindowDimensions,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
 } from 'react-native';
+import Animated, { useAnimatedScrollHandler, useSharedValue } from 'react-native-reanimated';
 import { Colors } from '../../design/colors';
+import { useMotion } from '../../design/motion';
+import { Radius } from '../../design/radius';
 import { Spacing } from '../../design/spacing';
 import { Type } from '../../design/typography';
 import { useAuthContext } from '../../core/providers/AuthProvider';
-import { HomeTabs, HomeTab } from '../../features/home/components/HomeTabs';
+import { Skeleton } from '../../components/Skeleton';
+import { HomeTabs, HomeTab, HOME_TAB_ORDER } from '../../features/home/components/HomeTabs';
 import {
   ManageEstablishmentsTab,
   ManageEstablishmentsTabHandle,
@@ -44,16 +51,35 @@ function getFormattedTime(): string {
   });
 }
 
+const SKELETON_ROW_HEIGHT = 96;
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 export default function HomeScreen() {
   const { fullName } = useAuthContext();
+  const { width: pageWidth } = useWindowDimensions();
+  const { reduced } = useMotion();
   const [activeTab, setActiveTab] = useState<HomeTab>('manageReports');
-  const [refreshing, setRefreshing] = useState(false);
+  // Pages mount the first time they're shown and stay mounted after, so a
+  // swipe back is instant and keeps that tab's filters/scroll — but a page
+  // never visited costs nothing: Home's first paint is still one tab, one
+  // query, however large the local database grows. Each tab already
+  // refetches on every sync, so a stale mounted page is not a concern.
+  const [visited, setVisited] = useState<ReadonlySet<HomeTab>>(() => new Set(['manageReports']));
+  const [refreshingTab, setRefreshingTab] = useState<HomeTab | null>(null);
+  const pagerRef = useRef<Animated.ScrollView>(null);
   const manageEstablishmentsRef = useRef<ManageEstablishmentsTabHandle>(null);
   const manageReportsRef = useRef<ManageReportsTabHandle>(null);
   const exportReportsRef = useRef<ExportReportsTabHandle>(null);
   const firstName = fullName?.trim().split(/\s+/)[0] ?? 'Inspector';
+
+  // The pager's offset as a fractional page index, written on the UI thread
+  // every scroll frame and read only by HomeTabs' underline worklet — React
+  // never re-renders for it.
+  const position = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler(event => {
+    position.set(event.contentOffset.x / pageWidth);
+  });
 
   // Ticks the header clock once a second — cheap enough given it's just one
   // small Text re-render, and keeps the displayed time actually live.
@@ -65,8 +91,8 @@ export default function HomeScreen() {
 
   // A sync can complete while Home is already mounted and focused (the
   // manual "Sync Now" button, or the post-login sync landing right as this
-  // screen appears) — pull-to-refresh alone wouldn't pick that up, so all
-  // three tabs also refetch whenever local data changes for any reason.
+  // screen appears) — pull-to-refresh alone wouldn't pick that up, so every
+  // mounted tab also refetches whenever local data changes for any reason.
   useEffect(() => {
     return subscribeToSyncDataChanged(() => {
       manageEstablishmentsRef.current?.refresh();
@@ -75,32 +101,96 @@ export default function HomeScreen() {
     });
   }, []);
 
-  const renderTab = () => {
-    switch (activeTab) {
-      case 'manageReports':
-        return <ManageReportsTab ref={manageReportsRef} />;
-      case 'manageEstablishments':
-        return <ManageEstablishmentsTab ref={manageEstablishmentsRef} />;
-      case 'exportReports':
-        return <ExportReportsTab ref={exportReportsRef} />;
-    }
-  };
+  const markVisited = useCallback((tabs: HomeTab[]) => {
+    setVisited(prev => {
+      if (tabs.every(t => prev.has(t))) return prev;
+      const next = new Set(prev);
+      tabs.forEach(t => next.add(t));
+      return next;
+    });
+  }, []);
 
-  // Pull-to-refresh reloads the active tab's data.
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
+  const activate = useCallback((tab: HomeTab) => {
+    setActiveTab(tab);
+    markVisited([tab]);
+  }, [markVisited]);
+
+  // A tab tap drives the pager, and the pager settling drives activeTab —
+  // one path for both inputs, so the bar and the pages can't disagree.
+  const handleTabPress = useCallback((tab: HomeTab) => {
+    activate(tab);
+    pagerRef.current?.scrollTo({ x: HOME_TAB_ORDER.indexOf(tab) * pageWidth, y: 0, animated: !reduced });
+  }, [activate, pageWidth, reduced]);
+
+  const handlePagerSettle = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const index = Math.round(e.nativeEvent.contentOffset.x / pageWidth);
+    const tab = HOME_TAB_ORDER[Math.min(Math.max(index, 0), HOME_TAB_ORDER.length - 1)];
+    if (tab !== activeTab) activate(tab);
+  }, [activeTab, activate, pageWidth]);
+
+  // Mount both neighbours the moment a drag starts, so the swipe reveals
+  // real content rather than a skeleton that fills in after it settles.
+  const handleDragStart = useCallback(() => {
+    const index = HOME_TAB_ORDER.indexOf(activeTab);
+    markVisited(HOME_TAB_ORDER.filter((_, i) => Math.abs(i - index) === 1));
+  }, [activeTab, markVisited]);
+
+  // Pull-to-refresh reloads the tab it was pulled on.
+  const handleRefresh = useCallback(async (tab: HomeTab) => {
+    setRefreshingTab(tab);
     try {
-      if (activeTab === 'manageEstablishments') {
+      if (tab === 'manageEstablishments') {
         await manageEstablishmentsRef.current?.refresh();
-      } else if (activeTab === 'manageReports') {
+      } else if (tab === 'manageReports') {
         await manageReportsRef.current?.refresh();
-      } else if (activeTab === 'exportReports') {
+      } else if (tab === 'exportReports') {
         await exportReportsRef.current?.refresh();
       }
     } finally {
-      setRefreshing(false);
+      setRefreshingTab(null);
     }
-  }, [activeTab]);
+  }, []);
+
+  const refreshControlFor = (tab: HomeTab) => (
+    <RefreshControl
+      refreshing={refreshingTab === tab}
+      onRefresh={() => handleRefresh(tab)}
+      tintColor={Colors.navy}
+      colors={[Colors.navy]}
+    />
+  );
+
+  // The Manage tabs page their lists (five rows at a time), so a plain
+  // ScrollView around them is fine. Export shows the whole filtered set and
+  // virtualises it through its own FlatList — which only works when that
+  // list is the page's scroller, so it gets the RefreshControl as a prop
+  // instead of a wrapper.
+  const renderPage = (tab: HomeTab) => {
+    if (tab === 'exportReports') {
+      return (
+        <ExportReportsTab
+          ref={exportReportsRef}
+          focused={activeTab === 'exportReports'}
+          refreshControl={refreshControlFor(tab)}
+        />
+      );
+    }
+    return (
+      <ScrollView
+        testID={`home-page-${tab}`}
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={refreshControlFor(tab)}>
+        {tab === 'manageReports' ? (
+          <ManageReportsTab ref={manageReportsRef} />
+        ) : (
+          <ManageEstablishmentsTab ref={manageEstablishmentsRef} />
+        )}
+      </ScrollView>
+    );
+  };
 
   return (
     <View style={styles.screen}>
@@ -113,24 +203,37 @@ export default function HomeScreen() {
       </View>
 
       {/* Sticky tab bar */}
-      <HomeTabs activeTab={activeTab} onTabChange={setActiveTab} />
+      <HomeTabs activeTab={activeTab} onTabChange={handleTabPress} position={position} />
 
-      {/* Scrollable tab content */}
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+      {/* One page per tab, swipeable. Each page scrolls on its own, so a
+          long list on one tab never moves another's scroll position. */}
+      <Animated.ScrollView
+        ref={pagerRef}
+        testID="home-pager"
+        horizontal
+        pagingEnabled
+        bounces={false}
+        showsHorizontalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={Colors.navy}
-            colors={[Colors.navy]}
-          />
-        }>
-        {renderTab()}
-      </ScrollView>
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        onScrollBeginDrag={handleDragStart}
+        onMomentumScrollEnd={handlePagerSettle}
+        style={styles.pager}>
+        {HOME_TAB_ORDER.map(tab => (
+          <View key={tab} style={{ width: pageWidth }}>
+            {visited.has(tab) ? (
+              renderPage(tab)
+            ) : (
+              <View style={styles.placeholder}>
+                <Skeleton height={38} radius={Radius.pill} style={styles.skeletonRow} />
+                <Skeleton height={SKELETON_ROW_HEIGHT} style={styles.skeletonRow} />
+                <Skeleton height={SKELETON_ROW_HEIGHT} />
+              </View>
+            )}
+          </View>
+        ))}
+      </Animated.ScrollView>
     </View>
   );
 }
@@ -161,11 +264,23 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     marginTop: Spacing.xs,
   },
+  pager: {
+    flex: 1,
+    backgroundColor: Colors.white,
+  },
   scroll: {
     flex: 1,
     backgroundColor: Colors.white,
   },
   scrollContent: {
     flexGrow: 1,
+  },
+  // Mirrors the tabs' own loading layout (search pill + rows) so an
+  // unvisited page looks like a tab that's about to load, not a gap.
+  placeholder: {
+    padding: Spacing.lg,
+  },
+  skeletonRow: {
+    marginBottom: Spacing.md,
   },
 });

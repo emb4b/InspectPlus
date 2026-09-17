@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   detail: { fontSize: Type.bodySm.fontSize, lineHeight: Type.bodySm.lineHeight, color: Colors.textMuted },
   failure: { fontSize: Type.caption.fontSize, lineHeight: Type.caption.lineHeight, color: Colors.conflict },
   track: { height: 6, borderRadius: Radius.pill, backgroundColor: Colors.bgLight, overflow: 'hidden' },
-  fill: { height: '100%', backgroundColor: Colors.accent },
+  fill: { height: '100%', backgroundColor: Colors.green },
   actions: { flexDirection: 'row', gap: Spacing.sm },
   action: { flex: 1 },
 });

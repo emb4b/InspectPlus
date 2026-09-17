@@ -1,5 +1,5 @@
-import React, { forwardRef, useImperativeHandle, useMemo, useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Keyboard, StyleSheet } from 'react-native';
+import React, { forwardRef, useCallback, useImperativeHandle, useMemo, useState } from 'react';
+import { FlatList, View, Text, TextInput, TouchableOpacity, Keyboard, StyleSheet, RefreshControlProps } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Badge } from '../../../components/Badge';
 import { Button } from '../../../components/Button';
@@ -51,7 +51,17 @@ const toExportItem = (item: AllReportItem): ExportItem => ({
   date: item.date,
 });
 
-export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref) => {
+interface ExportReportsTabProps {
+  // Whether this tab is the page Home is showing. Home keeps visited pages
+  // mounted so a swipe back is instant, so this component can be alive
+  // behind another tab — and its pinned selection bar must not be.
+  focused?: boolean;
+  // This tab is its own scroller (see the FlatList below), so Home hands
+  // its pull-to-refresh control in rather than wrapping the tab in one.
+  refreshControl?: React.ReactElement<RefreshControlProps>;
+}
+
+export const ExportReportsTab = forwardRef<ExportReportsTabHandle, ExportReportsTabProps>(({ focused = true, refreshControl }, ref) => {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const browser = useReportBrowser();
@@ -202,12 +212,13 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
   // protects against the rare one.
   useImperativeHandle(ref, () => ({ refresh: refetch }), [refetch]);
 
-  // Registered rather than rendered inline: this component mounts inside
-  // HomeScreen's ScrollView, so an absolutely-positioned bar would anchor to
-  // the scrolling content and slide away instead of pinning to the viewport.
+  // Registered rather than rendered inline: this component is one page of
+  // HomeScreen's pager, so an absolutely-positioned bar would anchor to the
+  // scrolling content and slide away instead of pinning to the viewport.
   // See useScreenFooter for why this takes a factory plus deps.
   useScreenFooter(
     () => {
+      if (!focused) return null;
       // A run in flight (or just finished) replaces the selection bar
       // outright — its own Cancel/Retry/Done actions are the only ones that
       // make sense while exporter.phase isn't idle.
@@ -248,8 +259,38 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
         </View>
       ) : null;
     },
-    [selectedItems, draftCount, exporter.phase, signatories],
+    [focused, selectedItems, draftCount, exporter.phase, signatories],
   );
+
+  // Rows go through a FlatList rather than a map: Export needs the whole
+  // filtered set (not a page of five like the Manage tabs) so "select all"
+  // means something, and a FlatList mounts only the visible window of it,
+  // however many reports the local database accumulates. That only works
+  // if this list IS the page's scroller — a FlatList nested in a ScrollView
+  // measures as its full height and never virtualises — which is why the
+  // search row and header ride inside ListHeaderComponent and Home passes
+  // refreshControl in instead of wrapping the tab.
+  const renderRow = useCallback(({ item }: { item: AllReportItem }) => (
+    <ReportListCard
+      item={item}
+      currentUid={currentUid}
+      canManageAll={isDeveloper}
+      // Opening, editing, and deleting are all suppressed while
+      // selecting — the row's only job here is to be picked.
+      onPress={() => {}}
+      onEdit={() => {}}
+      onDelete={() => {}}
+      selectable
+      selected={selectedKeys.has(item.key)}
+      onToggleSelect={toggleSelect}
+      // Untemplated types can't be selected at all; a run in flight
+      // additionally freezes whatever is already picked, but only the
+      // "no template" case gets an explanatory badge.
+      selectDisabled={busy || !canExport(item)}
+      selectDisabledReason={canExport(item) ? undefined : NO_TEMPLATE_REASON}
+    />
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- toggleSelect is re-created each render; selectedKeys/busy are what actually change a row
+  ), [currentUid, isDeveloper, selectedKeys, busy]);
 
   if (loading) {
     return (
@@ -274,8 +315,10 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
     );
   }
 
-  return (
-    <View style={styles.container}>
+  // An element, not a component type: a component type would remount the
+  // header (and blur the search field) every time the list re-renders.
+  const listHeader = (
+    <>
       <View style={styles.searchRow}>
         <View style={[styles.searchWrap, busy && styles.controlDisabled]}>
           <Ionicons name="search-outline" size={14} color={Colors.textMuted} />
@@ -322,39 +365,35 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
           ) : undefined
         }
       />
+    </>
+  );
 
-      {reports.length === 0 ? (
-        <EmptyState
-          icon="document-outline"
-          message={
-            state.search || activeFilterCount > 0
-              ? 'No reports match your filters.'
-              : 'No reports to export yet.'
-          }
-        />
-      ) : (
-        reports.map(item => (
-          <ReportListCard
-            key={item.key}
-            item={item}
-            currentUid={currentUid}
-            canManageAll={isDeveloper}
-            // Opening, editing, and deleting are all suppressed while
-            // selecting — the row's only job here is to be picked.
-            onPress={() => {}}
-            onEdit={() => {}}
-            onDelete={() => {}}
-            selectable
-            selected={selectedKeys.has(item.key)}
-            onToggleSelect={toggleSelect}
-            // Untemplated types can't be selected at all; a run in flight
-            // additionally freezes whatever is already picked, but only the
-            // "no template" case gets an explanatory badge.
-            selectDisabled={busy || !canExport(item)}
-            selectDisabledReason={canExport(item) ? undefined : NO_TEMPLATE_REASON}
+  return (
+    <>
+      <FlatList
+        data={reports}
+        keyExtractor={keyOf}
+        renderItem={renderRow}
+        // renderRow closes over these, so a change must re-render the
+        // visible rows even though `data` is the same array.
+        extraData={selectedKeys}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={
+          <EmptyState
+            icon="document-outline"
+            message={
+              state.search || activeFilterCount > 0
+                ? 'No reports match your filters.'
+                : 'No reports to export yet.'
+            }
           />
-        ))
-      )}
+        }
+        style={styles.list}
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={refreshControl}
+      />
 
       <ReportFilterSheet
         visible={filtersOpen}
@@ -370,16 +409,23 @@ export const ExportReportsTab = forwardRef<ExportReportsTabHandle>((_props, ref)
         onCancel={() => setSheetOpen(false)}
         onConfirm={s => { void runExport(selectedItems, s); }}
       />
-    </View>
+    </>
   );
 });
 
 ExportReportsTab.displayName = 'ExportReportsTab';
 
+const keyOf = (item: AllReportItem) => item.key;
+
 const styles = StyleSheet.create({
+  list: {
+    flex: 1,
+    backgroundColor: Colors.white,
+  },
   container: {
     padding: Spacing.lg,
     paddingBottom: Spacing.xxl,
+    flexGrow: 1,
   },
   skeletonRow: {
     marginBottom: Spacing.md,
@@ -428,7 +474,7 @@ const styles = StyleSheet.create({
     fontSize: Type.bodySm.fontSize,
     lineHeight: Type.bodySm.lineHeight,
     fontWeight: '700',
-    color: Colors.accent,
+    color: Colors.green,
   },
   selectionBar: {
     backgroundColor: Colors.white,

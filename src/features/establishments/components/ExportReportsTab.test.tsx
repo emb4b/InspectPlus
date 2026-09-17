@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, View } from 'react-native';
+import { FlatList, RefreshControl, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import type { AllReportItem } from '../hooks/useEstablishment';
 import type { UseReportBrowserReturn } from '../hooks/useReportBrowser';
@@ -294,6 +294,42 @@ describe('ExportReportsTab', () => {
     mockUseReportBrowser.mockImplementation(() => makeBrowserReturn());
   });
 
+  // The Manage tabs page their lists five at a time; Export needs the whole
+  // filtered set on screen for "select all" to mean anything, so its rows go
+  // through a FlatList — only the visible window is ever mounted, however
+  // many reports the local database accumulates.
+  describe('virtualised list', () => {
+    it('feeds the filtered reports to a FlatList keyed by report key', () => {
+      const list = render().root.findByType(FlatList);
+      expect(list.props.data).toBe(mockReports);
+      expect(list.props.keyExtractor(mockReports[1])).toBe('inspection-r2');
+    });
+
+    it('keeps the search row and the select-all header inside the list header, so they scroll with the rows', () => {
+      const list = render().root.findByType(FlatList);
+      let header!: Renderer;
+      act(() => { header = TestRenderer.create(list.props.ListHeaderComponent); });
+      // TextInput forwards its props onto a host node of the same name, so
+      // the composite is matched by type to count it once.
+      expect(header.root.findAllByType(TextInput).map(n => n.props.placeholder)).toEqual(['Search by establishment name...']);
+      expect(header.root.findAllByType(TouchableOpacity).map(n => n.props.accessibilityLabel)).toContain('Select all reports');
+    });
+
+    it('is its own scroller: the RefreshControl Home hands it lands on the FlatList', () => {
+      const refreshControl = <RefreshControl refreshing={false} onRefresh={() => {}} />;
+      let r!: Renderer;
+      act(() => { r = TestRenderer.create(<ExportReportsTab refreshControl={refreshControl} />); });
+      expect(r.root.findByType(FlatList).props.refreshControl).toBe(refreshControl);
+    });
+
+    it('renders the empty state through the list, not around it', () => {
+      mockUseReportBrowser.mockImplementation(() => makeBrowserReturn({ reports: [] }));
+      const r = render();
+      expect(r.root.findByType(FlatList).props.ListEmptyComponent).toBeTruthy();
+      expect(() => r.root.findByType(EmptyState)).not.toThrow();
+    });
+  });
+
   it('renders every filtered report as a selectable row', () => {
     const r = render();
     const cards = r.root.findAllByType(ReportListCard);
@@ -304,6 +340,25 @@ describe('ExportReportsTab', () => {
   it('registers no selection bar until something is selected', () => {
     render();
     expect(mockRegisteredFooter).toBeNull();
+  });
+
+  // Home keeps visited pages mounted so a swipe back is instant, which
+  // means this tab can be alive while another page is showing — its
+  // selection bar must not stay pinned over that page.
+  it('registers no selection bar while unfocused, even with a selection, and restores it on focus', () => {
+    let r!: Renderer;
+    act(() => { r = TestRenderer.create(<ExportReportsTab focused={false} />); });
+    selectRow(r, 0);
+    expect(mockRegisteredFooter).toBeNull();
+
+    act(() => { r.update(<ExportReportsTab focused />); });
+    expect(footerText()).toContain('1 selected');
+  });
+
+  it('colours Select all in the brand green like the form tabs, not a purple accent', () => {
+    const r = render();
+    const label = findSelectAllToggle(r).findByType(Text);
+    expect(flattenStyle(label.props.style).color).toBe(Colors.green);
   });
 
   it('reports the selected count once a row is ticked', () => {

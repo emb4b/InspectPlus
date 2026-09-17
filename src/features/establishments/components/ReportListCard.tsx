@@ -204,7 +204,7 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
             <View
               style={[
                 styles.iconWrap,
-                { backgroundColor: showAsSelected ? Colors.accent : display?.bgColor ?? Colors.bgLight },
+                { backgroundColor: showAsSelected ? Colors.navy : display?.bgColor ?? Colors.bgLight },
                 // The ring the old checkbox wore. Without it an unselected
                 // tile is indistinguishable from a normal one and nothing
                 // says the row is pickable.
