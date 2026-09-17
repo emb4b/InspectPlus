@@ -52,7 +52,9 @@
           "savePhotosPermission": "InspectPlus saves downloaded attachments to your photo library.",
           "isAccessMediaLocationEnabled": false
         }
-      ]
+      ],
+      "expo-sharing",
+      "expo-asset"
     ],
     "extra": {
       "eas": {

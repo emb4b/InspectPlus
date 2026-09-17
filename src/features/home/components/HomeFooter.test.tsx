@@ -1,7 +1,8 @@
 import React from 'react';
 import { Text } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import TestRenderer, { act } from 'react-test-renderer';
-import { HomeFooter } from './HomeFooter';
+import { HomeFooter, HOME_FOOTER_BAR_HEIGHT } from './HomeFooter';
 
 jest.mock('expo-constants', () => ({
   __esModule: true,
@@ -30,5 +31,16 @@ describe('HomeFooter version stamp', () => {
 
   it('prints it on the plain bar every signed-in screen carries', () => {
     expect(texts(render(<HomeFooter />))).toContain('v1.0.3 (12) · db 15');
+  });
+});
+
+// HOME_FOOTER_BAR_HEIGHT is exported for other screens' layout math (e.g.
+// the export sheet's footer) to line up against — guard that it's still what
+// the plain bar (the variant every authenticated screen renders) is styled
+// to, not the taller login-only credits variant.
+describe('HomeFooter height math', () => {
+  it('renders the plain bar at HOME_FOOTER_BAR_HEIGHT', () => {
+    const bar = render(<HomeFooter />).root.findByType(LinearGradient).props.style;
+    expect(bar.height).toBe(HOME_FOOTER_BAR_HEIGHT);
   });
 });

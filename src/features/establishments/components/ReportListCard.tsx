@@ -31,6 +31,14 @@ interface ReportListCardProps {
   selectable?: boolean;
   selected?: boolean;
   onToggleSelect?: (item: AllReportItem) => void;
+  // Set when this row can't currently be picked (no template for its type
+  // yet, or a run is already in flight) — the whole card (the selection
+  // control itself, since there's no separate checkbox) dims and stops
+  // forwarding taps to onToggleSelect. selectDisabledReason additionally
+  // renders as a Badge beside the status chip; a run-in-flight disables
+  // without a reason label.
+  selectDisabled?: boolean;
+  selectDisabledReason?: string;
 }
 
 function formatDate(iso: string): string {
@@ -55,6 +63,8 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
   selectable = false,
   selected = false,
   onToggleSelect,
+  selectDisabled = false,
+  selectDisabledReason,
 }) => {
   const isSubmitted = item.status === 'submitted';
   // `selected` is only meaningful inside selection mode — a stray true
@@ -109,6 +119,7 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
 
   const handleCardPress = () => {
     if (selectable) {
+      if (selectDisabled) return;
       onToggleSelect?.(item);
       return;
     }
@@ -127,31 +138,37 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
 
   return (
     <View style={styles.rowWrap}>
-      {/* Actions revealed behind the card when swiped left */}
-      <View style={styles.swipeActions}>
-        {showEdit && (
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.actionEdit]}
-            onPress={() => handleAction(onEdit)}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel={`Edit ${item.title}`}>
-            <Ionicons name="pencil" size={20} color={Colors.textWhite} />
-            <Text style={styles.actionText}>Edit</Text>
-          </TouchableOpacity>
-        )}
-        {showDelete && (
-          <TouchableOpacity
-            style={[styles.actionBtn, styles.actionDelete]}
-            onPress={() => handleAction(onDelete)}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel={`Delete ${item.title}`}>
-            <Ionicons name="trash-outline" size={20} color={Colors.textWhite} />
-            <Text style={styles.actionText}>Delete</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      {/* Actions revealed behind the card when swiped left. Selection mode
+          already disables the pan gesture that would reveal them (see
+          panGesture above), but a dimmed card (a run in flight, or "No
+          template yet") is translucent enough to let them show through
+          underneath — so they're not rendered at all while selectable. */}
+      {!selectable && (
+        <View style={styles.swipeActions}>
+          {showEdit && (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionEdit]}
+              onPress={() => handleAction(onEdit)}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`Edit ${item.title}`}>
+              <Ionicons name="pencil" size={20} color={Colors.textWhite} />
+              <Text style={styles.actionText}>Edit</Text>
+            </TouchableOpacity>
+          )}
+          {showDelete && (
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionDelete]}
+              onPress={() => handleAction(onDelete)}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={`Delete ${item.title}`}>
+              <Ionicons name="trash-outline" size={20} color={Colors.textWhite} />
+              <Text style={styles.actionText}>Delete</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {/* Foreground card — slides left via gesture to reveal the actions */}
       <GestureDetector gesture={panGesture}>
@@ -161,8 +178,10 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
               styles.card,
               urgency.level === 'overdue' && styles.cardOverdue,
               urgency.level === 'due-soon' && styles.cardDueSoon,
+              selectable && selectDisabled && styles.cardSelectDisabled,
             ]}
             onPress={handleCardPress}
+            disabled={selectable && selectDisabled}
             activeOpacity={0.75}
             accessibilityRole={selectable ? 'checkbox' : 'button'}
             accessibilityLabel={`${item.title} for ${item.estabName}`}
@@ -185,7 +204,7 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
             <View
               style={[
                 styles.iconWrap,
-                { backgroundColor: showAsSelected ? Colors.accent : display?.bgColor ?? Colors.bgLight },
+                { backgroundColor: showAsSelected ? Colors.navy : display?.bgColor ?? Colors.bgLight },
                 // The ring the old checkbox wore. Without it an unselected
                 // tile is indistinguishable from a normal one and nothing
                 // says the row is pickable.
@@ -207,12 +226,19 @@ export const ReportListCard: React.FC<ReportListCardProps> = ({
                   containerStyle={styles.titleContainer}
                 />
                 {/* Filing status only — urgency moved to the corner ribbon,
-                    so this slot no longer has to say two things at once. */}
-                {item.status && (
-                  <Badge
-                    label={isSubmitted ? 'Submitted' : 'Draft'}
-                    tone={isSubmitted ? 'success' : 'warning'}
-                  />
+                    so this slot no longer has to say two things at once.
+                    selectDisabledReason (the Export tab, e.g. "No template
+                    yet") shares the slot rather than adding a new one. */}
+                {(item.status || selectDisabledReason) && (
+                  <View style={styles.statusBadges}>
+                    {item.status && (
+                      <Badge
+                        label={isSubmitted ? 'Submitted' : 'Draft'}
+                        tone={isSubmitted ? 'success' : 'warning'}
+                      />
+                    )}
+                    {selectDisabledReason && <Badge label={selectDisabledReason} tone="neutral" />}
+                  </View>
                 )}
               </View>
 
@@ -385,6 +411,17 @@ const styles = StyleSheet.create({
   cardOverdue: {
     borderColor: Colors.hazwaste.border,
     backgroundColor: Colors.hazwaste.bg,
+  },
+  // The card is the selection control in selectable mode (there's no
+  // separate checkbox), so dimming it is what "the checkbox is rendered
+  // dimmed" means here.
+  cardSelectDisabled: {
+    opacity: 0.4,
+  },
+  statusBadges: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.xs,
   },
   // Colors.border is too faint here to carry the affordance: on device a
   // hairline that colour against a pale type tint is close to invisible, and

@@ -136,6 +136,19 @@ describe('Button 48dp hit target (unchanged by the token migration)', () => {
     expect(flattenStyle(button.props.style).minHeight).toBe(40);
     expect(button.props.hitSlop).toEqual({ top: 4, bottom: 4, left: 4, right: 4 });
   });
+
+  it('stretches a fullWidth button across its parent without a zero flexBasis, so a column parent cannot squash it to minHeight', () => {
+    // `flex: 1` sets flexBasis 0 along the parent's main axis. Every
+    // full-width Generate/Cancel sits in a column, so the button collapsed
+    // to its 40dp minHeight and crushed the 18dp label line box into the
+    // 13dp left after padding and border.
+    const r = render(<Button label="Generate" onPress={() => {}} size="md" fullWidth />);
+    const style = flattenStyle(findButton(r).props.style);
+    expect(style.alignSelf).toBe('stretch');
+    expect(style.flexGrow).toBe(1);
+    expect(style.flex).toBeUndefined();
+    expect(style.flexBasis).toBeUndefined();
+  });
 });
 
 describe('Button behavior (unchanged by the token migration)', () => {

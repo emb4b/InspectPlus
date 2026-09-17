@@ -1,5 +1,6 @@
 import React from 'react';
-import { RefreshControl, Text } from 'react-native';
+import { Dimensions, RefreshControl, ScrollView, Text } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import TestRenderer, { act } from 'react-test-renderer';
 // Imported from its route path — a normal module import, not a file placed
 // inside src/app, so expo-router never treats this test file itself as a
@@ -29,6 +30,15 @@ jest.mock('../../../core/providers/AuthProvider', () => ({
 
 jest.mock('../../../services/sync/syncEvents', () => ({
   subscribeToSyncDataChanged: jest.fn(() => () => {}),
+}));
+
+// The reanimated jest mock (jest.config's moduleNameMapper) predates
+// useReducedMotion, which home.tsx reads through useMotion() to decide
+// whether a tab tap animates the pager — same override Skeleton.test.tsx
+// layers over the mock.
+jest.mock('react-native-reanimated', () => ({
+  ...jest.requireActual('react-native-reanimated'),
+  useReducedMotion: jest.fn(() => false),
 }));
 
 // Prefixed `mock` — babel-plugin-jest-hoist statically rejects any
@@ -87,9 +97,10 @@ jest.mock('../../establishments/components/ExportReportsTab', () => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports -- see comment above
   const ReactLib = require('react');
   return {
-    ExportReportsTab: ReactLib.forwardRef((_props: unknown, ref: unknown) => {
+    ExportReportsTab: ReactLib.forwardRef((props: { focused: boolean; refreshControl: unknown }, ref: unknown) => {
       ReactLib.useImperativeHandle(ref, () => ({ refresh: mockExportReportsRefresh }));
-      return null;
+      // Rendered as host props so tests can read what home.tsx passed.
+      return ReactLib.createElement('ExportStandIn', { focused: props.focused, refreshControl: props.refreshControl });
     }),
   };
 });
@@ -101,11 +112,41 @@ jest.mock('../../establishments/components/ExportReportsTab', () => {
 // renderer created here is unmounted before the test ends.
 let activeRenderer: Renderer | undefined;
 
+// RN's jest preset swaps ScrollView for a class mock whose instance methods
+// (scrollTo among them) are jest.fn()s shared on the prototype — the pager
+// ref home.tsx holds resolves to one of those instances, so this is the spy
+// a tab tap's scrollTo lands on.
+const mockScrollTo = (ScrollView.prototype as unknown as { scrollTo: jest.Mock }).scrollTo;
+
 const render = () => {
   let r!: Renderer;
   act(() => { r = TestRenderer.create(<HomeScreen />); });
   activeRenderer = r;
   return r;
+};
+
+const PAGE_WIDTH = Dimensions.get('window').width;
+
+// The horizontal pager is the one ScrollView home.tsx tags. The Manage
+// pages each wrap their tab in a tagged vertical ScrollView; the Export tab
+// is its own scroller (a FlatList, so a large report set virtualises), so
+// its RefreshControl arrives as a prop instead.
+const findPager = (r: Renderer) =>
+  r.root.find(n => n.props?.testID === 'home-pager' && typeof n.props?.onMomentumScrollEnd === 'function');
+const findPage = (r: Renderer, tab: string) =>
+  r.root.find(n => n.type === ScrollView && n.props?.testID === `home-page-${tab}`);
+const findExportStandIn = (r: Renderer) => r.root.findByType(ExportReportsTab).findByType('ExportStandIn' as never);
+const findRefreshControl = (r: Renderer, tab: string) =>
+  tab === 'exportReports'
+    ? findExportStandIn(r).props.refreshControl
+    : findPage(r, tab).findByType(RefreshControl);
+
+// Simulates the pager settling on a page after a swipe — the only event
+// that moves activeTab from a gesture.
+const settlePagerOn = (r: Renderer, index: number) => {
+  act(() => {
+    findPager(r).props.onMomentumScrollEnd({ nativeEvent: { contentOffset: { x: index * PAGE_WIDTH, y: 0 } } });
+  });
 };
 
 afterEach(() => {
@@ -139,19 +180,20 @@ const switchTab = (r: Renderer, label: string) => {
   act(() => { findTab(r, label).props.onPress(); });
 };
 
-// Exactly one RefreshControl exists in the tree (home.tsx renders it once,
-// wrapping the ScrollView) — `findByType` throws on zero or multiple matches
-// rather than silently resolving the wrong node, same convention as
-// findActiveTabLabel/findTab above. handleRefresh is async, so the resulting
-// promise is awaited inside act() to let its `finally` (setRefreshing(false))
-// settle before the test makes assertions.
-const triggerPullToRefresh = async (r: Renderer) => {
+// Every mounted page carries its own RefreshControl, so the lookup is scoped
+// to the named page — `findByType` still throws on zero or multiple matches
+// within it. handleRefresh is async, so the resulting promise is awaited
+// inside act() to let its `finally` (clearing the refreshing tab) settle
+// before the test makes assertions.
+const triggerPullToRefresh = async (r: Renderer, tab: string) => {
   await act(async () => {
-    await r.root.findByType(RefreshControl).props.onRefresh();
+    await findRefreshControl(r, tab).props.onRefresh();
   });
 };
 
 beforeEach(() => {
+  mockScrollTo.mockClear();
+  (useReducedMotion as jest.Mock).mockReturnValue(false);
   mockManageEstablishmentsRefresh.mockClear();
   mockManageReportsRefresh.mockClear();
   mockExportReportsRefresh.mockClear();
@@ -173,24 +215,27 @@ describe('HomeScreen', () => {
     expect(r.root.findAllByType(ExportReportsTab)).toHaveLength(0);
   });
 
-  it('renders the real ManageEstablishmentsTab when that tab is selected', () => {
+  it('mounts ManageEstablishmentsTab when that tab is selected, keeps the visited Manage Reports page, and leaves Export unmounted', () => {
     const r = render();
-    switchTab(r, 'Manage\nEstablishments');
-    expect(findActiveTabLabel(r)).toBe('Manage\nEstablishments');
+    switchTab(r, 'Manage Establishments');
+    expect(findActiveTabLabel(r)).toBe('Manage Establishments');
     expect(() => r.root.findByType(ManageEstablishmentsTab)).not.toThrow();
-    expect(r.root.findAllByType(ManageReportsTab)).toHaveLength(0);
+    // Pages mount on first visit and stay mounted, so swiping back is
+    // instant and keeps that tab's filters — but a never-visited page
+    // costs nothing, which is what keeps Home's first paint at one query.
+    expect(r.root.findAllByType(ManageReportsTab)).toHaveLength(1);
     expect(r.root.findAllByType(ExportReportsTab)).toHaveLength(0);
   });
 
   it('renders the real ExportReportsTab when the Export tab is selected, not a placeholder', () => {
     const r = render();
-    switchTab(r, 'Export Inspection\nReports');
-    expect(findActiveTabLabel(r)).toBe('Export Inspection\nReports');
+    switchTab(r, 'Export Inspection Reports');
+    expect(findActiveTabLabel(r)).toBe('Export Inspection Reports');
 
     // Proves home.tsx now mounts the actual ExportReportsTab component built
     // in the prior task, not a stand-in reimplementation.
     expect(() => r.root.findByType(ExportReportsTab)).not.toThrow();
-    expect(r.root.findAllByType(ManageReportsTab)).toHaveLength(0);
+    expect(r.root.findAllByType(ManageReportsTab)).toHaveLength(1);
     expect(r.root.findAllByType(ManageEstablishmentsTab)).toHaveLength(0);
 
     // The retired interim placeholder ("Export is coming next.") rendered an
@@ -202,7 +247,7 @@ describe('HomeScreen', () => {
   describe('pull-to-refresh', () => {
     it('refreshes Manage Reports via its handle when that tab is active (the default)', async () => {
       const r = render();
-      await triggerPullToRefresh(r);
+      await triggerPullToRefresh(r, 'manageReports');
 
       expect(mockManageReportsRefresh).toHaveBeenCalledTimes(1);
       expect(mockManageEstablishmentsRefresh).not.toHaveBeenCalled();
@@ -214,9 +259,9 @@ describe('HomeScreen', () => {
     // settled back without ever calling anything.
     it('refreshes the Export tab via its handle when that tab is active, and does not call the other tabs handles', async () => {
       const r = render();
-      switchTab(r, 'Export Inspection\nReports');
+      switchTab(r, 'Export Inspection Reports');
 
-      await triggerPullToRefresh(r);
+      await triggerPullToRefresh(r, 'exportReports');
 
       expect(mockExportReportsRefresh).toHaveBeenCalledTimes(1);
       expect(mockManageReportsRefresh).not.toHaveBeenCalled();
@@ -225,9 +270,9 @@ describe('HomeScreen', () => {
 
     it('refreshes Manage Establishments via its handle when that tab is active', async () => {
       const r = render();
-      switchTab(r, 'Manage\nEstablishments');
+      switchTab(r, 'Manage Establishments');
 
-      await triggerPullToRefresh(r);
+      await triggerPullToRefresh(r, 'manageEstablishments');
 
       expect(mockManageEstablishmentsRefresh).toHaveBeenCalledTimes(1);
       expect(mockManageReportsRefresh).not.toHaveBeenCalled();
@@ -237,13 +282,13 @@ describe('HomeScreen', () => {
 
   describe('sync-data-changed subscription', () => {
     // A background sync can complete while Home is open on any of the three
-    // tabs. Only the active tab is actually mounted (renderTab() is a
-    // switch), so only its ref is non-null — but the subscription callback
-    // unconditionally calls all three refs, and this asserts the Export
-    // tab's is now one of them (previously it was omitted entirely).
+    // tabs. Only visited pages are mounted, so only their refs are non-null
+    // — but the subscription callback unconditionally calls all three refs,
+    // and this asserts the Export tab's is now one of them (previously it
+    // was omitted entirely).
     it('refreshes the Export tab when a sync completes while it is the active tab', () => {
       const r = render();
-      switchTab(r, 'Export Inspection\nReports');
+      switchTab(r, 'Export Inspection Reports');
 
       const syncCallback = (subscribeToSyncDataChanged as jest.Mock).mock.calls[0][0];
       act(() => { syncCallback(); });
@@ -258,6 +303,74 @@ describe('HomeScreen', () => {
       act(() => { syncCallback(); });
 
       expect(mockManageReportsRefresh).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('swipe pager', () => {
+    it('lays the three tabs out as pages of a horizontal, paging ScrollView', () => {
+      const pager = findPager(render());
+      expect(pager.props.horizontal).toBe(true);
+      expect(pager.props.pagingEnabled).toBe(true);
+    });
+
+    it('makes the tab the pager settles on active, so a swipe moves the tab bar', () => {
+      const r = render();
+      settlePagerOn(r, 2);
+      expect(findActiveTabLabel(r)).toBe('Export Inspection Reports');
+      expect(() => r.root.findByType(ExportReportsTab)).not.toThrow();
+    });
+
+    it('mounts the neighbouring pages as soon as a drag starts, so the swipe reveals content rather than a blank page', () => {
+      const r = render();
+      expect(r.root.findAllByType(ManageEstablishmentsTab)).toHaveLength(0);
+      act(() => { findPager(r).props.onScrollBeginDrag(); });
+      expect(r.root.findAllByType(ManageEstablishmentsTab)).toHaveLength(1);
+      // Two pages away is not a neighbour of the first page.
+      expect(r.root.findAllByType(ExportReportsTab)).toHaveLength(0);
+    });
+
+    it('scrolls the pager to the tapped tab, animated', () => {
+      const r = render();
+      switchTab(r, 'Export Inspection Reports');
+      expect(mockScrollTo).toHaveBeenCalledWith({ x: 2 * PAGE_WIDTH, y: 0, animated: true });
+    });
+
+    it('jumps rather than animates the pager under reduced motion', () => {
+      (useReducedMotion as jest.Mock).mockReturnValue(true);
+      const r = render();
+      switchTab(r, 'Manage Establishments');
+      expect(mockScrollTo).toHaveBeenCalledWith({ x: PAGE_WIDTH, y: 0, animated: false });
+    });
+  });
+
+  describe('Export page scroller', () => {
+    it('does not wrap the Export tab in a ScrollView — a FlatList inside one would never virtualise', () => {
+      const r = render();
+      switchTab(r, 'Export Inspection Reports');
+      expect(r.root.findAll(n => n.type === ScrollView && n.props?.testID === 'home-page-exportReports')).toHaveLength(0);
+      const refreshControl = findRefreshControl(r, 'exportReports');
+      expect(refreshControl.type).toBe(RefreshControl);
+      expect(refreshControl.props.refreshing).toBe(false);
+    });
+  });
+
+  describe('Export tab focus', () => {
+    // ExportReportsTab pins its selection bar through useScreenFooter; once
+    // pages stay mounted, an unfocused Export page must not keep that bar
+    // over the other tabs.
+    const exportFocused = (r: Renderer) => findExportStandIn(r).props.focused;
+
+    it('tells the Export tab it is focused while it is the active page', () => {
+      const r = render();
+      switchTab(r, 'Export Inspection Reports');
+      expect(exportFocused(r)).toBe(true);
+    });
+
+    it('tells the Export tab it is unfocused once another page is active again', () => {
+      const r = render();
+      switchTab(r, 'Export Inspection Reports');
+      switchTab(r, 'Manage Reports');
+      expect(exportFocused(r)).toBe(false);
     });
   });
 });

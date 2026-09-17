@@ -1,7 +1,7 @@
 # Export Inspection Report — Design
 
 **Date:** 2026-09-15
-**Status:** Approved, awaiting implementation plan
+**Status:** Implemented — see docs/superpowers/plans/2026-09-15-export-inspection-report.md
 **Supersedes:** the "out of scope" note on document generation in
 `2026-09-03-modern-ui-harmony-design.md`
 
@@ -22,8 +22,8 @@ several.
 | How the engine finds fields | Merge tags inserted into the templates (tagged copies checked in) — not positional lookup |
 | Data outgrowing the printed rows | Row loops grow to fit, padded with blank rows up to the form's printed count so a sparse report still looks like the form |
 | After Generate | OS share sheet (`expo-sharing`); nothing kept in the app beyond a cache cleared on the next run |
-| Photos | Embedded on the ATTACHMENTS page, 2 per row, with caption; a photo not on the device prints as its filename + "(not downloaded)" |
-| Signature block | Inspector/supervisor name + position asked in an on-device sheet and remembered; approvers stay as printed. Behind a `SignatoryProvider` seam so the future admin-defined chain of command replaces the storage, not the engine |
+| Photos | Embedded on the ATTACHMENTS page, 2 per row, captioned "Figure N" (1-based across the report) plus the inspector's own caption when given; a photo not on the device prints "(photo not downloaded)" under its figure caption |
+| Signature block | Inspector/supervisor name + position, the recommending/approving signatories, and any number of additional inspectors under "Submitted by", all asked in an on-device sheet. Inspector/supervisor/additional-inspectors are one value shared across every report type; the recommending/approving signatories are remembered PER report type (keyed the same way `templateFor` looks templates up) and default to that type's own printed names (see `defaultApproversFor` in `features/export/templates/index.ts`) — editing the approvers for a Water export never changes what a Hazwaste export prefills, or vice versa. Behind a `SignatoryProvider` seam so the future admin-defined chain of command replaces the storage, not the engine |
 | Scope of mapping | Water end-to-end. The other four templates get the shared sections (General Information, Purpose, DENR Permits, Documents Reviewed, signatures, ATTACHMENTS) tagged and mapped now; their type-specific sections are tagged and mapped when each form is built, since only the Water form exists in the app today |
 | Engine | docxtemplater + pizzip on-device (both MIT, pure JS, Hermes-safe). Image support decided by the spike: the MIT community image module if it holds up, otherwise a small post-pass of our own. Server-side rendering rejected — the app is offline-first |
 
@@ -63,9 +63,9 @@ src/features/export/
 - **Checkboxes:** every `w14:checkbox` content control is replaced by a plain run with the same run properties and the text `{cb_<name>}`. The mapper emits `☒` (U+2612) or `☐` (U+2610). Survey's legacy `FORMCHECKBOX` fields and `__ Label` blanks are converted the same way. Radio-style groups are independent checkboxes; the mapper guarantees at most one is ticked.
 - **Repeating rows:** the first data row carries `{#rows_name}` at the start of its first cell and `{/rows_name}` at the end of its last cell; the other printed blank rows are deleted. The mapper pads with blank records up to the printed count (`padRows(items, min)`; each table's `min` is recorded next to the tag in the `.tags.md`). Fixed-label tables (Summary of Findings, Water Sources, DENR Permits) are not looped — each printed row has its own tags so the legal text stays exactly as printed.
 - **Free text:** plain tags; multi-line fields (remarks, observations) use docxtemplater's `linebreaks: true` so `\n` renders as a line break.
-- **Photos:** the ATTACHMENTS page gets one 2-column table with `{#photos}` … image tag … `{caption}` … `{/photos}`. The image tag's exact form follows the spike.
+- **Photos:** the ATTACHMENTS page gets a two-per-row layout: `{#photo_rows}{#left}` … `{@photo_drawing}` … `{caption}` … `{/left}{#right}` … `{@photo_drawing}` … `{caption}` … `{/right}{/photo_rows}`, one row of the loop per pair of photos. The ATTACHMENTS heading paragraph carries `pageBreakBefore` so the photos start on their own page, after the signature block.
 - **Untouched:** headers/footers, the pre-printed approver names, all legal reference text, styling.
-- **Tooling:** `scripts/docx-template.js` unpacks a `.docx` to a folder and packs it back, so `word/document.xml` can be edited directly. Every tagged template has a sibling `assets/templates/<name>.tags.md` listing each tag, its meaning, and each loop's minimum row count.
+- **Tooling:** `scripts/docx-tag.js` inserts merge tags into an EMB `.docx` from a JSON recipe (`npm run tag-templates` runs it against every template). The untagged originals live in `assets/templates/originals/`; each template's recipe (coordinates, tag names, loop minimums) lives in `assets/templates/recipes/`. Every tagged template has a sibling `assets/templates/<name>.tags.md` listing each tag, its meaning, and each loop's minimum row count.
 
 ## Data mapping
 
@@ -76,8 +76,8 @@ src/features/export/
 - **Purpose:** `purpose_cb_verify`, `purpose_cb_compliance`, `purpose_cb_complaints`, `purpose_cb_commitments`, `purpose_cb_others` from the booleans. Verify sub-table New/Renewal checkboxes from `verify_info_list[item_key].status`. Commitments sub-list checkboxes from `check_commitments_list`. `purpose_others` text.
 - **DENR Permits:** fixed-label rows keyed by `(envi_law, permit_type)`; `permitsSnapshot` is matched to the printed labels, ECC 1/2/3 taking the first three PD 1586 entries in order. Unmatched permits go into a padded loop appended under the last printed row so nothing is dropped silently.
 - **Documents reviewed:** a checkbox per printed option from `documentsReviewed[]`; an entry not in the printed list goes in the Others blank.
-- **Signatures:** `sig_inspector_name`, `sig_inspector_position`, `sig_supervisor_name`, `sig_supervisor_position` from `SignatoryProvider`.
-- **Photos:** `photos[]` = `{ image, caption }` ordered by `capturedAt`; caption is `caption ?? fileName` followed by the geotag when present.
+- **Signatures:** `sig_inspector_name`, `sig_inspector_position`, `sig_supervisor_name`, `sig_supervisor_position`, `sig_recommending_name`, `sig_recommending_position`, `sig_approver_name`, `sig_approver_position` from `SignatoryProvider`. `sig_inspectors[]` (`sig_inspector_name`, `sig_inspector_position`) loops the primary inspector plus any additional ones under "Submitted by" whose name isn't blank — min 1 row (the primary inspector always appears).
+- **Photos:** `photos[]` = `{ image, caption }` ordered by `capturedAt`; caption is `Figure N: <caption>` (1-based across the report) when the inspector gave one, else just `Figure N`. A photo not on the device prints `(photo not downloaded)` in place of the drawing, under its figure caption.
 
 ### Water block (`mappers/water.ts`)
 
@@ -101,7 +101,7 @@ null → `''`; an unknown `YnValue` → no box ticked; a JSON row missing fields
 
 ## UI flow
 
-- **Untemplated types** (`hazwaste_tsd`): the card shows a "No template yet" badge and is not selectable; Select all skips it.
+- **Untemplated types** (`hazwaste_tsd`): the card shows a "No template yet" badge and is not selectable; Select all skips it. Both hazwaste create paths currently store `report_type = 'hazardous_waste'` (see `src/constants/reportTypeDisplay.ts`), so this guard is latent until the TSD form gets its own storage key.
 - **Generate** opens the signatory sheet (same style as `ReportFilterSheet`): inspector name (prefilled from the profile's `fullName`), inspector position, supervisor name, supervisor position. Values persist under `export.signatories`; the sheet's confirm is the real Generate.
 - **Progress:** the selection bar becomes a progress row — "Generating 2 of 5 — <establishment>", a determinate bar, and Cancel (stops after the current report). Selection and filters are locked. Reports render sequentially to keep peak memory low.
 - **Completion:** the OS share sheet opens with the `.docx` or `.zip`. Dismissing it returns to the tab with the selection intact. A toast reports skipped photos ("3 photos weren't downloaded").

@@ -436,7 +436,7 @@ describe('ReportListCard selection mode', () => {
     );
     const tile = flattenStyle(findIconWrap(r).props.style);
     expect(tile.borderWidth).toBeUndefined();
-    expect(tile.backgroundColor).not.toBe(Colors.accent);
+    expect(tile.backgroundColor).not.toBe(Colors.navy);
     expect(findCheckmarkIcons(r)).toHaveLength(0);
   });
 
@@ -452,16 +452,16 @@ describe('ReportListCard selection mode', () => {
     // tint, confirmed on device, and the ring is the only thing saying the
     // row is pickable.
     expect(tile.borderColor).toBe(Colors.textLight);
-    expect(tile.backgroundColor).not.toBe(Colors.accent);
+    expect(tile.backgroundColor).not.toBe(Colors.navy);
     expect(findCheckmarkIcons(r)).toHaveLength(0);
     expect(findReportIcon(r)).toBeDefined();
   });
 
-  it('flips the tile to an accent checkmark when selected', () => {
+  it('flips the tile to a navy checkmark when selected — the same fill as every other filled control', () => {
     const r = renderSelectable(true);
     const tile = flattenStyle(findIconWrap(r).props.style);
 
-    expect(tile.backgroundColor).toBe(Colors.accent);
+    expect(tile.backgroundColor).toBe(Colors.navy);
     expect(findCheckmarkIcons(r)).toHaveLength(1);
     // The ring would double up with the filled state.
     expect(tile.borderWidth).toBeUndefined();
@@ -514,6 +514,32 @@ describe('ReportListCard selection mode', () => {
     expect(onPress).not.toHaveBeenCalled();
   });
 
+  it('renders a disabled selector with the reason and ignores taps', () => {
+    const onToggleSelect = jest.fn();
+    let r!: TestRenderer.ReactTestRenderer;
+    TestRenderer.act(() => {
+      r = TestRenderer.create(
+        <ReportListCard
+          item={ownedDraftInspection}
+          currentUid="uid-1"
+          canManageAll={false}
+          onPress={noop}
+          onEdit={noop}
+          onDelete={noop}
+          selectable
+          selectDisabled
+          selectDisabledReason="No template yet"
+          onToggleSelect={onToggleSelect}
+        />,
+      );
+    });
+    expect(JSON.stringify(r.toJSON())).toContain('No template yet');
+    TestRenderer.act(() => {
+      findCard(r, ownedDraftInspection).props.onPress();
+    });
+    expect(onToggleSelect).not.toHaveBeenCalled();
+  });
+
   it('exposes accessibilityRole="button" and no accessibilityState when not selectable', () => {
     const r = render(
       <ReportListCard item={ownedDraftInspection} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
@@ -557,6 +583,36 @@ describe('ReportListCard selection mode', () => {
       />,
     );
     expect(findCard(r, ownedDraftInspection).props.accessibilityState).toEqual({ checked: false });
+  });
+});
+
+describe('ReportListCard swipe actions hidden while selecting', () => {
+  // ownedDraftInspection has both showEdit and showDelete true, so this is
+  // the exact case where a dimmed selectable card (or the "No template yet"
+  // one) could otherwise let the Edit/Delete buttons show through behind it.
+  it('renders neither Edit nor Delete when selectable', () => {
+    const r = render(
+      <ReportListCard
+        item={ownedDraftInspection}
+        currentUid="uid-1"
+        canManageAll={false}
+        selectable
+        onPress={noop}
+        onEdit={noop}
+        onDelete={noop}
+        onToggleSelect={noop}
+      />,
+    );
+    expect(findEditButtons(r, ownedDraftInspection)).toHaveLength(0);
+    expect(findDeleteButtons(r, ownedDraftInspection)).toHaveLength(0);
+  });
+
+  it('still renders Edit and Delete for the same owned draft report when not selectable', () => {
+    const r = render(
+      <ReportListCard item={ownedDraftInspection} currentUid="uid-1" canManageAll={false} onPress={noop} onEdit={noop} onDelete={noop} />,
+    );
+    expect(findEditButtons(r, ownedDraftInspection)).toHaveLength(1);
+    expect(findDeleteButtons(r, ownedDraftInspection)).toHaveLength(1);
   });
 });
 

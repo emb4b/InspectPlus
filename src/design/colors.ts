@@ -5,10 +5,6 @@ export const Colors = {
   green: '#1a9e45',
   greenLight: '#4ade80',
   greenMuted: '#d1fae5',
-  // The active-tab underline color. It shipped as a bare '#5b4fcf' inside
-  // HomeTabs and existed nowhere else in the palette — named here so the one
-  // place it's used isn't the definition of it.
-  accent: '#5b4fcf',
 
   // Backgrounds
   white: '#ffffff',

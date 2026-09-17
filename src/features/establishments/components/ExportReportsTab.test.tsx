@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity } from 'react-native';
+import { FlatList, RefreshControl, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 import type { AllReportItem } from '../hooks/useEstablishment';
 import type { UseReportBrowserReturn } from '../hooks/useReportBrowser';
@@ -7,6 +7,8 @@ import { Badge } from '../../../components/Badge';
 import { Button } from '../../../components/Button';
 import { EmptyState } from '../../../components/EmptyState';
 import { Skeleton } from '../../../components/Skeleton';
+import { Colors } from '../../../design/colors';
+import { GENERATE_BOTTOM_GAP } from '../../export/exportLayout';
 // Imported here at the top rather than after the jest.mock() calls below
 // (as the brief originally had it): babel-plugin-jest-hoist hoists every
 // jest.mock() call to the top of the module regardless of where it's
@@ -16,6 +18,35 @@ import { Skeleton } from '../../../components/Skeleton';
 // import/first rule requires it.
 import { ExportReportsTab, ExportReportsTabHandle } from './ExportReportsTab';
 import { ReportListCard } from './ReportListCard';
+import { SignatorySheet } from '../../export/components/SignatorySheet';
+import { ExportProgressBar } from '../../export/components/ExportProgressBar';
+
+const mockStart = jest.fn();
+const mockCancel = jest.fn();
+const mockReset = jest.fn();
+let mockPhase: { status: string; [k: string]: unknown } = { status: 'idle' };
+jest.mock('../../export/hooks/useExportReports', () => ({
+  useExportReports: () => ({ phase: mockPhase, start: mockStart, cancel: mockCancel, reset: mockReset }),
+}));
+jest.mock('../../export/templates', () => ({
+  hasTemplate: (_kind: string, type: string) => type !== 'hazwaste_tsd',
+}));
+const mockSignatoryLoad = jest.fn();
+const mockSignatoryLoadFor = jest.fn();
+const mockSignatorySave = jest.fn();
+jest.mock('../../export/signatories', () => ({
+  asyncStorageSignatoryProvider: {
+    load: () => mockSignatoryLoad(),
+    loadFor: (kind: string, reportType: string) => mockSignatoryLoadFor(kind, reportType),
+    save: (s: unknown, kind: string, reportType: string) => mockSignatorySave(s, kind, reportType),
+  },
+  emptySignatories: (name: string | null) => ({
+    inspectorName: name ?? '', inspectorPosition: '', supervisorName: '', supervisorPosition: '',
+    recommendingName: 'Default Rec', recommendingPosition: 'Default Rec Position',
+    approverName: 'Default App', approverPosition: 'Default App Position',
+    additionalInspectors: [],
+  }),
+}));
 
 // ExportReportsTab renders the real ReportListCard, which pulls in
 // confirmResolveConflict -> the WatermelonDB sync adapter chain, which
@@ -46,6 +77,13 @@ jest.mock('react-native-reanimated', () => ({
   ...jest.requireActual('react-native-reanimated'),
   useReducedMotion: () => false,
 }));
+
+// The real SignatorySheet (rendered here, not mocked) reads
+// useSafeAreaInsets — the library ships its own jest mock, but nothing
+// wires it in automatically the way jest-expo does for some other native
+// modules.
+// eslint-disable-next-line @typescript-eslint/no-require-imports -- factory can't close over top-level imports (babel-plugin-jest-hoist)
+jest.mock('react-native-safe-area-context', () => require('react-native-safe-area-context/jest/mock').default);
 
 // Prefixed `mock` — babel-plugin-jest-hoist hoists every jest.mock() call to
 // the top of the file, ahead of ordinary top-level declarations, and
@@ -139,7 +177,13 @@ jest.mock('../../home/context/FabVisibilityContext', () => {
 });
 
 jest.mock('../../../core/providers/AuthProvider', () => ({
-  useAuthContext: () => ({ municipalities: [], session: { user: { id: 'u1' } }, role: 'Inspector' }),
+  useAuthContext: () => ({
+    municipalities: [],
+    session: { user: { id: 'u1' } },
+    role: 'Inspector',
+    fullName: 'Juan Dela Cruz',
+    province: 'P',
+  }),
 }));
 
 // canManageAllRecords is the only runtime import ExportReportsTab takes from
@@ -215,6 +259,15 @@ const flattenText = (node: JsonNode | JsonNode[] | null): string => {
 };
 const footerFlatText = (): string => flattenText(renderFooter().toJSON());
 
+// Flatten a StyleProp (single object or array) into a single resolved style
+// object — same convention as Card.test.tsx's helper of the same name.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const flattenStyle = (style: any): any => {
+  if (!style) return {};
+  if (Array.isArray(style)) return style.reduce((acc, s) => ({ ...acc, ...(s || {}) }), {});
+  return style;
+};
+
 // RN's own TouchableOpacity module is a thin wrapper that spreads every prop
 // it receives onto an inner, unexported class component of the same
 // displayName, so a props-only predicate (matching just accessibilityLabel)
@@ -241,6 +294,42 @@ describe('ExportReportsTab', () => {
     mockUseReportBrowser.mockImplementation(() => makeBrowserReturn());
   });
 
+  // The Manage tabs page their lists five at a time; Export needs the whole
+  // filtered set on screen for "select all" to mean anything, so its rows go
+  // through a FlatList — only the visible window is ever mounted, however
+  // many reports the local database accumulates.
+  describe('virtualised list', () => {
+    it('feeds the filtered reports to a FlatList keyed by report key', () => {
+      const list = render().root.findByType(FlatList);
+      expect(list.props.data).toBe(mockReports);
+      expect(list.props.keyExtractor(mockReports[1])).toBe('inspection-r2');
+    });
+
+    it('keeps the search row and the select-all header inside the list header, so they scroll with the rows', () => {
+      const list = render().root.findByType(FlatList);
+      let header!: Renderer;
+      act(() => { header = TestRenderer.create(list.props.ListHeaderComponent); });
+      // TextInput forwards its props onto a host node of the same name, so
+      // the composite is matched by type to count it once.
+      expect(header.root.findAllByType(TextInput).map(n => n.props.placeholder)).toEqual(['Search by establishment name...']);
+      expect(header.root.findAllByType(TouchableOpacity).map(n => n.props.accessibilityLabel)).toContain('Select all reports');
+    });
+
+    it('is its own scroller: the RefreshControl Home hands it lands on the FlatList', () => {
+      const refreshControl = <RefreshControl refreshing={false} onRefresh={() => {}} />;
+      let r!: Renderer;
+      act(() => { r = TestRenderer.create(<ExportReportsTab refreshControl={refreshControl} />); });
+      expect(r.root.findByType(FlatList).props.refreshControl).toBe(refreshControl);
+    });
+
+    it('renders the empty state through the list, not around it', () => {
+      mockUseReportBrowser.mockImplementation(() => makeBrowserReturn({ reports: [] }));
+      const r = render();
+      expect(r.root.findByType(FlatList).props.ListEmptyComponent).toBeTruthy();
+      expect(() => r.root.findByType(EmptyState)).not.toThrow();
+    });
+  });
+
   it('renders every filtered report as a selectable row', () => {
     const r = render();
     const cards = r.root.findAllByType(ReportListCard);
@@ -253,49 +342,38 @@ describe('ExportReportsTab', () => {
     expect(mockRegisteredFooter).toBeNull();
   });
 
+  // Home keeps visited pages mounted so a swipe back is instant, which
+  // means this tab can be alive while another page is showing — its
+  // selection bar must not stay pinned over that page.
+  it('registers no selection bar while unfocused, even with a selection, and restores it on focus', () => {
+    let r!: Renderer;
+    act(() => { r = TestRenderer.create(<ExportReportsTab focused={false} />); });
+    selectRow(r, 0);
+    expect(mockRegisteredFooter).toBeNull();
+
+    act(() => { r.update(<ExportReportsTab focused />); });
+    expect(footerText()).toContain('1 selected');
+  });
+
+  it('colours Select all in the brand green like the form tabs, not a purple accent', () => {
+    const r = render();
+    const label = findSelectAllToggle(r).findByType(Text);
+    expect(flattenStyle(label.props.style).color).toBe(Colors.green);
+  });
+
   it('reports the selected count once a row is ticked', () => {
     const r = render();
     selectRow(r, 0);
     expect(footerText()).toContain('1 selected');
   });
 
-  describe('the Generate button', () => {
-    // The most important assertion in this task: Generate must render
-    // disabled with copy explaining why, never as a live-looking control that
-    // silently does nothing — document generation is a separate spec/spike
-    // not part of this branch. A future refactor that accidentally enables it
-    // must fail this test.
-    it('renders disabled, with copy saying document generation is not available yet', () => {
-      const r = render();
-      selectRow(r, 0);
-
-      const footer = renderFooter();
-      const generateButton = footer.root.findByType(Button);
-      expect(generateButton.props.label).toBe('Generate');
-      expect(generateButton.props.disabled).toBe(true);
-
-      // Button.tsx computes accessibilityState.disabled from the `disabled`
-      // prop it was given (`isInactive = disabled || loading`) and sets it on
-      // the TouchableOpacity it renders internally — asserting that resolved,
-      // screen-reader-visible value too, not just the prop ExportReportsTab
-      // passed in, so a future rewrite of that computation can't quietly stop
-      // propagating it.
-      const innerTouchable = generateButton.findByType(TouchableOpacity);
-      expect(innerTouchable.props.accessibilityState).toEqual({ disabled: true, busy: false });
-      expect(innerTouchable.props.disabled).toBe(true);
-
-      expect(JSON.stringify(footer.toJSON())).toContain(
-        'Document generation arrives in a future release.',
-      );
-    });
-
-    it('stays disabled regardless of how many reports are selected', () => {
-      const r = render();
-      act(() => { findSelectAllToggle(r).props.onPress(); });
-
-      const generateButton = renderFooter().root.findByType(Button);
-      expect(generateButton.props.disabled).toBe(true);
-    });
+  it('gives the selection bar GENERATE_BOTTOM_GAP of paddingBottom, so its Generate button lands at the same height as the sheet\'s', () => {
+    const r = render();
+    selectRow(r, 0);
+    const bar = renderFooter().root.find(
+      n => n.type === View && flattenStyle(n.props.style).borderTopColor === Colors.border,
+    );
+    expect(flattenStyle(bar.props.style).paddingBottom).toBe(GENERATE_BOTTOM_GAP);
   });
 
   describe('draft warning reflects the SELECTED reports, not the visible list', () => {
@@ -439,5 +517,271 @@ describe('ExportReportsTab', () => {
 
       expect(mockRefetch).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+// A full Signatories row, as loadFor would resolve it — used as the
+// default mockSignatoryLoadFor return so any test that doesn't care about
+// prefill specifics still gets a well-formed value.
+const blankLoadForResult = {
+  inspectorName: '', inspectorPosition: '', supervisorName: '', supervisorPosition: '',
+  recommendingName: 'Def Rec', recommendingPosition: 'Def RecPos', approverName: 'Def App', approverPosition: 'Def AppPos',
+  additionalInspectors: [],
+};
+
+describe('the Generate flow', () => {
+  beforeEach(() => {
+    mockPhase = { status: 'idle' };
+    mockStart.mockReset();
+    mockSignatoryLoad.mockResolvedValue(null);
+    mockSignatoryLoadFor.mockReset();
+    mockSignatoryLoadFor.mockResolvedValue(blankLoadForResult);
+    mockSignatorySave.mockReset();
+    mockCancel.mockReset();
+    mockReset.mockReset();
+    mockUseReportBrowser.mockReset();
+    mockUseReportBrowser.mockImplementation(() => makeBrowserReturn());
+  });
+
+  it('is enabled once something is selected and opens the signatory sheet, prefilled from the profile name when nothing was ever saved', async () => {
+    const r = render();
+    selectRow(r, 0);
+    const generate = renderFooter().root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
+    expect(generate.props.disabled).toBe(false);
+    await act(async () => { generate.props.onPress(); });
+    const sheet = r.root.findByType(SignatorySheet);
+    expect(sheet.props.visible).toBe(true);
+    expect(sheet.props.initial.inspectorName).toBe('Juan Dela Cruz');
+    // r1 (the only selected report) is water_monitoring.
+    expect(mockSignatoryLoadFor).toHaveBeenCalledWith('inspection', 'water_monitoring');
+  });
+
+  it('prefills the sheet from the signatories remembered for the FIRST selected item\'s report type', async () => {
+    mockSignatoryLoadFor.mockResolvedValue({ ...blankLoadForResult, inspectorName: 'Saved', recommendingName: 'Saved Rec' });
+    const r = render();
+    selectRow(r, 0); // r1: water_monitoring
+    // renderFooter() (below) already wraps its own TestRenderer.create() in
+    // its own act() — nesting a second, outer act() around that call (as an
+    // earlier draft of this test did, mirroring the brief's snippet) made
+    // react-test-renderer report "Can't access .root on unmounted test
+    // renderer" on the very next access in this test environment. Fetching
+    // the button reference outside any act(), then invoking onPress() inside
+    // a single act() (matching the pattern the "is enabled once something is
+    // selected" test above already uses successfully), avoids the nesting.
+    const generate = renderFooter().root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
+    await act(async () => { generate.props.onPress(); });
+    expect(r.root.findByType(SignatorySheet).props.initial.inspectorName).toBe('Saved');
+    expect(r.root.findByType(SignatorySheet).props.initial.recommendingName).toBe('Saved Rec');
+    expect(mockSignatoryLoadFor).toHaveBeenCalledWith('inspection', 'water_monitoring');
+  });
+
+  it('prefills from the air_monitoring type when that is the first selected item, not water', async () => {
+    mockSignatoryLoadFor.mockImplementation((kind: string, reportType: string) =>
+      Promise.resolve({ ...blankLoadForResult, inspectorName: `${kind}:${reportType}` }));
+    const r = render();
+    selectRow(r, 1); // r2: air_monitoring
+    const generate = renderFooter().root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
+    await act(async () => { generate.props.onPress(); });
+    expect(mockSignatoryLoadFor).toHaveBeenCalledWith('inspection', 'air_monitoring');
+    expect(r.root.findByType(SignatorySheet).props.initial.inspectorName).toBe('inspection:air_monitoring');
+  });
+
+  it('does not flag mixedTypes for a single-type selection, but does once the selection spans two types', async () => {
+    const r = render();
+    selectRow(r, 0); // water_monitoring only
+    let generate = renderFooter().root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
+    await act(async () => { generate.props.onPress(); });
+    expect(r.root.findByType(SignatorySheet).props.mixedTypes).toBe(false);
+    await act(async () => { r.root.findByType(SignatorySheet).props.onCancel(); });
+
+    selectRow(r, 1); // now both water_monitoring and air_monitoring are selected
+    generate = renderFooter().root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
+    await act(async () => { generate.props.onPress(); });
+    expect(r.root.findByType(SignatorySheet).props.mixedTypes).toBe(true);
+  });
+
+  it('confirming the sheet saves the signatories under the run\'s report type and starts the run with the selected items', async () => {
+    const r = render();
+    selectRow(r, 0);
+    // See the note in the previous test: renderFooter() must not be called
+    // from inside another act() callback.
+    const generate = renderFooter().root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
+    await act(async () => { generate.props.onPress(); });
+    const s = { inspectorName: 'J', inspectorPosition: 'E', supervisorName: 'M', supervisorPosition: 'C', recommendingName: 'R', recommendingPosition: 'RP', approverName: 'AP', approverPosition: 'APP', additionalInspectors: [] };
+    await act(async () => { r.root.findByType(SignatorySheet).props.onConfirm(s); });
+    expect(mockSignatorySave).toHaveBeenCalledWith(s, 'inspection', 'water_monitoring');
+    expect(mockStart).toHaveBeenCalledWith(
+      [{ key: 'inspection-r1', kind: 'inspection', reportId: 'r1', reportType: 'water_monitoring', title: 'Water Monitoring', estabName: 'Alpha Corp', date: '2026-08-01' }],
+      s,
+    );
+    expect(r.root.findByType(SignatorySheet).props.visible).toBe(false);
+  });
+
+  it('still starts the run even if remembering the signatories fails', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockSignatorySave.mockRejectedValueOnce(new Error('quota'));
+    const r = render();
+    selectRow(r, 0);
+    const generate = renderFooter().root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
+    await act(async () => { generate.props.onPress(); });
+    const s = { inspectorName: 'J', inspectorPosition: 'E', supervisorName: 'M', supervisorPosition: 'C', recommendingName: 'R', recommendingPosition: 'RP', approverName: 'AP', approverPosition: 'APP', additionalInspectors: [] };
+    // The rejection must not escape as an unhandled promise rejection — this
+    // await/act only resolves cleanly if runExport's own try/catch actually
+    // caught it.
+    await act(async () => { r.root.findByType(SignatorySheet).props.onConfirm(s); });
+    expect(mockStart).toHaveBeenCalledWith(
+      [{ key: 'inspection-r1', kind: 'inspection', reportId: 'r1', reportType: 'water_monitoring', title: 'Water Monitoring', estabName: 'Alpha Corp', date: '2026-08-01' }],
+      s,
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('shows the progress bar instead of the selection bar while running, and Cancel cancels', () => {
+    mockPhase = { status: 'running', progress: { index: 1, total: 2, title: 'Alpha Corp', fraction: 0.3 } };
+    const r = render();
+    selectRow(r, 0);
+    const footer = renderFooter();
+    expect(footer.root.findAllByType(ExportProgressBar)).toHaveLength(1);
+    expect(JSON.stringify(footer.toJSON())).toContain('Generating 1 of 2');
+    act(() => footer.root.findByType(ExportProgressBar).props.onCancel());
+    expect(mockCancel).toHaveBeenCalled();
+  });
+
+  it('fills the track from the run fraction, not from the count of finished items', () => {
+    // A single-report export never has a finished item while running, so a
+    // completed-count bar sat at 0% for the whole run.
+    mockPhase = { status: 'running', progress: { index: 1, total: 1, title: 'Alpha Corp', fraction: 0.6 } };
+    const r = render();
+    selectRow(r, 0);
+    const fill = renderFooter().root.find(
+      n => n.type === View && flattenStyle(n.props.style).backgroundColor === Colors.green && typeof flattenStyle(n.props.style).width === 'string',
+    );
+    expect(flattenStyle(fill.props.style).width).toBe('60%');
+  });
+
+  it('freezes Select all while a run is in flight, and dims the control', () => {
+    mockPhase = { status: 'running', progress: { index: 1, total: 2, title: 'Alpha Corp', fraction: 0 } };
+    const r = render();
+    selectRow(r, 0);
+    const toggle = findSelectAllToggle(r);
+    expect(toggle.props.disabled).toBe(true);
+    act(() => { toggle.props.onPress(); });
+    // Still only the one row selected — a broken guard would have selected
+    // every exportable report (both mockReports) instead.
+    const selectedCount = r.root.findAllByType(ReportListCard).filter(c => c.props.selected).length;
+    expect(selectedCount).toBe(1);
+  });
+
+  it('keeps the selection after a run and Done returns to the selection bar', () => {
+    mockPhase = { status: 'done', result: { shareUri: 'u', succeeded: 1, failures: [], skippedPhotos: 2, cancelled: false } };
+    const r = render();
+    selectRow(r, 0);
+    // A single renderFooter() call, reused for both the text assertion and
+    // the onDismiss() interaction — calling renderFooter() a second time
+    // from inside the act() below hit the same nested-act issue described
+    // above.
+    const footer = renderFooter();
+    expect(JSON.stringify(footer.toJSON())).toContain('1 report generated, 2 photos not downloaded');
+    act(() => footer.root.findByType(ExportProgressBar).props.onDismiss());
+    expect(mockReset).toHaveBeenCalled();
+  });
+
+  it('Retry failed re-runs only the failed reports', async () => {
+    mockPhase = { status: 'done', result: { shareUri: null, succeeded: 0, failures: [{ key: 'inspection-r2', title: 'x', reason: 'y' }], skippedPhotos: 0, cancelled: false } };
+    const r = render();
+    selectRow(r, 0);
+    selectRow(r, 1);
+    const footer = renderFooter();
+    await act(async () => { footer.root.findByType(ExportProgressBar).props.onRetry(); });
+    expect(mockStart).toHaveBeenCalledWith([expect.objectContaining({ key: 'inspection-r2' })], expect.anything());
+  });
+
+  // Regression coverage: a mixed Water+Air selection, confirmed while r1
+  // (water) is the first selected item, so sheetType (and the save) are
+  // keyed on water_monitoring. Only r2 (air_monitoring) fails and gets
+  // retried — a bug fixed here once saved the confirmed approvers under
+  // items[0] of whatever runExport was called with, which for THIS retry
+  // is r2 alone, misattributing the Water-prefilled approvers to
+  // air_monitoring. sheetType (captured once, in openSheet) is what
+  // save() must key off regardless — and a retry must not re-save at all,
+  // since it's re-sending signatories already saved at the original
+  // confirm, not a fresh one.
+  it('keeps saving under the type the sheet was confirmed for when a retry only re-sends a different-typed report, and never re-saves on retry', async () => {
+    const r = render();
+    selectRow(r, 0); // r1: water_monitoring
+    selectRow(r, 1); // r2: air_monitoring
+    const generate = renderFooter().root.findAllByType(Button).find(b => b.props.label === 'Generate')!;
+    await act(async () => { generate.props.onPress(); });
+    const s = { inspectorName: 'J', inspectorPosition: 'E', supervisorName: 'M', supervisorPosition: 'C', recommendingName: 'R', recommendingPosition: 'RP', approverName: 'AP', approverPosition: 'APP', additionalInspectors: [] };
+    await act(async () => { r.root.findByType(SignatorySheet).props.onConfirm(s); });
+    expect(mockSignatorySave).toHaveBeenCalledTimes(1);
+    expect(mockSignatorySave).toHaveBeenCalledWith(s, 'inspection', 'water_monitoring');
+
+    // Only r2 (air_monitoring) failed. mockPhase is a plain mock variable,
+    // not React state, so the component needs an explicit re-render (same
+    // props) to pick up the change before the retry button reflects it.
+    mockPhase = { status: 'done', result: { shareUri: null, succeeded: 1, failures: [{ key: 'inspection-r2', title: 'x', reason: 'y' }], skippedPhotos: 0, cancelled: false } };
+    await act(async () => { r.update(<ExportReportsTab />); });
+    const footer = renderFooter();
+    await act(async () => { footer.root.findByType(ExportProgressBar).props.onRetry(); });
+
+    expect(mockStart).toHaveBeenLastCalledWith([expect.objectContaining({ key: 'inspection-r2' })], s);
+    // Still exactly once, still water_monitoring — the retry neither
+    // re-saved nor misattributed the save to air_monitoring.
+    expect(mockSignatorySave).toHaveBeenCalledTimes(1);
+    expect(mockSignatorySave).toHaveBeenCalledWith(s, 'inspection', 'water_monitoring');
+  });
+
+  it('Retry failed re-runs the whole selection when the failure is the synthetic save/share entry', async () => {
+    // exportReports.ts pushes { key: 'export', ... } when saving/sharing the
+    // whole export fails, after every per-item report already rendered — it
+    // matches no item's key. Filtering selectedItems by failedKeys against
+    // that entry alone would produce an empty list, and runExport([]) resets
+    // the export dir and reports 0 done, silently discarding the work.
+    mockPhase = {
+      status: 'done',
+      result: { shareUri: null, succeeded: 2, failures: [{ key: 'export', title: 'Saving the export', reason: 'disk full' }], skippedPhotos: 0, cancelled: false },
+    };
+    const r = render();
+    selectRow(r, 0);
+    selectRow(r, 1);
+    const footer = renderFooter();
+    await act(async () => { footer.root.findByType(ExportProgressBar).props.onRetry(); });
+    expect(mockStart).toHaveBeenCalledWith(
+      [expect.objectContaining({ key: 'inspection-r1' }), expect.objectContaining({ key: 'inspection-r2' })],
+      expect.anything(),
+    );
+  });
+
+  it('locks the search field while a run is in flight', () => {
+    mockPhase = { status: 'running', progress: { index: 1, total: 2, title: 'Alpha Corp', fraction: 0 } };
+    const r = render();
+    const search = r.root.findByProps({ placeholder: 'Search by establishment name...' });
+    expect(search.props.editable).toBe(false);
+    // The wrapper around the search field gets the same reduced-emphasis
+    // treatment as the filter button and Select all while a run is in
+    // flight — see styles.controlDisabled.
+    expect(search.parent!.props.style).toEqual(
+      expect.arrayContaining([expect.objectContaining({ opacity: 0.55 })]),
+    );
+  });
+});
+
+describe('a report type with no template', () => {
+  const tsd: AllReportItem = { ...mockReports[0], key: 'inspection-r9', reportId: 'r9', reportType: 'hazwaste_tsd', title: 'Hazardous Waste TSD' };
+
+  beforeEach(() => {
+    mockPhase = { status: 'idle' };
+    mockUseReportBrowser.mockReset();
+  });
+
+  it('cannot be selected and says why; Select all skips it', () => {
+    mockUseReportBrowser.mockImplementation(() => makeBrowserReturn({ reports: [mockReports[0], tsd] }));
+    const r = render();
+    const card = r.root.find(n => n.type === ReportListCard && (n.props as { item: AllReportItem }).item.key === tsd.key);
+    expect(card.props.selectDisabled).toBe(true);
+    expect(card.props.selectDisabledReason).toBe('No template yet');
+    act(() => { r.root.findByProps({ accessibilityLabel: 'Select all reports' }).props.onPress(); });
+    expect(footerText()).toContain('1 selected');
   });
 });

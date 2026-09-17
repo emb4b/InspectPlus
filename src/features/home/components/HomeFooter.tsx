@@ -11,6 +11,16 @@ interface HomeFooterProps {
   showCredits?: boolean;
 }
 
+// The plain bar's height on every authenticated screen (showCredits=false —
+// the login page's credits variant is taller and irrelevant there). This is
+// the number any other chrome math (e.g. the export sheet's footer) must use
+// to line up with HomeFooter — exported so styles.bar can't drift from it.
+export const HOME_FOOTER_BAR_HEIGHT = 20;
+const BAR_HEIGHT = HOME_FOOTER_BAR_HEIGHT;
+// The credits footer's own vertical padding — unrelated to the plain bar
+// above; nothing outside this file should need it.
+const CREDITS_FOOTER_PADDING_VERTICAL = 4;
+
 export const HomeFooter: React.FC<HomeFooterProps> = ({ showCredits = false }) => {
   // The one place the running version is visible - the recovery guide and
   // support both ask for it, and the footer is on every screen including
@@ -49,12 +59,12 @@ export const HomeFooter: React.FC<HomeFooterProps> = ({ showCredits = false }) =
 
 const styles = StyleSheet.create({
   footer: {
-    paddingVertical: 4,
+    paddingVertical: CREDITS_FOOTER_PADDING_VERTICAL,
     paddingHorizontal: 16,
     alignItems: 'center',
   },
   bar: {
-    height: 20,
+    height: BAR_HEIGHT,
   },
   line: {
     fontSize: 7.5,
@@ -69,8 +79,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 10,
     top: 0,
-    height: 20,
-    lineHeight: 20,
+    height: BAR_HEIGHT,
+    lineHeight: BAR_HEIGHT,
     fontSize: 9,
     fontVariant: ['tabular-nums'],
     color: 'rgba(255,255,255,0.7)',

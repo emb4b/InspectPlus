@@ -17,7 +17,7 @@ const NETWORK_TIMEOUT_MS = 20000;
 // which only accepts a local file:// uri, never a remote URL. Reuses
 // whatever's already on-device if present; otherwise pulls the bytes down
 // from a signed URL into a temp cache file first.
-async function resolveLocalFileUri(attachment: Attachment): Promise<string> {
+export async function resolveLocalFileUri(attachment: Pick<Attachment, 'attachmentId' | 'localUri' | 'storagePath'>): Promise<string> {
   if (attachment.localUri) {
     const file = new File(attachment.localUri);
     if (file.exists) return attachment.localUri;
@@ -26,6 +26,14 @@ async function resolveLocalFileUri(attachment: Attachment): Promise<string> {
   if (!attachment.storagePath) {
     throw new Error('This photo has not finished uploading yet — nothing to download.');
   }
+
+  // Attachments are immutable once uploaded, so a cached copy downloaded for
+  // this id (by an earlier export or gallery save) is always the same bytes.
+  // Reuse it: downloadFileAsync refuses to overwrite an existing destination
+  // (ERR_DESTINATION_ALREADY_EXISTS), and this also lets a repeat export
+  // work offline.
+  const destination = new File(Paths.cache, `download-${attachment.attachmentId}.jpg`);
+  if (destination.exists) return destination.uri;
 
   const { data, error } = await withTimeout(
     supabase.storage.from(STORAGE_BUCKET).createSignedUrl(attachment.storagePath, 300),
@@ -36,13 +44,20 @@ async function resolveLocalFileUri(attachment: Attachment): Promise<string> {
     throw new Error('Could not reach the photo — check your connection and try again.');
   }
 
-  const destination = new File(Paths.cache, `download-${attachment.attachmentId}.jpg`);
-  const downloaded = await withTimeout(
-    File.downloadFileAsync(data.signedUrl, destination),
+  // Download to a side file and move it into place only once it's complete.
+  // On Android, downloadFileAsync writes straight into its destination with
+  // no temp file/atomic rename of its own — a crash or connection drop
+  // mid-download must not leave a truncated file at `destination` for the
+  // exists() check above to reuse forever.
+  const partial = new File(Paths.cache, `download-${attachment.attachmentId}.partial.jpg`);
+  if (partial.exists) partial.delete();
+  await withTimeout(
+    File.downloadFileAsync(data.signedUrl, partial),
     NETWORK_TIMEOUT_MS,
     'downloadFileAsync'
   );
-  return downloaded.uri;
+  partial.move(destination);
+  return destination.uri;
 }
 
 // Saves into a dedicated "InspectPlus" album rather than dumping straight

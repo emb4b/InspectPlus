@@ -10,5 +10,10 @@ module.exports = {
       files: ['jest.setup.js'],
       env: { jest: true },
     },
+    {
+      files: ['scripts/**/*.js'],
+      env: { node: true, jest: true },
+      rules: { '@typescript-eslint/no-require-imports': 'off' },
+    },
   ],
 };

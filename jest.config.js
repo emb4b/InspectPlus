@@ -5,5 +5,6 @@ module.exports = {
   moduleNameMapper: {
     '^react-native-reanimated$': 'react-native-reanimated/mock',
     '^react-native-worklets$': 'react-native-worklets/lib/module/mock',
+    '\\.docx$': '<rootDir>/jest.docxStub.js',
   },
 };
