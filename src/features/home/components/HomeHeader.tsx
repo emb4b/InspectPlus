@@ -16,6 +16,7 @@ import { runManagedSync, runResetAndRedownload } from '../../../services/sync/sy
 import { countPendingRecords } from '../../../db/sync/watermelonAdapter';
 import { UpdateRequiredError } from '../../../services/sync/appVersionGate';
 import { subscribeToUpdateRequired } from '../../../services/sync/syncEvents';
+import { showUpdateRequiredAlert } from '../../updates/updateRequiredAlert';
 import { SyncOptionsModal, SyncDirection } from './SyncOptionsModal';
 
 interface HomeHeaderProps {
@@ -63,10 +64,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
       );
     } catch (err) {
       if (err instanceof UpdateRequiredError) {
-        Alert.alert(
-          'Update required',
-          `This app version is no longer supported for sync. Please update to at least version ${err.minVersion}.`
-        );
+        showUpdateRequiredAlert(err.minVersion);
         return;
       }
       console.error('[HomeHeader] Sync failed:', err);
@@ -112,10 +110,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
               );
             } catch (err) {
               if (err instanceof UpdateRequiredError) {
-                Alert.alert(
-                  'Update required',
-                  `This app version is no longer supported for sync. Please update to at least version ${err.minVersion}. Nothing was changed.`,
-                );
+                showUpdateRequiredAlert(err.minVersion, 'Nothing was changed.');
                 return;
               }
               console.error('[HomeHeader] Reset and re-download failed:', err);
@@ -137,12 +132,7 @@ export const HomeHeader: React.FC<HomeHeaderProps> = ({
   // to report through — mirrors how other screens use
   // subscribeToSyncDataChanged for their own refetch-on-sync behavior.
   useEffect(() => {
-    return subscribeToUpdateRequired(minVersion => {
-      Alert.alert(
-        'Update required',
-        `This app version is no longer supported for sync. Please update to at least version ${minVersion}.`
-      );
-    });
+    return subscribeToUpdateRequired(minVersion => showUpdateRequiredAlert(minVersion));
   }, []);
 
   const handleLogout = async () => {
