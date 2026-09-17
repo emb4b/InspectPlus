@@ -130,6 +130,20 @@ jobs:
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
           fi
 
+      # The app reads Supabase's URL/key from EXPO_PUBLIC_* at startup and
+      # .env is gitignored, so a build whose EAS environment lacks them bakes
+      # in empty strings and force-closes on launch (v1.0.4-dev.56 did).
+      # Refuse to build rather than publish an APK that can't start.
+      - name: Check EAS environment variables
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          PROFILE: ${{ steps.meta.outputs.profile }}
+        run: |
+          npx eas-cli env:list --environment "$PROFILE" > env-list.txt
+          for name in EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY EXPO_PUBLIC_APP_ENV; do
+            grep -q "^\s*$name=" env-list.txt || { echo "::error::$name is not set in the EAS '$PROFILE' environment (eas env:create --environment $PROFILE --name $name ...)"; exit 1; }
+          done
+
       - name: Build on EAS (Android)
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
