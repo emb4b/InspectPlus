@@ -103,7 +103,7 @@ describe('EstablishmentHeaderCard button hierarchy', () => {
     const button = findButtonByLabel(r, 'Add Report');
     const style = flattenStyle(button.props.style);
     expect(style.minHeight).toBe(40); // md
-    expect(style.flex).toBe(1); // fullWidth
+    expect(style.flexGrow).toBe(1); // fullWidth (row parent: fills the row)
     expect(style.backgroundColor).not.toBe(undefined);
   });
 

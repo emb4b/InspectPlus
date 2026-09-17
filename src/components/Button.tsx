@@ -137,8 +137,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
   },
+  // Not `flex: 1`: that also sets flexBasis 0 along the parent's main axis,
+  // and every full-width Generate/Cancel sits in a *column*, where basis 0
+  // let Yoga collapse the button to its 40dp minHeight and crush the 18dp
+  // label line box into the 13dp left after padding and border — the label
+  // read as squeezed/clipped. alignSelf fills a column's width; flexGrow
+  // fills a row's. Neither touches the natural height.
   fullWidth: {
-    flex: 1,
+    alignSelf: 'stretch',
+    flexGrow: 1,
   },
   // Reduced emphasis rather than a different shape, so a disabled control
   // still reads as the same button.
