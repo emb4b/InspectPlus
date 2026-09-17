@@ -24,7 +24,19 @@ export interface ExportProgress {
   index: number;
   total: number;
   title: string;
+  // How far through the whole run we are, 0..1, advancing at every stage
+  // inside an item (loads, each photo, render) — not just at item starts.
+  // The bar draws this directly: a completed-items fraction sat at 0% for
+  // the entire run of a single-report export, which is the common case.
+  fraction: number;
 }
+
+// Rough share of an item's wall time spent in each stage. Photos dominate
+// (each one is decoded and resized), so they get most of the bar.
+const STAGE_LOADED = 0.2;
+const STAGE_PHOTOS = 0.6;
+
+const yieldToUi = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 
 export interface ExportOptions {
   signatories: Signatories;
@@ -65,19 +77,28 @@ export async function exportReports(items: ExportItem[], options: ExportOptions,
       break;
     }
     const item = items[i];
-    options.onProgress?.({ index: i + 1, total: items.length, title: item.estabName });
+    const report = (withinItem: number) =>
+      options.onProgress?.({ index: i + 1, total: items.length, title: item.estabName, fraction: (i + withinItem) / items.length });
+    report(0);
     try {
       const entry = templateFor(item.kind, item.reportType);
       if (!entry) throw new Error(`No template for ${item.title} yet`);
       const [template, bundle] = await Promise.all([ports.loadTemplate(entry), ports.loadBundle(item)]);
+      report(STAGE_LOADED);
       const data = mapBundle(bundle, { signatories: options.signatories });
       const images: ImageInput[] = [];
-      for (const photo of bundle.photos) {
-        const image = await ports.preparePhoto(photo);
+      for (let p = 0; p < bundle.photos.length; p += 1) {
+        const image = await ports.preparePhoto(bundle.photos[p]);
         if (image) images.push(image);
         else skippedPhotos += 1;
+        report(STAGE_LOADED + STAGE_PHOTOS * ((p + 1) / bundle.photos.length));
       }
+      // render() is synchronous and blocks the JS thread for the whole
+      // docx build; without a tick here the progress reported above never
+      // reaches the screen for a report with no photos to await.
+      await yieldToUi();
       rendered.push({ name: names[i], bytes: ports.render(template, data, images) });
+      report(1);
     } catch (e) {
       failures.push({ key: item.key, title: `${item.title} — ${item.estabName}`, reason: reason(e) });
     }

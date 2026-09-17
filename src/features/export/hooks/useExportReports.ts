@@ -27,7 +27,7 @@ export function useExportReports() {
       if (running.current) return;
       running.current = true;
       cancelled.current = false;
-      setPhase({ status: 'running', progress: { index: 0, total: items.length, title: '' } });
+      setPhase({ status: 'running', progress: { index: 0, total: items.length, title: '', fraction: 0 } });
       try {
         const result = await exportReports(
           items,

@@ -40,8 +40,25 @@ describe('exportReports', () => {
     expect(written.map(w => w.name)).toEqual(['Water-Monitoring-Alpha-Water-2026-09-05.docx']);
     expect(shared).toEqual([{ uri: 'file:///cache/exports/Water-Monitoring-Alpha-Water-2026-09-05.docx', mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }]);
     expect(result).toEqual({ shareUri: shared[0].uri, succeeded: 1, failures: [], skippedPhotos: 1, cancelled: false });
-    expect(progress).toEqual([{ index: 1, total: 1, title: 'Alpha Water' }]);
+    // Progress is a fraction of the whole run that advances inside the
+    // item — loads, each photo, render — not just once at its start.
+    // Before this, a single-report export drew an empty bar for its whole
+    // run: the bar showed completed items, and there never were any.
+    expect(progress.length).toBeGreaterThan(2);
+    const fractions = progress.map(p => (p as { fraction: number }).fraction);
+    expect(fractions[0]).toBe(0);
+    expect(fractions[fractions.length - 1]).toBe(1);
+    fractions.forEach((f, i) => { if (i > 0) expect(f).toBeGreaterThanOrEqual(fractions[i - 1]); });
+    expect(progress.every(p => (p as { index: number; total: number; title: string }).index === 1 && (p as { total: number }).total === 1 && (p as { title: string }).title === 'Alpha Water')).toBe(true);
     expect(ports.render).toHaveBeenCalledWith(new Uint8Array([1]), expect.objectContaining({ gi_establishment_name: expect.stringContaining('Alpha') }), [expect.objectContaining({ id: 'a1' })]);
+  });
+
+  it('starts each item at its share of the run, so the bar keeps its place across items', async () => {
+    const { ports } = makePorts();
+    const progress: { index: number; fraction: number }[] = [];
+    await exportReports([item('r1'), item('r2')], { signatories, onProgress: p => progress.push(p) }, ports);
+    expect(progress.find(p => p.index === 2)?.fraction).toBe(0.5);
+    expect(progress[progress.length - 1]).toMatchObject({ index: 2, fraction: 1 });
   });
 
   it('zips several and disambiguates duplicate names', async () => {

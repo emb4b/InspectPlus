@@ -38,12 +38,12 @@ describe('useExportReports', () => {
     expect(get().phase).toEqual({ status: 'idle' });
     let resolve!: (r: unknown) => void;
     mockExport.mockImplementation((_items, options) => {
-      options.onProgress({ index: 1, total: 2, title: 'Alpha' });
+      options.onProgress({ index: 1, total: 2, title: 'Alpha', fraction: 0 });
       return new Promise(r => { resolve = r; });
     });
     let run!: Promise<void>;
     act(() => { run = get().start([item], signatories); });
-    expect(get().phase).toEqual({ status: 'running', progress: { index: 1, total: 2, title: 'Alpha' } });
+    expect(get().phase).toEqual({ status: 'running', progress: { index: 1, total: 2, title: 'Alpha', fraction: 0 } });
     await act(async () => { resolve({ shareUri: 'u', succeeded: 1, failures: [], skippedPhotos: 0, cancelled: false }); await run; });
     expect(get().phase).toEqual({ status: 'done', result: { shareUri: 'u', succeeded: 1, failures: [], skippedPhotos: 0, cancelled: false } });
   });

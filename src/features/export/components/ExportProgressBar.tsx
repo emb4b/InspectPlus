@@ -20,8 +20,7 @@ interface ExportProgressBarProps {
 // dismissed. Registered through useScreenFooter by ExportReportsTab.
 export const ExportProgressBar: React.FC<ExportProgressBarProps> = ({ phase, onCancel, onRetry, onDismiss }) => {
   if (phase.status === 'running') {
-    const { index, total, title } = phase.progress;
-    const fraction = total > 0 ? Math.max(0, index - 1) / total : 0;
+    const { index, total, title, fraction } = phase.progress;
     return (
       <View style={styles.bar}>
         <Text style={styles.heading}>{index > 0 ? `Generating ${index} of ${total}` : 'Preparing…'}</Text>

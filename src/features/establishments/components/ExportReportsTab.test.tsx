@@ -637,7 +637,7 @@ describe('the Generate flow', () => {
   });
 
   it('shows the progress bar instead of the selection bar while running, and Cancel cancels', () => {
-    mockPhase = { status: 'running', progress: { index: 1, total: 2, title: 'Alpha Corp' } };
+    mockPhase = { status: 'running', progress: { index: 1, total: 2, title: 'Alpha Corp', fraction: 0.3 } };
     const r = render();
     selectRow(r, 0);
     const footer = renderFooter();
@@ -647,8 +647,20 @@ describe('the Generate flow', () => {
     expect(mockCancel).toHaveBeenCalled();
   });
 
+  it('fills the track from the run fraction, not from the count of finished items', () => {
+    // A single-report export never has a finished item while running, so a
+    // completed-count bar sat at 0% for the whole run.
+    mockPhase = { status: 'running', progress: { index: 1, total: 1, title: 'Alpha Corp', fraction: 0.6 } };
+    const r = render();
+    selectRow(r, 0);
+    const fill = renderFooter().root.find(
+      n => n.type === View && flattenStyle(n.props.style).backgroundColor === Colors.green && typeof flattenStyle(n.props.style).width === 'string',
+    );
+    expect(flattenStyle(fill.props.style).width).toBe('60%');
+  });
+
   it('freezes Select all while a run is in flight, and dims the control', () => {
-    mockPhase = { status: 'running', progress: { index: 1, total: 2, title: 'Alpha Corp' } };
+    mockPhase = { status: 'running', progress: { index: 1, total: 2, title: 'Alpha Corp', fraction: 0 } };
     const r = render();
     selectRow(r, 0);
     const toggle = findSelectAllToggle(r);
@@ -742,7 +754,7 @@ describe('the Generate flow', () => {
   });
 
   it('locks the search field while a run is in flight', () => {
-    mockPhase = { status: 'running', progress: { index: 1, total: 2, title: 'Alpha Corp' } };
+    mockPhase = { status: 'running', progress: { index: 1, total: 2, title: 'Alpha Corp', fraction: 0 } };
     const r = render();
     const search = r.root.findByProps({ placeholder: 'Search by establishment name...' });
     expect(search.props.editable).toBe(false);
