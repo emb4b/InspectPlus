@@ -31,6 +31,8 @@ import {
   ExportReportsTabHandle,
 } from '../../features/establishments/components/ExportReportsTab';
 import { subscribeToSyncDataChanged } from '../../services/sync/syncEvents';
+import { useUpdateCheck } from '../../features/updates/useUpdateCheck';
+import { UpdateBanner } from '../../features/updates/UpdateBanner';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -59,6 +61,7 @@ export default function HomeScreen() {
   const { fullName } = useAuthContext();
   const { width: pageWidth } = useWindowDimensions();
   const { reduced } = useMotion();
+  const { update, dismiss: dismissUpdate } = useUpdateCheck();
   const [activeTab, setActiveTab] = useState<HomeTab>('manageReports');
   // Pages mount the first time they're shown and stay mounted after, so a
   // swipe back is instant and keeps that tab's filters/scroll — but a page
@@ -201,6 +204,10 @@ export default function HomeScreen() {
           {getFormattedDate()} · {currentTime} · EMB Region 4-B
         </Text>
       </View>
+
+      {/* Sits between the greeting and the tabs so it's seen on every launch
+          but never covers the content an inspector came for. */}
+      {update && <UpdateBanner version={update.version} url={update.url} onDismiss={() => { void dismissUpdate(); }} />}
 
       {/* Sticky tab bar */}
       <HomeTabs activeTab={activeTab} onTabChange={handleTabPress} position={position} />

@@ -21,6 +21,8 @@ import { EmptyState } from '../../../components/EmptyState';
 // registers with it — the same "import the mocked reference" approach as the
 // three tab components above.
 import { subscribeToSyncDataChanged } from '../../../services/sync/syncEvents';
+import { useUpdateCheck } from '../../updates/useUpdateCheck';
+import { UpdateBanner } from '../../updates/UpdateBanner';
 
 type Renderer = TestRenderer.ReactTestRenderer;
 
@@ -30,6 +32,12 @@ jest.mock('../../../core/providers/AuthProvider', () => ({
 
 jest.mock('../../../services/sync/syncEvents', () => ({
   subscribeToSyncDataChanged: jest.fn(() => () => {}),
+}));
+
+// The update check talks to GitHub and AsyncStorage; here it's a switch the
+// tests flip to prove Home shows the banner only when a newer APK exists.
+jest.mock('../../updates/useUpdateCheck', () => ({
+  useUpdateCheck: jest.fn(() => ({ update: null, dismiss: jest.fn() })),
 }));
 
 // The reanimated jest mock (jest.config's moduleNameMapper) predates
@@ -192,6 +200,7 @@ const triggerPullToRefresh = async (r: Renderer, tab: string) => {
 };
 
 beforeEach(() => {
+  (useUpdateCheck as jest.Mock).mockReturnValue({ update: null, dismiss: jest.fn() });
   mockScrollTo.mockClear();
   (useReducedMotion as jest.Mock).mockReturnValue(false);
   mockManageEstablishmentsRefresh.mockClear();
@@ -371,6 +380,22 @@ describe('HomeScreen', () => {
       switchTab(r, 'Export Inspection Reports');
       switchTab(r, 'Manage Reports');
       expect(exportFocused(r)).toBe(false);
+    });
+  });
+
+  describe('update banner', () => {
+    it('shows no banner when there is nothing newer', () => {
+      expect(render().root.findAllByType(UpdateBanner)).toHaveLength(0);
+    });
+
+    it('shows the banner above the tabs when a newer APK is published, wired to dismiss', () => {
+      const dismiss = jest.fn();
+      (useUpdateCheck as jest.Mock).mockReturnValue({ update: { version: '1.1.0', url: 'https://example.test/a.apk' }, dismiss });
+      const r = render();
+      const banner = r.root.findByType(UpdateBanner);
+      expect(banner.props).toMatchObject({ version: '1.1.0', url: 'https://example.test/a.apk' });
+      act(() => { banner.props.onDismiss(); });
+      expect(dismiss).toHaveBeenCalledTimes(1);
     });
   });
 });
